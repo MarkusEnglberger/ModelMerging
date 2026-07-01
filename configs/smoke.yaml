@@ -1,0 +1,31 @@
+# Code smoke test (proposal POC step 1):
+# DistilRoBERTa on MRPC + STS-B (related sentence-pair tasks). Small/fast.
+# Experts are fine-tuned locally first (scripts/train_expert.py) from
+# distilroberta-base so the task vectors share theta_0 = distilroberta-base.
+base_model: distilroberta-base
+tag: smoke_distilroberta
+output_dir: results/smoke
+device: cuda
+seed: 0
+
+experts:
+  - {name: mrpc, checkpoint: experts/distilroberta-mrpc, lam: 0.4}
+  - {name: stsb, checkpoint: experts/distilroberta-stsb, lam: 0.4}
+
+refine:
+  steps: 3
+  lr: 1.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist
+  aggregated: false
+
+data:
+  n_probe: 32
+  max_length: 128
+  eval_batch_size: 64
+  probe_seed: 0
+  class_balanced: true

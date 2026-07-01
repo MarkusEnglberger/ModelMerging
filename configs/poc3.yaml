@@ -1,0 +1,32 @@
+# First convincing three-task result (proposal POC step 2):
+# RoBERTa-base on MRPC + STS-B (related sentence-pair) + SST-2 (single-sentence control).
+# Experts are public textattack checkpoints, all fine-tuned from roberta-base,
+# so the task vectors share theta_0 = roberta-base.
+base_model: roberta-base
+tag: poc3_roberta
+output_dir: results/poc3
+device: cuda
+seed: 0
+
+experts:
+  - {name: mrpc, checkpoint: textattack/roberta-base-MRPC, lam: 0.3}
+  - {name: stsb, checkpoint: textattack/roberta-base-STS-B, lam: 0.3}
+  - {name: sst2, checkpoint: textattack/roberta-base-SST-2, lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 1.0
+  clip_frac: 0.5
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 128
+  eval_batch_size: 64
+  probe_seed: 0
+  class_balanced: true

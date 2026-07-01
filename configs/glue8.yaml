@@ -1,0 +1,38 @@
+# Full GLUE-8 merge (proposal's scale-up): CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE.
+# All experts from JeremiahZ (one consistent roberta-base recipe + label conventions, all
+# share theta_0 = roberta-base). Switched from mixed textattack because textattack's MNLI
+# checkpoint was broken (expert acc 0.287 < base, almost certainly a label-order mismatch),
+# which poisoned both its NormRet denominator and the merge direction.
+base_model: roberta-base
+tag: glue8
+output_dir: results/glue8
+device: cuda
+seed: 0
+
+experts:
+  - {name: cola, checkpoint: JeremiahZ/roberta-base-cola, lam: 0.3}
+  - {name: sst2, checkpoint: JeremiahZ/roberta-base-sst2, lam: 0.3}
+  - {name: mrpc, checkpoint: JeremiahZ/roberta-base-mrpc, lam: 0.3}
+  - {name: stsb, checkpoint: JeremiahZ/roberta-base-stsb, lam: 0.3}
+  - {name: qqp,  checkpoint: JeremiahZ/roberta-base-qqp,  lam: 0.3}
+  - {name: mnli, checkpoint: JeremiahZ/roberta-base-mnli, lam: 0.3}
+  - {name: qnli, checkpoint: JeremiahZ/roberta-base-qnli, lam: 0.3}
+  - {name: rte,  checkpoint: JeremiahZ/roberta-base-rte,  lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 16.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 128
+  eval_batch_size: 128
+  probe_seed: 0
+  class_balanced: true

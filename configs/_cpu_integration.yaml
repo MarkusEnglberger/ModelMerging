@@ -1,0 +1,12 @@
+# Tiny CPU integration check (NOT a real result). Uses distilroberta-base as
+# both base and "experts" so task vectors are ~0; only exercises code paths.
+base_model: distilroberta-base
+tag: cpu_integration
+output_dir: results/_debug
+device: cpu
+seed: 0
+experts:
+  - {name: mrpc, checkpoint: distilroberta-base, lam: 0.4}
+  - {name: stsb, checkpoint: distilroberta-base, lam: 0.4}
+refine: {steps: 1, lr: 1.0, clip_frac: 1.0, gate_mode: coordinate}
+data: {n_probe: 4, max_length: 64, eval_batch_size: 8, max_eval: 16}

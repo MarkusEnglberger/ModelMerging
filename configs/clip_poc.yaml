@@ -1,0 +1,37 @@
+# CLIP/ViT vision-track proof-of-concept (proposal H5, secondary benchmark).
+# Three small tasks from the standard task-vector image suite:
+#   EuroSAT (satellite, 10 cls) + GTSRB (traffic signs, 43 cls) + MNIST (digits).
+# Backbone theta_0 = openai/clip-vit-base-patch32 vision tower; experts are the
+# FusionBench/tanganke fine-tuned CLIPVisionModel checkpoints (resolved from the
+# task name when `checkpoint` is null). The mergeable encoder is the vision tower;
+# each task keeps a frozen zero-shot text head.
+base_model: openai/clip-vit-base-patch32
+modality: clip
+tag: clip_poc
+output_dir: results/clip_poc
+device: cuda
+seed: 0
+
+experts:
+  - {name: eurosat, lam: 0.3}
+  - {name: gtsrb,   lam: 0.3}
+  - {name: mnist,   lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 1.0
+  clip_frac: 0.5
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist
+  aggregated: false
+
+data:
+  n_probe: 64
+  eval_batch_size: 128
+  eval_num_workers: 8  # parallel image decode/resize (8 CPUs allocated)
+  probe_seed: 0
+  class_balanced: true
+  max_eval: null

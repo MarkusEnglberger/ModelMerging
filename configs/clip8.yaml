@@ -1,0 +1,41 @@
+# Full CLIP/ViT task-vector suite (proposal H5 scale-up): the 8 standard
+# image-classification tasks (SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB,
+# MNIST, DTD). Backbone theta_0 = openai/clip-vit-base-patch32 vision tower;
+# experts are the FusionBench/tanganke fine-tuned CLIPVisionModel checkpoints
+# (resolved from the task name). Mergeable encoder = vision tower; each task
+# keeps a frozen zero-shot text head.
+base_model: openai/clip-vit-base-patch32
+modality: clip
+tag: clip8
+output_dir: results/clip8
+device: cuda
+seed: 0
+
+experts:
+  - {name: sun397,   lam: 0.3}
+  - {name: cars,     lam: 0.3}
+  - {name: resisc45, lam: 0.3}
+  - {name: eurosat,  lam: 0.3}
+  - {name: svhn,     lam: 0.3}
+  - {name: gtsrb,    lam: 0.3}
+  - {name: mnist,    lam: 0.3}
+  - {name: dtd,      lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 32.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  eval_batch_size: 128
+  eval_num_workers: 8  # parallel image decode/resize (8 CPUs allocated)
+  probe_seed: 0
+  class_balanced: true
+  max_eval: null
