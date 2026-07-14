@@ -1,0 +1,278 @@
+#!/usr/bin/env python
+"""Merge baselines vs. APR refinement on top of each merge init.
+
+All families are built from the SAME loaded experts / replay buffers / heads and
+scored with the same NormRet, so the only thing that differs is how theta^(0) is
+constructed and what (if anything) refines it.
+
+  Checkpoint-only (data-free)
+    merge:TA@l<lam>            theta_0 + sum_i lam tau_i                (task arithmetic)
+    merge:TIES@d,l             trim -> sign-elect -> disjoint mean      (Yadav 2023)
+    merge:DARE@d,s             drop+rescale -> task arithmetic          (CONTROL, Yu 2023)
+    merge:DARETIES@dd,t,l      drop+rescale -> TIES                     (Yu 2023 x Yadav 2023)
+    merge:BC@d,o,l             magnitude-band mask -> task arithmetic   (Breadcrumbs, Davari 2023)
+  Data-dependent, label-free
+    merge:ADA-{task,layer}     unlabeled test-time entropy minimisation (AdaMerging, Yang 2024)
+  Labeled replay
+    apr:from=<init>@lr         Algorithm 1 started from that init
+
+Two questions this answers:
+  1. Does APR beat the best merge that uses no labels at all?
+  2. Does APR *stack* on a better init, or has the better merge already captured
+     what the gate would fix?
+
+Note on the lr grid: APR's step and its trust region both scale with the
+expert distance |v_i| = |theta_i - theta_init|, which differs per init, so the
+optimal lr is init-dependent. Every init therefore gets the SAME lr grid and we
+report best-per-init (equal tuning budget). A grid centred on the TA optimum
+silently diverges for the other inits -- that bug invalidated the first run.
+
+DARE-alone is kept only as a control: its drop+rescale is expectation-preserving,
+so over ~10^8 coordinates it concentrates back onto plain task arithmetic. It
+isolates *sign election* as the active ingredient of TIES.
+"""
+
+import argparse
+import dataclasses
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from apr.config import ExperimentConfig
+from apr.pipeline import MergeContext, _log
+from apr.metrics import aggregate_retention
+from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ta_merge,
+                               dare_ties_merge, breadcrumbs_merge)
+from apr.taskvec import task_arithmetic_merge
+from apr.adamerging import adamerging
+from apr.models import pd_sub, pd_global_norm
+
+
+def eval_merge(ctx, state):
+    scores = ctx.eval_encoder(state)
+    nr = ctx.normret(scores)
+    return scores, nr, aggregate_retention(nr)
+
+
+def record(report, name, scores, nr, ag, disp, **extra):
+    report["methods"][name] = {"scores": scores, "normret": nr, "aggregate": ag,
+                               "displacement": disp, **extra}
+    _log(f"  -> {name}: mean={ag['mean_normret']:.3f} worst={ag['worst_normret']:.3f} "
+         f"disp={disp:.3f}")
+    return ag["mean_normret"]
+
+
+class Best:
+    """Track the best-scoring cell of one family (by mean NormRet)."""
+
+    def __init__(self, label):
+        self.label, self.mean, self.name, self.state = label, None, None, None
+
+    def offer(self, mean, name, state):
+        if self.mean is None or mean > self.mean:
+            self.mean, self.name, self.state = mean, name, state
+
+    def __bool__(self):
+        return self.state is not None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--n_probe", type=int, default=None)
+    # --- checkpoint-only grids ---
+    ap.add_argument("--ta_lams", type=float, nargs="*", default=[0.2, 0.3, 0.4, 0.5])
+    ap.add_argument("--ties_densities", type=float, nargs="*", default=[0.1, 0.2])
+    ap.add_argument("--ties_lams", type=float, nargs="*", default=[0.8, 1.0])
+    ap.add_argument("--dare_densities", type=float, nargs="*", default=[0.3])
+    ap.add_argument("--dare_seeds", type=int, nargs="*", default=[0, 1])
+    ap.add_argument("--dt_drops", type=float, nargs="*", default=[0.5])
+    ap.add_argument("--dt_trims", type=float, nargs="*", default=[0.1, 0.2])
+    ap.add_argument("--dt_lams", type=float, nargs="*", default=[0.8, 1.0])
+    ap.add_argument("--dt_seed", type=int, default=0)
+    ap.add_argument("--bc_densities", type=float, nargs="*", default=[0.1, 0.2])
+    ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01, 0.05])
+    ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.4])
+    # --- AdaMerging (label-free, data-dependent) ---
+    ap.add_argument("--ada_variants", nargs="*", default=["task", "layer"],
+                    choices=["task", "layer"])
+    ap.add_argument("--ada_steps", type=int, default=300)
+    ap.add_argument("--ada_lr", type=float, default=1e-3)
+    ap.add_argument("--ada_bs", type=int, default=16)
+    ap.add_argument("--ada_init_lam", type=float, default=0.3)
+    # AdaMerging holds one live DataLoader per task; with the CLIP config's
+    # eval_num_workers=8 that would fork 8*8=64 workers. Keep it small.
+    ap.add_argument("--ada_workers", type=int, default=0)
+    # eval_ds = standard transductive AdaMerging (unlimited unlabeled test inputs).
+    # probe_buffer = matched to APR's replay budget (same n_probe inputs, labels
+    # stripped), which is what the proposal's protocol actually asks for.
+    ap.add_argument("--ada_data", nargs="*", default=["eval_ds"],
+                    choices=["eval_ds", "probe_buffer"])
+    # --- APR on top ---
+    ap.add_argument("--refine_from", nargs="*",
+                    default=["ta", "ties", "dareties", "bc", "ada"],
+                    choices=["ta", "ties", "dare", "dareties", "bc", "ada"])
+    ap.add_argument("--apr_lrs", type=float, nargs="*", default=[2, 4, 8, 16])
+    ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
+    ap.add_argument("--skip_families", nargs="*", default=[],
+                    choices=["ta", "ties", "dare", "dareties", "bc", "ada"])
+    ap.add_argument("--out", default="results/compare/merge_baselines.json")
+    args = ap.parse_args()
+
+    cfg = ExperimentConfig.from_yaml(args.config)
+    if args.n_probe is not None:
+        cfg.data.n_probe = args.n_probe
+    ctx = MergeContext.build(cfg)
+    steps = args.steps if args.steps is not None else cfg.refine.steps
+    names = cfg.task_names
+
+    report = {"config": cfg.to_dict(), "tasks": names, "steps": steps,
+              "base": ctx.base_scores, "expert": ctx.expert_scores,
+              "grids": vars(args), "methods": {}}
+    skip = set(args.skip_families)
+
+    # ---- task arithmetic, lambda swept (the other families tune theirs, so must this) ----
+    ta = Best("TA")
+    if "ta" not in skip:
+        for lam in args.ta_lams:
+            state = task_arithmetic_merge(ctx.base_encoder, ctx.task_vectors,
+                                          {n: lam for n in names})
+            nm = f"merge:TA@l{lam:g}"
+            s, nr, ag = eval_merge(ctx, state)
+            ta.offer(record(report, nm, s, nr, ag,
+                            pd_global_norm(pd_sub(state, ctx.merged0)), lam=lam), nm, state)
+
+    # ---- TIES (combined tau reused across the lambda grid) ----
+    ties = Best("TIES")
+    if "ties" not in skip:
+        for d in args.ties_densities:
+            _log(f"\n[TIES] density={d:g}")
+            combined = ties_combined_tau(ctx.task_vectors, density=d)
+            for lam in args.ties_lams:
+                state = ties_merge(ctx.base_encoder, ctx.task_vectors, lam=lam,
+                                   density=d, combined=combined)
+                nm = f"merge:TIES@d{d:g},l{lam:g}"
+                s, nr, ag = eval_merge(ctx, state)
+                ties.offer(record(report, nm, s, nr, ag,
+                                  pd_global_norm(pd_sub(state, ctx.merged0)),
+                                  density=d, lam=lam), nm, state)
+
+    # ---- DARE alone (control: expectation-preserving => ~= TA) ----
+    dare = Best("DARE")
+    if "dare" not in skip:
+        for d in args.dare_densities:
+            for sd in args.dare_seeds:
+                state = dare_ta_merge(ctx.base_encoder, ctx.task_vectors, ctx.lambdas,
+                                      density=d, seed=sd)
+                nm = f"merge:DARE@d{d:g},s{sd}"
+                s, nr, ag = eval_merge(ctx, state)
+                dare.offer(record(report, nm, s, nr, ag,
+                                  pd_global_norm(pd_sub(state, ctx.merged0)),
+                                  density=d, seed=sd, note="control"), nm, state)
+
+    # ---- DARE-TIES ----
+    dt = Best("DARETIES")
+    if "dareties" not in skip:
+        for dd in args.dt_drops:
+            for tr in args.dt_trims:
+                for lam in args.dt_lams:
+                    state = dare_ties_merge(ctx.base_encoder, ctx.task_vectors, lam=lam,
+                                            drop_density=dd, trim_density=tr,
+                                            seed=args.dt_seed)
+                    nm = f"merge:DARETIES@dd{dd:g},t{tr:g},l{lam:g}"
+                    s, nr, ag = eval_merge(ctx, state)
+                    dt.offer(record(report, nm, s, nr, ag,
+                                    pd_global_norm(pd_sub(state, ctx.merged0)),
+                                    drop=dd, trim=tr, lam=lam), nm, state)
+
+    # ---- Model Breadcrumbs ----
+    bc = Best("BC")
+    if "bc" not in skip:
+        for d in args.bc_densities:
+            for o in args.bc_outliers:
+                for lam in args.bc_lams:
+                    state = breadcrumbs_merge(ctx.base_encoder, ctx.task_vectors,
+                                              {n: lam for n in names},
+                                              density=d, outlier_frac=o)
+                    nm = f"merge:BC@d{d:g},o{o:g},l{lam:g}"
+                    s, nr, ag = eval_merge(ctx, state)
+                    bc.offer(record(report, nm, s, nr, ag,
+                                    pd_global_norm(pd_sub(state, ctx.merged0)),
+                                    density=d, outlier=o, lam=lam), nm, state)
+
+    # ---- AdaMerging (label-free, uses unlabeled eval inputs: transductive) ----
+    ada = Best("ADA")
+    if "ada" not in skip:
+        for dkey in args.ada_data:
+            for variant in args.ada_variants:
+                _log(f"\n[AdaMerging-{variant}/{dkey}] entropy minimisation "
+                     f"({args.ada_steps} steps, lr={args.ada_lr})")
+                state, info = adamerging(
+                    ctx.base_encoder, ctx.task_vectors, ctx.per_task, names, ctx.device,
+                    layerwise=(variant == "layer"), steps=args.ada_steps, lr=args.ada_lr,
+                    batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
+                    num_workers=args.ada_workers, data_key=dkey, logger=_log)
+                tag = variant if dkey == "eval_ds" else f"{variant}-matched"
+                nm = f"merge:ADA-{tag}"
+                s, nr, ag = eval_merge(ctx, state)
+                ada.offer(record(report, nm, s, nr, ag,
+                                 pd_global_norm(pd_sub(state, ctx.merged0)),
+                                 adamerging=info), nm, state)
+
+    fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt, "bc": bc, "ada": ada}
+    report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
+    _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
+
+    # ---- APR on top of each init (same lr grid for every init = equal budget) ----
+    for key in args.refine_from:
+        fam = fams.get(key)
+        if not fam:
+            _log(f"[apr] skip from={key} (family not run)")
+            continue
+        init_label = fam.name.split(":", 1)[1]
+        best_mean = None
+        for lr in args.apr_lrs:
+            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr)
+            _log(f"\n===== APR from {init_label} @ lr{lr:g} "
+                 f"({rc.gate_mode}/clip={rc.clip_mode}/g{rc.clip_frac:g}) =====")
+            refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
+            s, nr, ag = eval_merge(ctx, refined)
+            gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
+            nm = f"apr:from={key}@lr{lr:g}"
+            m = record(report, nm, s, nr, ag,
+                       pd_global_norm(pd_sub(refined, fam.state)),
+                       init=init_label, lr=lr, gate_density=gd)
+            if best_mean is None or m > best_mean:
+                best_mean = m
+                report[f"best_apr_from_{key}"] = nm
+        # a peak at the grid edge means the optimum was not bracketed
+        if best_mean is not None and args.apr_lrs:
+            best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1])
+            if best_lr == min(args.apr_lrs):
+                _log(f"[warn] APR from {key} peaked at the LOW EDGE (lr={best_lr:g}) "
+                     f"-- true optimum may be lower; result is a lower bound.")
+            elif best_lr == max(args.apr_lrs):
+                _log(f"[warn] APR from {key} peaked at the HIGH EDGE (lr={best_lr:g}).")
+
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    with open(args.out, "w") as f:
+        json.dump(report, f, indent=2)
+
+    print("\n" + "=" * 108)
+    print(f"{'method':<30} " + " ".join(f"{t[:7]:>7}" for t in names) +
+          f" | {'mean':>6} {'worst':>6} {'||disp||':>8}")
+    print("-" * 108)
+    for n, d in sorted(report["methods"].items(),
+                       key=lambda kv: -kv[1]["aggregate"]["mean_normret"]):
+        a = d["aggregate"]
+        print(f"{n:<30} " + " ".join(f"{d['normret'][t]:>7.3f}" for t in names) +
+              f" | {a['mean_normret']:>6.3f} {a['worst_normret']:>6.3f} {d['displacement']:>8.3f}")
+    print("=" * 108)
+    print("(normret: 0=pretrained floor, 1=expert ceiling; higher is better)")
+    print(f"[done] -> {args.out}")
+
+
+if __name__ == "__main__":
+    main()

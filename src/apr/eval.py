@@ -12,7 +12,13 @@ from .metrics import score_predictions
 @torch.no_grad()
 def evaluate_task(model, eval_ds, spec: TaskSpec, collator, batch_size: int,
                   device: str, num_workers: int = 0) -> Dict[str, float]:
-    """Run the model over the eval split and return the GLUE-convention score."""
+    """Run the model over the eval split and return the GLUE-convention score.
+
+    Specs with ``eval_kind == "generation"`` (the causal-LM track) are scored by
+    free generation + a task metric function instead of logits."""
+    if getattr(spec, "eval_kind", "classification") == "generation":
+        from .causal_lm import evaluate_generation
+        return evaluate_generation(model, eval_ds, spec, batch_size, device)
     model.eval()
     model.to(device)
     loader = DataLoader(eval_ds, batch_size=batch_size, collate_fn=collator,

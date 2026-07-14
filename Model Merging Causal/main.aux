@@ -1,0 +1,114 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{wortsman2022modelsoups}
+\citation{matena2022fisher}
+\citation{ilharco2022taskarithmetic}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Related Work and Background}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Model merging and weight-space averaging.}{1}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Task vectors.}{1}{section*.2}\protected@file@percent }
+\citation{yadav2023ties}
+\citation{yu2023dare}
+\citation{deep2024della}
+\citation{davari2023breadcrumbs}
+\citation{he2024localize}
+\citation{kong2024apl}
+\citation{jin2023regmean}
+\citation{yang2024adamerging}
+\citation{syed2024attributionpatching,kramar2024atpstar}
+\citation{lu2024twin}
+\citation{zeng2025taskvectorbases}
+\citation{tang2024fusionbench}
+\citation{wang2018glue}
+\citation{liu2019roberta}
+\citation{wang2019superglue,raffel2020t5}
+\citation{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}
+\@writefile{toc}{\contentsline {paragraph}{Interference-aware task-vector merging.}{2}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Data-dependent merging baselines.}{2}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Attribution patching.}{2}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Shared and task-specific structure.}{2}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Benchmark settings.}{2}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Methodology}{3}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Problem Setup}{3}{subsection.2.1}\protected@file@percent }
+\newlabel{eq:task-vector}{{3}{3}{Problem Setup}{equation.2.3}{}}
+\newlabel{eq:initial-merge}{{4}{3}{Problem Setup}{equation.2.4}{}}
+\newlabel{eq:task-loss}{{5}{3}{Problem Setup}{equation.2.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Trust-Region Replay Refinement}{3}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:replay-refinement}{{2.2}{3}{Trust-Region Replay Refinement}{subsection.2.2}{}}
+\newlabel{eq:naive-replay-gd}{{6}{3}{Trust-Region Replay Refinement}{equation.2.6}{}}
+\newlabel{eq:sequential-gradient}{{7}{4}{Trust-Region Replay Refinement}{equation.2.7}{}}
+\newlabel{eq:sequential-direction}{{8}{4}{Trust-Region Replay Refinement}{equation.2.8}{}}
+\newlabel{eq:sequential-mask}{{9}{4}{Trust-Region Replay Refinement}{equation.2.9}{}}
+\newlabel{eq:sequential-raw-update}{{10}{4}{Trust-Region Replay Refinement}{equation.2.10}{}}
+\newlabel{eq:clipped-update}{{11}{4}{Trust-Region Replay Refinement}{equation.2.11}{}}
+\newlabel{eq:sequential-single-task-update}{{12}{4}{Trust-Region Replay Refinement}{equation.2.12}{}}
+\newlabel{eq:sequential-sweep-update}{{13}{4}{Trust-Region Replay Refinement}{equation.2.13}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Sequential expert-direction-gated replay refinement}}{5}{algorithm.1}\protected@file@percent }
+\newlabel{alg:expert-gated-refinement}{{1}{5}{Trust-Region Replay Refinement}{algorithm.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}A Second Perspective: Attribution Patching in Parameter Space}{5}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:ap-view}{{2.3}{5}{A Second Perspective: Attribution Patching in Parameter Space}{subsection.2.3}{}}
+\newlabel{eq:ap-expert-direction}{{14}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.14}{}}
+\newlabel{eq:merge-to-expert-path}{{15}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.15}{}}
+\newlabel{eq:ap-gradient}{{16}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.16}{}}
+\newlabel{eq:ap-total}{{17}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.17}{}}
+\newlabel{eq:ap-coordinate}{{18}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.18}{}}
+\newlabel{eq:ap-gate}{{19}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.19}{}}
+\newlabel{eq:raw-update}{{20}{6}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.20}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Experimental Protocol}{6}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Primary diagnostic setting: RoBERTa GLUE-8.}{6}{section*.8}\protected@file@percent }
+\citation{sanh2019distilbert}
+\citation{wang2019superglue,raffel2020t5}
+\citation{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}
+\@writefile{toc}{\contentsline {paragraph}{Recommended proof-of-concept order.}{7}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Secondary benchmark settings.}{7}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Replay data.}{7}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Baselines.}{7}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Metrics.}{8}{section*.13}\protected@file@percent }
+\newlabel{eq:normalized-retention}{{21}{8}{Metrics}{equation.3.21}{}}
+\@writefile{toc}{\contentsline {paragraph}{Task-similarity and interference analysis.}{8}{section*.14}\protected@file@percent }
+\newlabel{eq:interference-matrix}{{22}{8}{Task-similarity and interference analysis}{equation.3.22}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Ablations and Diagnostics}{9}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Hypotheses}{9}{subsection.3.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Three-task RoBERTa-base proof of concept (MRPC, STS-B, SST-2; $n=64$, $S=5$). Mean normalized retention; best learning rate per family. Left: best configuration, mean $\pm $ std over five seeds. Right: a single-seed contrast at a large fixed learning rate, isolating the gate's effect.}}{10}{table.1}\protected@file@percent }
+\newlabel{tab:poc3}{{1}{10}{Three-task RoBERTa-base proof of concept (MRPC, STS-B, SST-2; $n=64$, $S=5$). Mean normalized retention; best learning rate per family. Left: best configuration, mean $\pm $ std over five seeds. Right: a single-seed contrast at a large fixed learning rate, isolating the gate's effect}{table.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Preliminary Results}{10}{section.4}\protected@file@percent }
+\newlabel{sec:results}{{4}{10}{Preliminary Results}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Three-task proof of concept.}{10}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{GLUE-8 scale-up.}{10}{section*.16}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces GLUE-8 (all eight tasks, RoBERTa-base, single seed). Best mean normalized retention per family (worst-task retention in parentheses); the task-arithmetic merge baseline is $0.320$ (worst $-0.175$).}}{11}{table.2}\protected@file@percent }
+\newlabel{tab:glue8}{{2}{11}{GLUE-8 (all eight tasks, RoBERTa-base, single seed). Best mean normalized retention per family (worst-task retention in parentheses); the task-arithmetic merge baseline is $0.320$ (worst $-0.175$)}{table.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{What the attribution gate is and is not doing.}{11}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{CLIP/ViT vision track.}{11}{section*.18}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Eight-task CLIP ViT-B/32 suite (single seed, $n=64$, $S=5$, $\gamma =1$, uniform $\lambda _i=0.3$). Best learning rate per family by mean normalized retention (Eq.~\eqref  {eq:normalized-retention}); worst-task retention in parentheses. The gated update is best on both, and is the only method keeping worst-task retention positive.}}{12}{table.3}\protected@file@percent }
+\newlabel{tab:clip8}{{3}{12}{Eight-task CLIP ViT-B/32 suite (single seed, $n=64$, $S=5$, $\gamma =1$, uniform $\lambda _i=0.3$). Best learning rate per family by mean normalized retention (Eq.~\eqref {eq:normalized-retention}); worst-task retention in parentheses. The gated update is best on both, and is the only method keeping worst-task retention positive}{table.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Per-task top-1 accuracy on the eight-task CLIP suite: zero-shot backbone, task expert, task-arithmetic merge, and the proposed gated refinement (APR, $\eta =8$). Refinement recovers most of the merge's interference loss, including on Cars and SUN397, which the merge had degraded below the zero-shot backbone.}}{12}{table.4}\protected@file@percent }
+\newlabel{tab:clip8pt}{{4}{12}{Per-task top-1 accuracy on the eight-task CLIP suite: zero-shot backbone, task expert, task-arithmetic merge, and the proposed gated refinement (APR, $\eta =8$). Refinement recovers most of the merge's interference loss, including on Cars and SUN397, which the merge had degraded below the zero-shot backbone}{table.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Replay budget and refinement horizon (CLIP/ViT).}{12}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Expected Contribution}{12}{section.5}\protected@file@percent }
+\bibcite{wang2018glue}{{1}{2018}{{Wang et~al.}}{{}}}
+\bibcite{liu2019roberta}{{2}{2019}{{Liu et~al.}}{{}}}
+\bibcite{wang2019superglue}{{3}{2019}{{Wang et~al.}}{{}}}
+\bibcite{raffel2020t5}{{4}{2020}{{Raffel et~al.}}{{}}}
+\bibcite{radford2021clip}{{5}{2021}{{Radford et~al.}}{{}}}
+\bibcite{sanh2019distilbert}{{6}{2019}{{Sanh et~al.}}{{}}}
+\bibcite{ilharco2022taskarithmetic}{{7}{2022}{{Ilharco et~al.}}{{}}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Replay-budget study on the eight-task CLIP suite (mean normalized retention; worst-task in parentheses). Best configuration per family; the gated update (APR) near-converges by $S=5\text  {--}10$ sweeps, while ordinary replay GD is given a longer horizon ($S=25\text  {--}35$) as a generous baseline. APR holds an ${\approx }\,+0.10$ mean advantage at every budget and is the only method with non-negative worst-task retention down to $n=16$.}}{13}{table.5}\protected@file@percent }
+\newlabel{tab:clipbudget}{{5}{13}{Replay-budget study on the eight-task CLIP suite (mean normalized retention; worst-task in parentheses). Best configuration per family; the gated update (APR) near-converges by $S=5\text {--}10$ sweeps, while ordinary replay GD is given a longer horizon ($S=25\text {--}35$) as a generous baseline. APR holds an ${\approx }\,+0.10$ mean advantage at every budget and is the only method with non-negative worst-task retention down to $n=16$}{table.5}{}}
+\bibcite{wortsman2022modelsoups}{{8}{2022}{{Wortsman et~al.}}{{}}}
+\bibcite{matena2022fisher}{{9}{2022}{{Matena and Raffel}}{{}}}
+\bibcite{jin2023regmean}{{10}{2023}{{Jin et~al.}}{{}}}
+\bibcite{yadav2023ties}{{11}{2023}{{Yadav et~al.}}{{}}}
+\bibcite{yu2023dare}{{12}{2023}{{Yu et~al.}}{{}}}
+\bibcite{davari2023breadcrumbs}{{13}{2023}{{Davari and Belilovsky}}{{}}}
+\bibcite{yang2024adamerging}{{14}{2024}{{Yang et~al.}}{{}}}
+\bibcite{deep2024della}{{15}{2024}{{Deep et~al.}}{{}}}
+\bibcite{kong2024apl}{{16}{2024}{{Kong et~al.}}{{}}}
+\bibcite{he2024localize}{{17}{2024}{{He et~al.}}{{}}}
+\bibcite{lu2024twin}{{18}{2024}{{Lu et~al.}}{{}}}
+\bibcite{tang2024fusionbench}{{19}{2024}{{Tang et~al.}}{{}}}
+\bibcite{zeng2025taskvectorbases}{{20}{2025}{{Zeng et~al.}}{{}}}
+\bibcite{sundararajan2017ig}{{21}{2017}{{Sundararajan et~al.}}{{}}}
+\bibcite{syed2024attributionpatching}{{22}{2024}{{Syed et~al.}}{{}}}
+\bibcite{kramar2024atpstar}{{23}{2024}{{Kramar et~al.}}{{}}}
+\gdef \@abspage@last{15}

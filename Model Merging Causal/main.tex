@@ -1,0 +1,689 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float}
+\usepackage{natbib}
+\usepackage{comment}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\thetab}{\theta_0}
+\newcommand{\taskvec}{\tau}
+\newcommand{\loss}{\mathcal{L}}
+\newcommand{\tasks}{\mathcal{T}}
+\newcommand{\data}{\mathcal{D}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ind}{\mathbf{1}}
+\DeclareMathOperator{\clip}{clip}
+\DeclareMathOperator{\rms}{rms}
+
+\title{Attribution-Patching-Guided Replay Refinement for Task-Vector Merging}
+\author{Anonymous Authors \\
+\small Draft proposal}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study the task of merging fine-tuned variants of a shared pretrained model when a small labeled replay buffer for each task is available.
+After an initial task-arithmetic merge, we refine the merged model with task gradients while using the known task experts as coordinate-wise trust anchors.
+The resulting update admits two equivalent motivations that we develop in parallel. As a parameter-space analogue of attribution patching, the effect of moving the current model toward a task expert is approximated by a first-order loss attribution, and only coordinates for which the expert direction is locally loss-decreasing are used. As an expert-anchored trust-region replay refinement, the departure from ordinary replay gradient descent is that each coordinate's step is weighted by its distance to the expert, gated to keep only steps that move toward the expert, and clipped so it cannot overshoot---the same coordinates that the attribution view selects. Both perspectives lead to a single refinement algorithm.
+%In contrast to an aggregated multi-task update, the proposed refinement is sequential: after computing a gated and clipped update for a single task, we immediately apply it to the current model before computing the next task's gradient and gate. This makes each task update local to the model state on which it was computed and avoids a single large aggregate step whose coordinates may overshoot the intended expert-distance trust region.
+\end{abstract}
+
+\section{Related Work and Background}
+
+\paragraph{Model merging and weight-space averaging.}
+Model merging combines multiple trained or fine-tuned models into a single model in weight space, avoiding the inference-time overhead of ensembling. Early and influential forms include direct parameter averaging, model soups, and Fisher-weighted merging. Model soups average multiple fine-tuned checkpoints and can improve accuracy without increasing inference cost when the checkpoints lie in a compatible basin \citep{wortsman2022modelsoups}. Fisher merging instead weights parameters using Fisher information, motivated by a Laplace approximation to the local posterior around each model \citep{matena2022fisher}. These approaches motivate the broader view that homologous fine-tuned models can often be combined directly in parameter space, but they do not by themselves resolve interference when the merged models specialize in different downstream tasks.
+
+\paragraph{Task vectors.}
+Task arithmetic represents the effect of fine-tuning as a task vector
+\begin{equation}
+    \taskvec_t = \theta_t - \thetab,
+\end{equation}
+where $\thetab$ is a shared pretrained model and $\theta_t$ is the model fine-tuned on task $t$. A merged model is then constructed as
+\begin{equation}
+    \theta_{\mathrm{merge}} = \thetab + \sum_{t \in \tasks} \lambda_t \taskvec_t,
+\end{equation}
+where $\lambda_t$ are scalar or tensor-wise coefficients. Task Arithmetic demonstrated that such vectors can be added or negated to steer model behavior \citep{ilharco2022taskarithmetic}. This formulation is attractive because it requires only checkpoints, but naive addition can over-count redundant directions and introduce sign or magnitude conflicts across tasks.
+
+\paragraph{Interference-aware task-vector merging.}
+A major line of work addresses interference between task vectors. TIES-Merging trims small-magnitude updates, resolves sign disagreement, and merges only sign-consistent components \citep{yadav2023ties}. DARE randomly drops most delta parameters and rescales the remaining entries, arguing that fine-tuning deltas are highly redundant \citep{yu2023dare}. DELLA generalizes this drop-and-rescale idea with magnitude-based sampling \citep{deep2024della}. Model Breadcrumbs similarly builds sparse masks by removing both negligible and outlier perturbations \citep{davari2023breadcrumbs}. Localize-and-Stitch explicitly localizes sparse task-relevant regions and stitches only those regions back into the pretrained model \citep{he2024localize}. These methods share the view that not all task-vector coordinates should be merged equally. The present proposal does not introduce another pruning rule; instead, it asks whether a small amount of supervised replay can repair an initial merge while staying close to the known task experts.
+
+\paragraph{Data-dependent merging baselines.}
+Several merging methods use small amounts of data or model outputs to estimate better combinations. Activated Parameter Locating (APL) estimates task-vector importance through a data-dependent contrast and then uses the result to guide pruning \citep{kong2024apl}. RegMean formulates merging as a regression problem that minimizes prediction differences between the merged model and the candidate models \citep{jin2023regmean}. AdaMerging learns task-wise or layer-wise merge coefficients by minimizing an unsupervised entropy objective on unlabeled samples \citep{yang2024adamerging}. These methods are important baselines because the proposed method also uses data, although it uses labeled replay buffers only for a few post-merge refinement steps rather than for constructing a pre-merge mask or a closed-form fusion rule.
+
+\paragraph{Attribution patching.}
+Attribution patching approximates the effect of an intervention by a first-order Taylor expansion, replacing many explicit interventions by gradient-based scores \citep{syed2024attributionpatching,kramar2024atpstar}. In parameter space, the analogous approximation is a directional derivative of the task loss along a chosen parameter displacement. Here the relevant intervention is not a replacement of one expert by another. It is the movement from the current merged model toward the expert for task $i$. This gives a direct bridge between attribution patching and replay-buffer refinement: the attribution score decides which coordinates of the expert direction are locally predicted to decrease the task loss.
+
+\paragraph{Shared and task-specific structure.}
+Several recent methods recognize that task vectors contain both shared and exclusive information. Twin-Merging separates shared and exclusive task knowledge and dynamically combines them at inference time \citep{lu2024twin}. Task Vector Bases clusters similar task vectors to compress and reuse shared directions, providing a theoretical and practical framework for reducing redundancy across related tasks \citep{zeng2025taskvectorbases}. FusionBench documents the need for standardized evaluation across model-fusion methods and includes GLUE-style language tasks among its benchmark families \citep{tang2024fusionbench}. Our proposal is complementary: rather than interpreting small attribution values as evidence that a coordinate can be pruned, we use the sign of a merge-to-expert attribution only as a local gate for refinement.
+
+\paragraph{Benchmark settings.}
+We use the standard GLUE-8 merging setting as the primary diagnostic benchmark: CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, and RTE, excluding WNLI as is common in many GLUE model-merging studies. GLUE was introduced as a multi-task benchmark for natural language understanding \citep{wang2018glue}. We use RoBERTa-base as the primary encoder backbone because it is a strong, widely used model for GLUE-style evaluation \citep{liu2019roberta}. In a full fine-tuning setup, each task has a task-specific classifier or regression head. We therefore treat RoBERTa GLUE-8 as a diagnostic setting for representation merging: the shared encoder is merged and evaluated with the corresponding task-specific head. This multi-head setup is convenient and common, but it assumes oracle task identity at evaluation time and should not be the only evidence for the method. Later experiments should include a shared-output setting, for example GLUE or SuperGLUE in a text-to-text T5-style format \citep{wang2019superglue,raffel2020t5}. A second-modality benchmark is also important: the standard CLIP/ViT task-vector suite with image-classification tasks such as SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB, MNIST, and DTD gives a stronger test of whether the method is specific to GLUE encoders or to task-specific NLP heads \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}. A third standard setting is decoder-only LLM merging, which combines domain-specialized experts---typically instruction following, mathematics, and code---and evaluates each on its own generation benchmark \citep{yu2023dare}; MergeBench standardizes this setting with released full-parameter experts and matched fine-tuning and evaluation protocols across the Llama and Gemma families \citep{he2025mergebench}. These three settings---CLIP/ViT vision, GLUE and text-to-text NLP, and decoder-only LLMs---constitute the benchmark families used across the recent merging literature, and we position our proposal against all three.
+
+\section{Methodology}
+
+\subsection{Problem Setup}
+Let $\tasks = \{1,\ldots,T\}$ denote a set of tasks. All task experts are initialized from the same pretrained encoder $\thetab \in \R^d$. Fine-tuning on task $t$ gives expert encoder parameters $\theta_t$ and task vector
+\begin{equation}
+    \taskvec_t = \theta_t - \thetab.
+    \label{eq:task-vector}
+\end{equation}
+The mergeable encoder parameters are treated as a vector in $\R^d$. We write $r \in \{1,\ldots,d\}$ for a parameter coordinate. Task-specific heads are not merged in the primary GLUE experiments; the merged encoder is evaluated with the corresponding head for each task.
+
+The initial merged encoder is
+\begin{equation}
+    \theta^{(0)} = \thetab + \sum_{i=1}^{T}\lambda_i\taskvec_i,
+    \label{eq:initial-merge}
+\end{equation}
+where $\lambda_i$ are fixed task-arithmetic coefficients, typically uniform or chosen by a small grid search. Let $\data_t^{\mathrm{probe}}$ be a small replay buffer used for refinement, and let $\data_t^{\mathrm{eval}}$ be the evaluation split used only for reporting performance. For each task $i$, let
+\begin{equation}
+    \loss_i(\theta;\data_i^{\mathrm{probe}})
+    \label{eq:task-loss}
+\end{equation}
+denote the replay-buffer loss obtained by using encoder parameters $\theta$ with task $i$'s prediction head.
+The proposed method does not use a base-relative saliency term and does not construct a pre-merge pruning mask. Its only data-dependent operation is a short replay-buffer refinement of the initial merge.
+
+
+
+%The attribution gate that the first derives from a Taylor expansion is exactly the trust-region acceptance rule that the second derives from staying close to the experts, and both yield the identical update in Equations~\eqref{eq:clipped-update}--\eqref{eq:sequential-single-task-update} and hence the same Algorithm~\ref{alg:expert-gated-refinement}.
+
+
+
+\subsection{Trust-Region Replay Refinement}
+\label{sec:replay-refinement}
+Starting from the task-arithmetic initialization in Equation~\eqref{eq:initial-merge}, the natural data-dependent baseline is ordinary replay-buffer gradient descent, which takes an unconstrained step along the task gradients:
+\begin{equation}
+    \theta^{(s+1)}
+    =
+    \theta^{(s)}
+    -
+    \eta \sum_{i=1}^{T}
+    \nabla_\theta \loss_i(\theta^{(s)};\data_i^{\mathrm{probe}}).
+    \label{eq:naive-replay-gd}
+\end{equation}
+This baseline treats the merge like any other initialization and lets the replay gradients move each coordinate freely, with nothing tying the refined model to the known task experts. The central departure of our method is precisely this anchoring: rather than taking a free gradient step, every coordinate of the update is tied to the corresponding task expert. For each task $i$ and coordinate $r$ we (i) weight the negative-gradient step by the current distance $|v_{i,r}|$ to the expert, so that coordinates already close to the expert barely move while coordinates far from it move more; (ii) keep the step only where it moves the model \emph{toward} the expert, discarding coordinates whose replay gradient would pull away from it; and (iii) clip the resulting step to the expert-distance trust region so that a single update can never overshoot the expert. These three operations---expert-distance weighting, the expert-agreement gate, and the trust-region clip---are what distinguish the refinement from ordinary replay gradient descent, and together they keep the whole refinement anchored to the known experts rather than letting it drift.
+
+A secondary and comparatively minor design choice concerns how the per-task updates are scheduled within a refinement step. An aggregated expert-guided update would compute all $u_i$ at $\theta^{(s)}$ and then apply $\eta\sum_i u_i$ at once; we instead apply each task's update immediately after computing it, so that its gradient, expert direction, and gate are evaluated at the same model state to which it is applied. Let $\theta^{(s,0)}=\theta^{(s)}$, and let $\pi_s$ be the task order for sweep $s$; $\pi_s$ can be fixed, cyclically rotated, or randomly permuted. For within-sweep index $k\in\{1,\ldots,T\}$, set $i=\pi_s(k)$ and compute
+\begin{align}
+    g_i^{(s,k)}
+    &=
+    \nabla_\theta \loss_i(\theta^{(s,k-1)};\data_i^{\mathrm{probe}}),
+    \label{eq:sequential-gradient}\\
+    v_i^{(s,k)}
+    &=
+    \theta_i - \theta^{(s,k-1)},
+    \label{eq:sequential-direction}\\
+    m_{i,r}^{(s,k)}
+    &=
+    \ind\{g_{i,r}^{(s,k)}v_{i,r}^{(s,k)} < -\epsilon_{\mathrm{gate}}\},
+    \label{eq:sequential-mask}\\
+    \widetilde u_{i,r}^{(s,k)}
+    &=
+    -g_{i,r}^{(s,k)}|v_{i,r}^{(s,k)}|m_{i,r}^{(s,k)}.
+    \label{eq:sequential-raw-update}
+\end{align}
+From this optimization side the coordinate mask $m_{i,r}^{(s,k)}$ arises as a trust-region acceptance rule rather than as an attribution score: we keep only those coordinates whose replay-gradient step also moves the current model toward expert $i$, and discard the coordinates where the replay step would pull away from the expert and out of the expert-anchored trust region. This is the same condition $g_{i,r}^{(s,k)}v_{i,r}^{(s,k)}<0$ that Section~\ref{sec:ap-view} obtained from the attribution-patching sign in Equation~\eqref{eq:ap-gate}, now read as \emph{stay within the expert-anchored trust region} instead of \emph{move along a locally loss-decreasing intervention}. The two perspectives therefore agree coordinate by coordinate.
+The raw update is first scaled by the learning rate $\eta$ and \emph{then} clipped by the the current distance to the expert, so that the applied per-coordinate step is bounded by $|v_{i,r}^{(s,k)}|$ regardless of $\eta$,
+\begin{equation}
+    u_{i,r}^{(s,k)}
+    =
+    \clip\!\left(
+        \eta\,\widetilde u_{i,r}^{(s,k)},
+        - |v_{i,r}^{(s,k)}|,
+         |v_{i,r}^{(s,k)}|
+    \right),
+    \label{eq:clipped-update}
+\end{equation}
+and the current model is immediately updated with this clipped step:
+\begin{equation}
+    \theta^{(s,k)}
+    =
+    \theta^{(s,k-1)} + u_i^{(s,k)}.
+    \label{eq:sequential-single-task-update}
+\end{equation}
+After all tasks in the sweep have been processed, we set
+\begin{equation}
+    \theta^{(s+1)}=\theta^{(s,T)}.
+    \label{eq:sequential-sweep-update}
+\end{equation}
+The robustness of the refinement comes primarily from the expert anchoring rather than from this scheduling: the distance weighting and gate keep every coordinate pointed at its expert, and the trust-region clip caps how far it can travel. The immediate application of each update, though secondary to the anchoring, has two motivations of its own. First, each update is applied at the same local model state on which its gradient, expert direction, and gate were computed. Second, the trust-region clipping in Equation~\eqref{eq:clipped-update} controls each single-task movement before the next task sees the modified model, rather than allowing several task vectors to accumulate into one larger coordinate step. Because the clip is applied \emph{after} the learning-rate scaling, the per-coordinate movement is bounded by $|v_{i,r}^{(s,k)}|$ for any $\eta$; for $\le 1$ a single update can never overshoot the expert in a coordinate, so the refinement stays within the expert-distance trust region and cannot diverge no matter how large $\eta$ is. The learning rate then controls only how many coordinates are driven to the trust-region boundary, not the maximum per-coordinate step size. The sequential rule still does not guarantee Pareto improvement across tasks, because an update that helps task $i$ can hurt task $j$. We therefore treat task ordering, cross-task interference, and worst-task retention as explicit diagnostics rather than as consequences of the gate alone. In practice, one can also normalize $u_i^{(s,k)}$ by tensor-wise RMS before applying the single-task update; the defining operation remains the coordinate gate in Equation~\eqref{eq:ap-gate}, whether it is read as an attribution-patching sign or as a trust-region acceptance rule. Under either reading the procedure is the single algorithm summarized in Algorithm~\ref{alg:expert-gated-refinement}.
+
+\begin{algorithm}[H]
+\caption{Sequential expert-direction-gated replay refinement}
+\label{alg:expert-gated-refinement}
+\begin{algorithmic}[1]
+\Require Pretrained encoder $\thetab$; task experts $\{\theta_i\}_{i=1}^T$; task heads; replay buffers $\{\data_i^{\mathrm{probe}}\}_{i=1}^T$; task-arithmetic weights $\{\lambda_i\}_{i=1}^T$; steps $S$; learning rate $\eta$; gate threshold $\epsilon_{\mathrm{gate}}$.
+\State $\taskvec_i \gets \theta_i-\thetab$ for all tasks $i$.
+\State $\theta^{(0)} \gets \thetab + \sum_{i=1}^{T}\lambda_i\taskvec_i$.
+\For{$s=0,\ldots,S-1$}
+    \State $\theta^{(s,0)} \gets \theta^{(s)}$.
+    \State Choose a task order $\pi_s$ over $\{1,\ldots,T\}$.
+    \For{$k=1,\ldots,T$}
+        \State $i \gets \pi_s(k)$.
+        \State $g_i^{(s,k)} \gets \nabla_\theta \loss_i(\theta^{(s,k-1)};\data_i^{\mathrm{probe}})$ using task $i$'s head.
+        \State $v_i^{(s,k)} \gets \theta_i - \theta^{(s,k-1)}$.
+        \For{each mergeable coordinate $r$}
+            \State $m_{i,r}^{(s,k)} \gets \ind\{g_{i,r}^{(s,k)}v_{i,r}^{(s,k)} < -\epsilon_{\mathrm{gate}}\}$.
+            \State $\widetilde u_{i,r}^{(s,k)} \gets -g_{i,r}^{(s,k)} |v_{i,r}^{(s,k)}| m_{i,r}^{(s,k)}$.
+            \State $u_{i,r}^{(s,k)} \gets \clip(\eta\,\widetilde u_{i,r}^{(s,k)},- |v_{i,r}^{(s,k)}|, |v_{i,r}^{(s,k)}|)$. \Comment{clip after learning-rate scaling}
+        \EndFor
+        \State $\theta^{(s,k)} \gets \theta^{(s,k-1)} + u_i^{(s,k)}$.
+    \EndFor
+    \State $\theta^{(s+1)} \gets \theta^{(s,T)}$.
+\EndFor
+\State \Return $\theta^{(S)}$.
+\end{algorithmic}
+\end{algorithm}
+
+
+\subsection{A Second Perspective: Attribution Patching in Parameter Space}
+\label{sec:ap-view}
+The refinement procedure developed in the previous section (Algorithm~\ref{alg:expert-gated-refinement}) can be motivated from a second independent starting point that arrive at the same per-coordinate update, comin fron an interpretability-style argument: it treats each move toward a task expert as a parameter-space intervention and uses a first-order attribution-patching score to decide, coordinate by coordinate, whether that intervention is locally loss-decreasing.
+
+
+The attribution step is a local calculation around the current model state. To make the sequential update rule explicit, let $\vartheta$ denote the current merged encoder immediately before applying a single task update. For task $i$, the task expert $\theta_i$ is a known reference solution, and the merge-to-expert direction is
+\begin{equation}
+    v_i(\vartheta) = \theta_i - \vartheta .
+    \label{eq:ap-expert-direction}
+\end{equation}
+The corresponding parameter-space intervention is the path
+\begin{equation}
+    \Gamma_i(\alpha;\vartheta)
+    =
+    \vartheta + \alpha v_i(\vartheta),
+    \qquad \alpha \in [0,1],
+    \label{eq:merge-to-expert-path}
+\end{equation}
+where $\alpha=0$ is the current model and $\alpha=1$ is the task expert. Let
+\begin{equation}
+    g_i(\vartheta) = \nabla_\theta \loss_i(\vartheta;\data_i^{\mathrm{probe}})
+    \label{eq:ap-gradient}
+\end{equation}
+be the task gradient at the current model, evaluated with task $i$'s head. A first-order attribution-patching approximation to the loss change caused by moving from $\vartheta$ toward expert $i$ is
+\begin{equation}
+    \Delta_i^{\mathrm{AP}}(\vartheta)
+    =
+    \left\langle g_i(\vartheta), v_i(\vartheta) \right\rangle
+    =
+    \sum_{r=1}^{d} a_{i,r}^{\mathrm{AP}}(\vartheta),
+    \label{eq:ap-total}
+\end{equation}
+with coordinate-wise contribution
+\begin{equation}
+    a_{i,r}^{\mathrm{AP}}(\vartheta)
+    =
+    g_{i,r}(\vartheta) v_{i,r}(\vartheta).
+    \label{eq:ap-coordinate}
+\end{equation}
+A negative contribution means that moving coordinate $r$ toward the task expert is locally predicted to reduce task $i$'s loss. A positive contribution means that the same movement is locally predicted to increase the loss. Thus the loss-decreasing expert gate is
+\begin{equation}
+    m_{i,r}(\vartheta)
+    =
+    \ind\!
+    \left\{
+        a_{i,r}^{\mathrm{AP}}(\vartheta) < -\epsilon_{\mathrm{gate}}
+    \right\},
+    \label{eq:ap-gate}
+\end{equation}
+where $\epsilon_{\mathrm{gate}}\geq 0$ is an optional confidence threshold; the default method uses $\epsilon_{\mathrm{gate}}=0$. The condition $g_{i,r}(\vartheta)v_{i,r}(\vartheta)<0$ is exactly the condition that the expert direction agrees with the negative gradient in coordinate $r$.
+
+The resulting coordinate-wise update for task $i$ is a distance-scaled negative-gradient step, masked by the attribution-patching sign:
+\begin{equation}
+    \widetilde u_{i,r}(\vartheta)
+    =
+    -g_{i,r}(\vartheta)\,\left|v_{i,r}(\vartheta)\right|\,m_{i,r}(\vartheta).
+    \label{eq:raw-update}
+\end{equation}
+Whenever $m_{i,r}(\vartheta)=1$, this update points toward the expert because $-g_{i,r}(\vartheta)$ and $v_{i,r}(\vartheta)$ have the same sign. The factor $|v_{i,r}(\vartheta)|$ makes the step small when the current model is already close to the expert in that coordinate and larger when the coordinate is far from the expert. Importantly, the gate only certifies a local first-order effect for task $i$ at the current model state. It does not by itself prove that the coordinate is harmless for other tasks, so cross-task interference must be measured experimentally.
+
+
+
+
+\begin{comment}
+\subsection{Finite-Difference and Mask-Stability Diagnostics}
+\label{sec:diagnostic}
+The method relies on a local Taylor approximation and on gradient signs estimated from very small replay buffers. The proposal should therefore validate both the attribution approximation and the stability of the induced masks. For sampled coordinates, tensors, or parameter blocks $B$, define the measured loss change
+\begin{equation}
+    \Delta_{i,B}^{\mathrm{meas}}(\alpha;\vartheta)
+    =
+    \loss_i\!\left(\vartheta + \alpha P_B v_i(\vartheta);\data_i^{\mathrm{probe}}\right)
+    -
+    \loss_i\!\left(\vartheta;\data_i^{\mathrm{probe}}\right),
+    \label{eq:measured-delta}
+\end{equation}
+where $P_B$ keeps the coordinates in block $B$ and zeros the rest. The attribution-patching prediction is
+\begin{equation}
+    \Delta_{i,B}^{\mathrm{AP}}(\alpha;\vartheta)
+    =
+    \alpha \sum_{r\in B} g_{i,r}(\vartheta)v_{i,r}(\vartheta).
+    \label{eq:predicted-delta}
+\end{equation}
+We report sign agreement between $\Delta_{i,B}^{\mathrm{AP}}$ and $\Delta_{i,B}^{\mathrm{meas}}$, Spearman correlation across sampled blocks, and precision@k for the blocks with the most negative predicted attribution. To quantify replay-buffer noise, we also compute mask stability: for two independently sampled replay buffers of size $n$, measure the agreement or Jaccard overlap between their active gates. Low stability at $n=16$ or $n=32$ would not invalidate the method, but it would suggest interpreting the gate as a noisy expert-guided regularizer rather than as a precise coordinate-level attribution.
+\end{comment}
+
+
+\section{Experimental Protocol}
+
+\paragraph{Primary diagnostic setting: RoBERTa GLUE-8.}
+The primary benchmark is GLUE-8: CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, and RTE. We use RoBERTa-base as the default encoder. Each task expert is obtained by fine-tuning from the same pretrained checkpoint with matched hyperparameter budgets. The primary setting merges full fine-tuned encoders and keeps task-specific heads fixed for evaluation. This setting is intentionally described as \emph{oracle-task-id, multi-head encoder merging}; it is a useful and inexpensive diagnostic but not a complete demonstration of single-model deployment.
+
+\paragraph{Recommended proof-of-concept order.}
+The first experiments should be deliberately smaller than full GLUE-8, but the final report should avoid relying only on hand-picked related tasks.
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Code smoke test:} use a distilled RoBERTa-style encoder \citep{sanh2019distilbert} on MRPC and STS-B. This pair is small enough for rapid iteration and tests whether the implementation can exploit related sentence-pair tasks.
+    \item \textbf{First convincing three-task result:} use RoBERTa-base on MRPC, STS-B, and SST-2. MRPC and STS-B form a related sentence-pair pair, while SST-2 acts as a less-related single-sentence control task.
+    \item \textbf{Systematic pairwise GLUE study:} evaluate all pairwise merges among the eight GLUE tasks and report a heatmap of mean retention, worst-task retention, and expert-relative drop. This guards against cherry-picking a favorable task subset.
+    \item \textbf{Structured GLUE subsets:} evaluate related subsets (MRPC/STS-B and MRPC/QQP/STS-B), a mixed-format subset (STS-B/SST-2/QNLI), small-task stress subsets (RTE/CoLA/MRPC and QQP/RTE/CoLA), and the entailment cluster (MNLI/QNLI/RTE).
+    \item \textbf{Full GLUE-8 scale-up:} run the final method and all feasible baselines on all eight tasks. CoLA and RTE require multiple seeds because they are small or high-variance; MNLI requires explicit compute budgeting because it is much larger than the other tasks.
+\end{enumerate}
+The main paper-aligned result should use RoBERTa-base. Distilled models are useful for debugging hyperparameters and implementation errors but should not be the only evidence.
+
+\paragraph{Secondary benchmark settings.}
+To address the limitations of multi-head GLUE, we include three secondary benchmark tracks once the RoBERTa proof of concept is stable. First, a shared-output NLP track evaluates GLUE or SuperGLUE in a text-to-text format using T5-style models, so that the merged model uses a common generation head rather than task-specific classifiers \citep{wang2019superglue,raffel2020t5}. Second, a CLIP/ViT vision track evaluates the standard task-vector image-classification suite: SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB, MNIST, and DTD \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}. The vision track is especially valuable because it tests a different modality, different loss geometry, and stronger domain shifts than GLUE.
+
+Third, a decoder-only LLM track tests whether the refinement extends beyond encoders to generative models, which is where much of the recent merging literature is concentrated. We adopt the MergeBench setting \citep{he2025mergebench}, which releases full-parameter domain experts---instruction following, mathematics, multilingual understanding, coding, and safety---for the Llama and Gemma families together with standardized fine-tuning and evaluation protocols and a suite of merging baselines. Because these experts are full fine-tunes sharing a common pretrained checkpoint, their task vectors and merge-to-expert directions are well defined, so the method applies unchanged; and because the checkpoints are published, no expert training is required on our side, which keeps the comparison to prior merging methods fair and reproducible. We begin at a small full-fine-tuning-feasible scale (a $2$--$3$B base model such as Llama-3.2-3B or Gemma-2-2B) and focus on the instruction/mathematics/code triple, since these experts are known to interfere strongly and thus stress worst-task retention---the regime in which the gate helped most on CLIP/ViT. Following common practice, we prefer judge-free automatic metrics where possible (for example verifiable instruction-following constraints, exact-match on grade-school mathematics, and functional-correctness pass rates on code). Generation-based evaluation, rather than expert training, is the main cost in this track; we therefore subsample evaluation sets during hyperparameter search and report full-set numbers only for final configurations. This decoder track should complement, not replace, the controlled RoBERTa and CLIP/ViT studies.
+
+\paragraph{Replay data.}
+For refinement, we use $n \in \{4,8,16,32,64,128\}$ replay examples per task. Replay examples are sampled from training data or from a held-out split separated from the final validation split. For classification tasks, replay buffers should be class-balanced whenever possible; for imbalanced tasks such as QQP and for small tasks such as RTE, we report the exact sampling procedure. We report sensitivity to the number of replay examples, variation across replay samples, and the area under the replay-budget curve rather than only the best tuned replay size.
+
+\paragraph{Baselines.}
+Because the proposed method uses labeled replay buffers, baselines are grouped by data regime.
+\begin{description}[style=nextline,leftmargin=1.7em,labelindent=0pt]
+    \item[Checkpoint-only baselines.] Pretrained encoder, individual single-task experts, uniform model averaging, task arithmetic, Fisher merging, TIES, DARE, DELLA-style magnitude sampling, Model Breadcrumbs, and Localize-and-Stitch if implementation allows.
+    \item[Data-dependent but label-free baselines.] RegMean, AdaMerging, APL, and any FusionBench-compatible unsupervised or activation-based method that can use the same number of unlabeled examples.
+    \item[Labeled-replay baselines.] Ordinary replay-buffer gradient descent from the same task-arithmetic initialization; distance-scaled gradient descent without the attribution gate; head-only replay calibration; encoder-only replay fine-tuning; encoder-plus-head replay fine-tuning; multitask replay fine-tuning from the pretrained checkpoint; and multitask replay fine-tuning from the task-arithmetic merge.
+    \item[Sanity controls.] Inverted gate, random gate with matched density, wrong-expert directions, shuffled replay labels, frozen first-step gates, and the aggregated-$U$ version of the method. The aggregated-$U$ ablation is important because the proposed algorithm applies each task update immediately after it is computed.
+\end{description}
+All labeled-replay baselines should use the same replay examples, the same number of gradient evaluations where possible, and the same hyperparameter search budget. This is essential because the strongest alternative explanation for a positive result is simply that the method performs supervised post-merge replay fine-tuning.
+
+\paragraph{Metrics.}
+For each GLUE task, we report the standard validation metric: Matthews correlation for CoLA, accuracy for SST-2, matched/mismatched accuracy for MNLI, correlation for STS-B, and accuracy/F1-style scores for the paraphrase and question-pair tasks according to the GLUE convention. Raw task scores, expert scores, pretrained scores, task-arithmetic scores, and absolute drops from the corresponding expert are primary. Because correlation-style metrics can be near zero or negative, the normalized retention metric is
+\begin{equation}
+    \mathrm{NormRet}_t
+    =
+    \frac{
+        \mathrm{Score}_t(\theta_{\mathrm{merge}})-\mathrm{Score}_t(\thetab)
+    }{
+        \mathrm{Score}_t(\theta_t)-\mathrm{Score}_t(\thetab)+\epsilon_{\mathrm{metric}}
+    },
+    \label{eq:normalized-retention}
+\end{equation}
+where $\epsilon_{\mathrm{metric}}$ prevents division by very small denominators. We report mean normalized retention, worst-task normalized retention, harmonic mean normalized retention, and expert-relative drop. Worst-task retention is important because a merge can improve average score while catastrophically harming a small task such as RTE or CoLA. For each main table, we also report confidence intervals across expert fine-tuning seeds and replay-buffer seeds.
+
+\paragraph{Task-similarity and interference analysis.}
+We group GLUE-8 tasks into interpretable clusters. The paraphrase and similarity cluster contains $\{\mathrm{MRPC},\mathrm{QQP},\mathrm{STS\mbox{-}B}\}$; the entailment-style cluster contains $\{\mathrm{MNLI},\mathrm{QNLI},\mathrm{RTE}\}$; and the single-sentence cluster contains $\{\mathrm{CoLA},\mathrm{SST\mbox{-}2}\}$. We test whether expert-direction-gated refinement helps most in related task clusters, where movement toward one expert is more likely to be compatible with other tasks. We also compute task-vector cosine similarity, cross-task transfer performance, average attribution-patching sign agreement, and the cross-task interference matrix
+\begin{equation}
+    C_{j\leftarrow i}^{(s,k)}
+    =
+    \left\langle
+        \nabla_\theta \loss_j(\theta^{(s,k-1)};\data_j^{\mathrm{probe}}),
+        u_i^{(s,k)}
+    \right\rangle.
+    \label{eq:interference-matrix}
+\end{equation}
+Negative entries indicate that task $i$'s update is locally predicted to help task $j$, while positive entries indicate predicted interference. This matrix directly tests whether the gate is only self-protective or also tends to align across related tasks.
+
+\subsection{Ablations and Diagnostics}
+We plan the following ablations:
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Gate sign and necessity:} compare the proposed gate $g_{i,r}v_{i,r}<0$ with no gate, an inverted gate $g_{i,r}v_{i,r}>0$, and a random mask of the same density.
+    \item \textbf{Gate confidence and granularity:} vary $\epsilon_{\mathrm{gate}}$, compare coordinate-wise gates with tensor-wise or block-wise gates, evaluate top-$k$ most negative attribution masks, and test sign-stability masks formed from multiple replay minibatches.
+    \item \textbf{Sequential update rule:} compare the proposed immediate single-task update with the aggregated-$U$ variant, fixed task order, cyclic task order, and random task order.
+    \item \textbf{Distance scaling:} compare ordinary replay-gradient descent, distance-scaled gradient descent without the gate, direct expert-interpolation steps $u_i\propto m_i v_i$, and the full gated update.
+    \item \textbf{Clipping and normalization:} compare no normalization, tensor-wise RMS normalization, per-task global norm clipping, and post-update validation line search.
+    \item \textbf{Replay budget and variance:} vary the number of replay examples per task and report variation across replay samples and random seeds.
+    \item \textbf{Number of refinement steps:} compare $S\in\{0,1,2,5,10\}$ to test whether most gains occur in the first few steps or whether overfitting appears.
+    \item \textbf{Expansion point:} recompute gradients and gates before every single-task update versus freezing the first-sweep gates from $\theta^{(0)}$.
+    \item \textbf{Label and expert sanity checks:} compare correct labels with shuffled replay labels, and correct expert directions with wrong-expert directions.
+\end{enumerate}
+
+\subsection{Hypotheses}
+The project evaluates five hypotheses:
+\begin{description}[style=nextline,leftmargin=1.5em,labelindent=0pt]
+    \item[H1: Attribution-patching signs predict useful expert directions.] Coordinates or blocks with $g_{i,r}v_{i,r}<0$ should be more likely to reduce task $i$'s loss when moved toward expert $i$ than coordinates or blocks with $g_{i,r}v_{i,r}>0$.
+    \item[H2: Expert-guided replay refinement improves task arithmetic.] Starting from the same task-arithmetic initialization and using the same replay budget, the gated update should outperform ordinary replay-buffer gradient descent and distance-scaled gradient descent without the gate.
+    \item[H3: Sequential single-task updates improve worst-task retention.] Applying each clipped task update immediately after it is computed should reduce overshoot and stale-gradient effects relative to an aggregated-$U$ update, improving worst-task retention under the same replay budget.
+    \item[H4: Benefits are larger for related tasks.] The method should help most in related task clusters, especially MRPC, QQP, and STS-B, where expert directions are more likely to be mutually compatible.
+    \item[H5: Gains are not GLUE-specific.] A positive GLUE result should transfer at least partially to a shared-head text-to-text setting, to the CLIP/ViT vision task-vector suite, or to decoder-only LLM merging in the MergeBench setting.
+\end{description}
+
+\section{Preliminary Results}
+\label{sec:results}
+We report initial experiments in the RoBERTa-base multi-head setting (oracle task identity at evaluation). Unless noted, refinement uses $S$ sweeps from the task-arithmetic merge with the corrected trust region applied \emph{after} the learning rate (Eq.~\eqref{eq:clipped-update}) and threshold $\epsilon_{\mathrm{gate}}=0$. Each method family (ordinary replay gradient descent, the proposed gated update, and the ungated distance-scaled update) is given its own learning-rate search of equal size; we report the best configuration per family by mean normalized retention (Eq.~\eqref{eq:normalized-retention}). Section~\ref{sec:mergebaselines} additionally compares the refinement against interference-aware and label-free merge baselines, and composes it with them.
+
+These results are preliminary in three respects that we state explicitly. First, the three-task study uses five seeds, but the GLUE-8 and CLIP-8 studies are single-seed; individual cells carry a run-to-run spread of roughly $\pm0.02$ mean retention (Table~\ref{tab:glue8} and the discussion of learning-rate sensitivity below), so differences smaller than that should not be read as orderings. Second, hyperparameters (learning rate, and in Section~\ref{sec:mergebaselines} also $\lambda$, sparsity, and density) are selected \emph{per family} by mean normalized retention on the evaluation split. This is a uniform and therefore fair rule across families, but it is oracle selection: a stricter protocol, in which every method that consumes labeled replay data selects its hyperparameters on that replay buffer alone and touches the evaluation split once, is the subject of ongoing experiments. Third, the multi-head GLUE setting assumes oracle task identity.
+
+
+
+\paragraph{Three-task proof of concept.}
+On the MRPC/STS-B/SST-2 triple ($n=64$ replay examples per task, $S=5$), all refinement methods recover most of the gap from the task-arithmetic merge (mean normalized retention $0.558$) toward the experts, and the three families are statistically tied at their tuned optima (Table~\ref{tab:poc3}). The decisive difference is robustness to the learning rate: the gated update attains its best score at a much larger step ($\eta=64$) and remains stable there, whereas the ungated update---identical except for the gate---\emph{diverges} at the same learning rate (mean normalized retention $-1.07$). The attribution gate thus acts as a protective mask that enables large, safe steps by suppressing the locally loss-increasing expert directions.
+
+\begin{table}[t]
+\centering
+\caption{Three-task RoBERTa-base proof of concept (MRPC, STS-B, SST-2; $n=64$, $S=5$). Mean normalized retention; best learning rate per family. Left: best configuration, mean $\pm$ std over five seeds. Right: a single-seed contrast at a large fixed learning rate, isolating the gate's effect.}
+\label{tab:poc3}
+\begin{tabular}{lcc}
+\toprule
+Method & Best mean NormRet ($\pm$ std) & at $\eta=64$ (1 seed) \\
+\midrule
+Task-arithmetic merge & $0.558$ & --- \\
+Ordinary replay GD & $0.831\pm0.005$ & --- \\
+Ungated distance-scaled (no gate) & $0.835\pm0.017$ & $-1.07$ (diverges) \\
+\textbf{APR (gated, proposed)} & $\mathbf{0.840\pm0.021}$ & $\mathbf{0.849}$ (stable) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{GLUE-8 scale-up.}
+Merging all eight experts (one consistent RoBERTa-base fine-tuning source) is a much harder, more interference-prone setting: the task-arithmetic merge attains only mean normalized retention $0.320$, with MRPC driven below the pretrained baseline. Here the value of expert anchoring grows: both anchored updates clearly outperform ordinary replay gradient descent, by a larger margin than in the three-task case and especially on worst-task retention (Table~\ref{tab:glue8}). The gate is approximately performance-neutral relative to the ungated anchored update on mean retention---the ordering flips between the two budgets and the gaps are within single-seed noise---but it again provides a wider safe learning-rate range (the gated update is stable through $\eta=16$, while the ungated update peaks at $\eta=2\text{--}4$ and diverges by $\eta\gtrsim 8\text{--}16$). MRPC and CoLA remain the persistent worst tasks; QQP, STS-B, MNLI, and QNLI recover to $0.78\text{--}0.86$.
+
+A caveat on the boundary of that safe range. At $\eta=32$ the gated update attained $0.614$ (worst $0.142$) in one run, but an identically configured re-run collapsed to $-0.093$ (worst $-3.467$, MRPC), so we report the stable $\eta=16$ configuration instead. The replay gradients are deterministic (they are computed in \texttt{eval} mode, so no dropout noise enters), which localises the cause: floating-point non-associativity on the GPU---the embedding backward pass accumulates with atomics, and library kernel selection varies with machine state---perturbs the gradient at the level of its last bits. The gate then \emph{discretises} that perturbation, because coordinates with $g_{i,r}v_{i,r}\approx 0$ can flip sign, and near the divergence boundary the resulting trajectories separate. This is a property of the method worth stating plainly: the trust region guarantees that large steps remain \emph{bounded} (Section~\ref{sec:replay-refinement}), but near the critical learning rate it does not make the outcome \emph{reproducible}. Reported learning rates should therefore be interior to the stable range, not at its edge.
+
+\begin{table}[t]
+\centering
+\caption{GLUE-8 (all eight tasks, RoBERTa-base, single seed). Best mean normalized retention per family (worst-task retention in parentheses); the task-arithmetic merge baseline is $0.320$ (worst $-0.175$). APR is reported at its largest stable learning rate, $\eta=16$; the $\eta=32$ configuration reached $0.614$ once but is not reproducible (see text).}
+\label{tab:glue8}
+\begin{tabular}{lcc}
+\toprule
+Method & $n{=}64,\,S{=}5$ & $n{=}32,\,S{=}10$ \\
+\midrule
+Ordinary replay GD & $0.574\ (0.04)$ & $0.588\ (0.04)$ \\
+Ungated distance-scaled (no gate) & $\mathbf{0.637}\ (0.15)$ & $0.607\ (0.05)$ \\
+\textbf{APR (gated, proposed)} & $0.595\ (0.11)$ & $\mathbf{0.617}\ (0.05)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What the attribution gate is and is not doing.}
+Two diagnostics temper the interpretation of the gate. First, the gate keeps a strikingly stable $\approx 36\%$ of coordinates across sweeps, tasks, and learning rates. A control attributes most of this to gradient sparsity rather than to the expert geometry: roughly $31\%$ of encoder coordinates are word-embedding rows for tokens absent from the small replay buffer and therefore have exactly zero gradient (always masked), and a random direction of matched magnitudes reproduces almost the same density ($0.345$ vs.\ $0.361$ for the true expert direction). The expert direction itself contributes only a small signal beyond chance. Second, the trust-region clip is almost never active at useful learning rates ($<0.1\%$ of gated coordinates), functioning as a rare-event safeguard against the few large-gradient coordinates rather than as a routine operation. The gate's measurable benefit is therefore concentrated in learning-rate robustness---masking the loss-increasing active coordinates so that large steps remain safe---rather than in a higher peak score at a tuned learning rate.
+
+\paragraph{CLIP/ViT vision track.}
+We next test whether the method transfers beyond GLUE encoders to the standard eight-task CLIP task-vector suite (SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB, MNIST, DTD) with a CLIP ViT-B/32 backbone. Here the mergeable model is the image encoder, and each task keeps a \emph{frozen} zero-shot classification head derived from the CLIP text encoder over class-name prompts; the experts are publicly available fine-tuned image encoders, merged with uniform $\lambda_i=0.3$ (a value we later show is over-scaled; see Section~\ref{sec:mergebaselines}). Refinement uses $n=64$, $S=5$, and the trust region of Eq.~\eqref{eq:clipped-update} with $\gamma=1$ (single seed). This is a stronger test than GLUE: a different modality, dense gradients without the word-embedding sparsity discussed above, and larger domain shifts. The task-arithmetic merge is weak at this coefficient (mean normalized retention $0.270$, worst-task $-0.527$; SUN397 and Cars are pushed \emph{below} the zero-shot backbone). All three families recover substantial ground, but---in contrast to GLUE-8---the attribution gate attains both the best mean retention and, \emph{among the three replay-refinement families}, the only positive worst-task retention (Table~\ref{tab:clip8}). This last property is specific to that comparison and does not extend to merge methods generally: tuned task arithmetic, Model Breadcrumbs, and TIES all keep worst-task retention positive without using any data at all (Section~\ref{sec:mergebaselines}). The gated update improves the merge from $0.270$ to $0.598$ mean and from $-0.527$ to $+0.159$ worst-task, beating ordinary replay gradient descent by $+0.14$ mean / $+0.36$ worst and the ungated anchored update by $+0.06$ mean / $+0.25$ worst. The gains concentrate on the most interference-damaged tasks: Cars and SUN397, which the merge drove below the zero-shot floor, are precisely the ones the gate rescues (Table~\ref{tab:clip8pt}), whereas the ungated update sacrifices Cars catastrophically at its larger steps (worst-task $-2.97$ at $\eta=8$). An inverted-gate control diverges (mean $-1.68$), confirming that the sign of the attribution product carries the signal. A smaller three-task vision study (EuroSAT/GTSRB/MNIST, single seed) shows the same ordering more sharply: APR $0.940$ mean / $0.915$ worst, versus $0.917/0.876$ for the ungated update, $0.874/0.792$ for ordinary replay GD, and $0.811/0.721$ for the merge. As in GLUE, the best learning rate falls as tasks are added (the gated update peaks at $\eta=32$ on three tasks and at $\eta=8$ on eight). Together these results support H5---the method transfers to a second modality---and indicate that the gate's usefulness is \emph{modality-dependent}: approximately neutral on GLUE encoders but beneficial, on both mean and worst-task retention, on CLIP/ViT.
+
+\begin{table}[t]
+\centering
+\caption{Eight-task CLIP ViT-B/32 suite (single seed, $n=64$, $S=5$, $\gamma=1$, uniform $\lambda_i=0.3$). Best learning rate per family by mean normalized retention (Eq.~\eqref{eq:normalized-retention}); worst-task retention in parentheses. The gated update is best on both, and is the only method keeping worst-task retention positive.}
+\label{tab:clip8}
+\begin{tabular}{lcc}
+\toprule
+Method & Mean NormRet & Worst-task \\
+\midrule
+Task-arithmetic merge & $0.270$ & $-0.527$ \\
+Ordinary replay GD & $0.458$ & $-0.203$ \\
+Ungated distance-scaled (no gate) & $0.536$ & $-0.086$ \\
+\textbf{APR (gated, proposed)} & $\mathbf{0.598}$ & $\mathbf{+0.159}$ \\
+\midrule
+Inverted-gate control & $-1.682$ & $-5.386$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Per-task top-1 accuracy on the eight-task CLIP suite: zero-shot backbone, task expert, task-arithmetic merge, and the proposed gated refinement (APR, $\eta=8$). Refinement recovers most of the merge's interference loss, including on Cars and SUN397, which the merge had degraded below the zero-shot backbone.}
+\label{tab:clip8pt}
+\begin{tabular}{lccccccccc}
+\toprule
+ & SUN397 & Cars & RESISC & EuroSAT & SVHN & GTSRB & MNIST & DTD & Avg. \\
+\midrule
+Zero-shot & $0.632$ & $0.597$ & $0.582$ & $0.450$ & $0.315$ & $0.325$ & $0.482$ & $0.439$ & $0.478$ \\
+Expert    & $0.749$ & $0.783$ & $0.949$ & $0.991$ & $0.972$ & $0.989$ & $0.996$ & $0.794$ & $0.903$ \\
+Merge     & $0.570$ & $0.553$ & $0.628$ & $0.734$ & $0.778$ & $0.685$ & $0.961$ & $0.472$ & $0.673$ \\
+\textbf{APR} & $\mathbf{0.650}$ & $\mathbf{0.648}$ & $\mathbf{0.769}$ & $\mathbf{0.923}$ & $\mathbf{0.874}$ & $\mathbf{0.851}$ & $0.961$ & $\mathbf{0.578}$ & $\mathbf{0.782}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Replay budget and refinement horizon (CLIP/ViT).}
+Two further studies on the eight-task suite probe the labeled-replay budget and the number of refinement sweeps, comparing the gated update directly against ordinary replay gradient descent---the strongest baseline that also uses labeled replay. First, reducing the replay buffer from $n=64$ to $32$ and $16$ examples per task degrades both methods gracefully, but the gated update retains an almost constant advantage of ${\approx}\,+0.10$ mean normalized retention at every budget and remains the only method with non-negative worst-task retention down to $n=16$ (Table~\ref{tab:clipbudget}). Its best learning rate also decreases as the buffer shrinks (from $\eta=8$ at $n=64$ to $\eta=6$ at $n\le 32$), consistent with noisier replay gradients favoring smaller trust-region steps. Second, on the refinement horizon: the gated update is essentially converged after five sweeps (mean retention $0.598\to0.615$ from $S=5$ to $S=15$ at $n=64$, with no sign of overfitting the buffer), whereas ordinary gradient descent is still improving at $S=35$ ($0.458\to0.504\to0.526$ at $S=5,15,35$) yet does not catch up and---critically---never lifts its worst task (SUN397) back above the zero-shot backbone. Thus the expert anchor, rather than additional replay data or gradient steps, is what recovers the most interference-damaged tasks.
+
+\begin{table}[t]
+\centering
+\caption{Replay-budget study on the eight-task CLIP suite (mean normalized retention; worst-task in parentheses). Best configuration per family; the gated update (APR) near-converges by $S=5\text{--}10$ sweeps, while ordinary replay GD is given a longer horizon ($S=25\text{--}35$) as a generous baseline. APR holds an ${\approx}\,+0.10$ mean advantage at every budget and is the only method with non-negative worst-task retention down to $n=16$.}
+\label{tab:clipbudget}
+\begin{tabular}{lcc}
+\toprule
+Replay budget & \textbf{APR (ours)} & Ordinary replay GD \\
+\midrule
+$n=16$ & $\mathbf{0.522}\ (\mathbf{+0.018})$ & $0.427\ (-0.266)$ \\
+$n=32$ & $\mathbf{0.570}\ (\mathbf{+0.122})$ & $0.476\ (-0.197)$ \\
+$n=64$ & $\mathbf{0.598}\ (\mathbf{+0.159})$ & $0.526\ (-0.135)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Merge baselines, and composition with them}
+\label{sec:mergebaselines}
+
+Every experiment above starts from a uniform task-arithmetic merge, which leaves the central objection unanswered: perhaps the refinement is only repairing a weak initialization, and a better \emph{merge} would make it unnecessary. We therefore evaluate the refinement against, and on top of, the merge methods it is supposed to complement (Table~\ref{tab:mergebaselines}). Four checkpoint-only baselines use no data at all: task arithmetic with a tuned coefficient, TIES \citep{yadav2023ties}, DARE \citep{yu2023dare}, their composition DARE-TIES, and Model Breadcrumbs \citep{davari2023breadcrumbs}. One label-free but data-dependent baseline, AdaMerging \citep{yang2024adamerging}, learns task-wise or layer-wise merge coefficients by minimizing prediction entropy on unlabeled inputs. All families share the same experts, the same replay buffers, the same frozen heads, and the same per-family tuning rule.
+
+\paragraph{The refinement composes with better merges rather than replacing them.}
+On both suites APR improves \emph{every} merge initialization, and the best result is obtained on top of the strongest merge, never on top of plain task arithmetic. On CLIP-8 it lifts AdaMerging from $0.610$ to $0.722$ mean and from $+0.219$ to $+0.429$ worst-task; on GLUE-8 it lifts DARE-TIES from $0.301$ to $0.610$. This is the clearest evidence that the gated replay update is doing something the interference-aware merges are not: it is complementary to them, not an alternative. Notably, the CLIP-8 composition uses only $64$ training examples per task in total---the same $64$ inputs unlabeled to fit the merge coefficients, then labeled for the refinement---so it never touches the evaluation split.
+
+\paragraph{But the refinement is not a standalone winner.}
+Layer-wise AdaMerging ($0.610$) slightly exceeds APR started from the tuned task-arithmetic merge ($0.588$) on CLIP-8, and it does so \emph{without labels}. We tested the obvious explanation---that AdaMerging benefits from its standard transductive protocol, which draws unlabeled inputs from the evaluation split in effectively unlimited quantity---by restricting it to exactly the $64$ unlabeled inputs per task that APR sees labeled. It does not degrade ($0.604\to0.610$ mean; $+0.165\to+0.219$ worst). The data advantage therefore does not account for the gap, and the honest claim is the narrower one: APR is a refinement that stacks on any initialization, including the strongest, and is not the best way to spend a small budget on its own.
+
+A plausible mechanism is a mismatch of parameterization rather than of information. Inspecting the learned layer-wise coefficients shows that AdaMerging does not merely rescale the merge---the spread of $\lambda_i^l$ across tensors within a task ($0.151$) is comparable to its mean ($0.258$), attention projections are amplified to nearly twice the initial coefficient while embedding and bias contributions are driven toward zero, and $38\%$ of coefficients \emph{increase} relative to initialization. The dominant recoverable error in the CLIP merge is thus a per-tensor mixing error, living in a well-conditioned space of $\sim\!1600$ coefficients. AdaMerging searches exactly that space; APR searches $\sim\!10^8$ coordinates with a step family---coordinate-wise moves \emph{toward} the experts---that cannot express ``double this tensor's contribution beyond the merge''. Consistent with this reading, the \emph{task-wise} AdaMerging variant, which has only eight degrees of freedom, scores $0.344$, worse than a single tuned global coefficient ($0.407$); the useful knowledge is which tensors to re-mix, not which tasks to weight.
+
+\paragraph{Coefficient tuning corrects an earlier conclusion.}
+The uniform $\lambda_i=0.3$ used throughout the CLIP experiments above is substantially over-scaled: $\lambda_i=0.2$ raises the merge from $0.270$ / $-0.527$ to $0.407$ / $+0.069$. As noted in Section~\ref{sec:results}, this invalidates any reading of Table~\ref{tab:clip8} in which APR is the only method with positive worst-task retention on CLIP-8; tuned task arithmetic, Breadcrumbs, and TIES all achieve it using no data. On GLUE-8, by contrast, $\lambda=0.3$ is already the interior optimum of the same grid ($0.175$, $\mathbf{0.320}$, $0.239$, $0.143$ for $\lambda\in\{0.2,0.3,0.4,0.5\}$), so the GLUE comparisons above are unaffected.
+
+\paragraph{Entropy is a good surrogate for accuracy only when the heads are frozen.}
+AdaMerging's usefulness is modality-dependent in the opposite direction to the gate's. On GLUE-8 it drives its unlabeled objective down hard---mean entropy $0.610\to0.163$ for the layer-wise variant---yet reaches only $0.173$ mean retention, far \emph{below} the $0.320$ of the merge it starts from, and the task-wise variant collapses outright ($0.023$; worst-task $-3.068$, MRPC). The explanation is structural. CLIP's heads are frozen zero-shot text embeddings, so confidence can only be increased by producing better image features; RoBERTa's heads are trained classifiers, and the shared encoder can instead be dragged into whatever region makes those classifiers confident, which is not the region that makes them correct. Minimizing entropy then makes the merged model confidently wrong. This is worth stating because it cuts against a natural intuition---that a label-free objective which improves on one benchmark is a safe default---and because it is precisely the failure mode that a \emph{labeled} replay signal, as used here, cannot exhibit.
+
+\paragraph{Which ingredient of the sparsification baselines matters.}
+DARE alone reproduces task arithmetic almost exactly (CLIP $0.270$ vs.\ $0.270$; all nine sampled cells fall in $[0.249,0.272]$), as it must: its drop-and-rescale is expectation-preserving, so summed over $\sim\!10^8$ coordinates the merge concentrates back onto the unsparsified one. It is therefore reported as a control rather than a competitor, and it isolates \emph{sign election}---not sparsification---as the operative ingredient of TIES. Pairing the two (DARE-TIES) is scale-sensitive, because DARE's $1/\text{density}$ rescale inflates magnitudes before the trim: at trim density $0.1$ it is well behaved, and at $0.2$ it collapses MRPC.
+
+\paragraph{The optimal step size depends on the initialization.}
+APR's update and its trust region both scale with the expert distance $|v_{i,r}| = |\theta_i - \theta^{(0)}|$, which differs across merge points. A learning-rate grid centered on the task-arithmetic optimum therefore diverges when the refinement is started from the sparser TIES or DARE-TIES merges---in our first attempt, every such cell failed, and we initially mis-read this as evidence that the refinement does not compose. Re-centering the grid recovers interior optima at every initialization. Measuring the geometry confirms the mechanism: relative to task arithmetic, the TIES merge is \emph{closer} to six of the eight GLUE experts but substantially farther from the two large-data ones (QQP, MNLI), so at a fixed $\eta$ those two tasks take steps $1.6\text{--}2.2\times$ larger and trample the fragile MRPC. In every diverged cell, exactly one fragile task collapses---MRPC on GLUE, Cars on CLIP.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Merge baselines and composition (single seed, $n=64$, $S=5$). Mean normalized retention, worst-task in parentheses. Every family shares the same experts, replay buffers, and heads; hyperparameters ($\lambda$, density, sparsity, $\eta$) are tuned per family on the evaluation split (see Section~\ref{sec:results}). $^\ddagger$: standard \emph{transductive} AdaMerging draws unlabeled inputs from the evaluation split; the CLIP rows instead use the matched budget (the same $64$ unlabeled inputs per task that APR sees labeled), which \emph{improves} on transductive ($0.333$ / $0.604$ for task/layer wise), and the matched layer-wise merge is the initialization for the last row (making that composition fully inductive). On GLUE both budgets fail alike (transductive $0.023$ / $0.173$; matched $0.029$ / $0.198$ for task/layer wise).}
+\label{tab:mergebaselines}
+\begin{tabular}{lcc}
+\toprule
+ & CLIP-8 & GLUE-8 \\
+Method & mean (worst) & mean (worst) \\
+\midrule
+\multicolumn{3}{l}{\emph{Checkpoint-only (no data)}}\\
+Task arithmetic, $\lambda_i=0.3$          & $0.270\ (-0.527)$          & $0.320\ (-0.175)$ \\
+Task arithmetic, $\lambda$ tuned          & $0.407\ (+0.069)$          & $0.320\ (-0.175)$ \\
+DARE (control)                            & $0.270\ (-0.524)$          & $0.337\ (+0.009)$ \\
+DARE-TIES                                 & $0.364\ (-0.319)$          & $0.301\ (-0.344)$ \\
+Model Breadcrumbs                         & $0.431\ (+0.079)$          & $0.143\ (-0.267)$ \\
+TIES                                      & $0.528\ (+0.255)$          & $0.302\ (\ \ 0.000)$ \\
+\midrule
+\multicolumn{3}{l}{\emph{Label-free, data-dependent}}\\
+AdaMerging (task-wise)                    & $0.344\ (-0.239)$          & $0.023^\ddagger\ (-3.068)$ \\
+AdaMerging (layer-wise)                   & $0.610\ (+0.219)$          & $0.173^\ddagger\ (\ \ 0.000)$ \\
+\midrule
+\multicolumn{3}{l}{\emph{Labeled replay ($n=64$): APR started from each merge}}\\
+APR $\leftarrow$ task arithmetic          & $0.588\ (0.185)$           & $0.595\ (0.108)$ \\
+APR $\leftarrow$ Breadcrumbs              & $0.606\ (0.212)$           & $0.523\ (0.095)$ \\
+APR $\leftarrow$ DARE-TIES                & $0.626\ (0.190)$           & $\mathbf{0.610}\ (0.178)$ \\
+APR $\leftarrow$ TIES                     & $0.653\ (0.333)$           & $0.571\ (0.165)$ \\
+APR $\leftarrow$ AdaMerging               & $\mathbf{0.722}\ (\mathbf{0.429})$ & $0.583\ (0.050)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Matched labeled budget: the same $64$ examples, every method.}
+The comparison so far spans the checkpoint-only and label-free regimes, but the method lives in the small-labeled-data regime, and the sharpest test holds the data fixed and varies only the method. Table~\ref{tab:matched} gives every labeled method exactly APR's $n=64$ replay examples per task, drawn from the training split, and---unlike the tables above---selects each method's hyperparameters on the \emph{replay buffer} rather than the evaluation split (the strict protocol of Section~\ref{sec:results}); we note where this replay-selected number differs from the evaluation-selected one. Against this budget, alternative uses of the same labels are surprisingly weak. Tuning a single global $\lambda$ recovers the task-arithmetic point (it is already optimal); tuning per-task $\lambda_i$ by coordinate descent \emph{overfits} the buffer, collapsing to $0.144$ on GLUE-8; LM-Cocktail-style loss weighting \citep{xiao2024lmcocktail} and Fisher merging \citep{matena2022fisher} with a diagonal Fisher estimated from $64$ examples are both weak on both suites. The competitive labeled baselines are instead the ones that touch many parameters: a data-free magnitude-pruned stitch (the dataless variant of Localize-and-Stitch, \citealp{he2024localize}) and the encoder-refinement family. On CLIP-8, APR is the best method at this budget ($0.598$), ahead of the magnitude stitch ($0.520$) and the ungated refinement ($0.521$); on GLUE-8 the encoder-refinement family again dominates but the gate is not the decisive ingredient there ($0.570$ for APR versus $0.637$ ungated), consistent with the modality-dependence established above.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Matched labeled-data budget: every method uses the same $64$ labeled examples per task (from train), with hyperparameters selected on the replay buffer, not the evaluation split. Mean normalized retention, worst-task in parentheses. $^\S$: replay-selected differs from evaluation-selected---APR on GLUE-8 reaches $0.595$ under evaluation selection ($0.570$ under replay selection), and the ungated update on CLIP-8 reaches $0.536$ ($0.521$ under replay selection).}
+\label{tab:matched}
+\begin{tabular}{lcc}
+\toprule
+Method ($n=64$ labeled) & CLIP-8 & GLUE-8 \\
+\midrule
+Global $\lambda$ tuned on replay          & $0.270\ (-0.53)$ & $0.320\ (-0.18)$ \\
+Per-task $\lambda_i$ (coordinate descent) & $0.377\ (-0.02)$ & $0.144\ (-1.96)$ \\
+LM-Cocktail loss-weighted                 & $0.214\ (+0.04)$ & $0.074\ (-0.03)$ \\
+Fisher merging (replay Fisher)            & $0.231\ (-0.05)$ & $-0.010\ (-1.16)$ \\
+Head-only recalibration                   & $-0.415\ (-4.30)$ & $0.613\ (+0.13)$ \\
+Localize-and-Stitch (magnitude, data-free)& $0.520\ (+0.22)$ & $0.284\ (+0.04)$ \\
+Ordinary replay GD                        & $0.458\ (-0.20)$ & $0.504\ (-0.02)$ \\
+Ungated distance-scaled                   & $0.521^\S\ (-0.32)$ & $\mathbf{0.637}\ (+0.18)$ \\
+\textbf{APR (proposed)}                   & $\mathbf{0.598}\ (+0.16)$ & $0.570^\S\ (+0.09)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Head-only recalibration exhibits the same modality asymmetry as AdaMerging, and for the same reason: refitting each task head on $64$ examples over a frozen merged encoder is the second-strongest method on GLUE-8 ($0.613$) but catastrophic on CLIP-8 ($-0.415$, with SUN397 and Cars driven far below the zero-shot floor). A trained GLUE classifier head can absorb a small labeled sample; CLIP's head is a frozen zero-shot anchor, and unfreezing it to fit $64$ images destroys the very alignment that makes the merge work. The labeled signal helps through the head only when the head is trainable, which reinforces that APR's gains on CLIP are encoder repair rather than head realignment.
+
+\paragraph{What is still missing.}
+Two entries in the labeled tier are not yet trustworthy. The \emph{learned}-mask variant of Localize-and-Stitch, as opposed to its data-free magnitude variant reported above, is currently mis-calibrated in our setup---the $\ell_1$ sparsity penalty overwhelms the small replay gradients and collapses the masks, so we omit it pending a corrected sparsity schedule; it is the closest published relative of the attribution gate and the most important remaining comparison. RegMean \citep{jin2023regmean} remains to be added to the label-free tier. With those caveats, the matched-budget comparison already substantially constrains the alternative explanation that a small labeled sample would help \emph{any} reasonable method equally: at $64$ labeled examples per task most alternative uses of the data are markedly worse than the refinement, and the strongest competitors are themselves parameter-space edits of the merge.
+
+\section{Expected Contribution}
+The expected contribution is an attribution-patching perspective on replay-guided model merging. Rather than using attribution scores to build a pre-merge sparsification mask, the method starts from a standard task-arithmetic merge and asks a local intervention question: for task $i$, which coordinates would reduce the replay loss if the current model moved toward expert $i$? The answer is the sign of the coordinate-wise product $g_{i,r}v_{i,r}$, which coincides with a trust-region acceptance rule that keeps each step moving toward its expert, so the attribution-patching and replay-refinement views motivate the same procedure. This leads to a simple implementable algorithm: mask out expert directions that are locally loss-increasing, scale the remaining negative-gradient update by distance to the expert, clip each per-task update by a trust-region fraction, and immediately apply that task's update before computing the next task's gradient and gate. The proposal also contributes a stricter empirical protocol: fair labeled-replay baselines, an aggregated-update ablation, mask-stability tests, systematic GLUE pair/subset evaluations, and secondary shared-head or CLIP/ViT benchmarks. If successful, the method would provide a lightweight bridge between checkpoint-only task arithmetic and full multitask fine-tuning with replay buffers, while making clear which gains come from the attribution gate rather than from supervised replay alone.
+
+\begin{thebibliography}{99}
+
+\bibitem[Wang et~al.(2018)]{wang2018glue}
+Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel R. Bowman.
+\newblock GLUE: A multi-task benchmark and analysis platform for natural language understanding.
+\newblock In \emph{Proceedings of the 2018 EMNLP Workshop BlackboxNLP}, 2018.
+
+\bibitem[Liu et~al.(2019)]{liu2019roberta}
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov.
+\newblock RoBERTa: A robustly optimized BERT pretraining approach.
+\newblock \emph{arXiv preprint arXiv:1907.11692}, 2019.
+
+\bibitem[Wang et~al.(2019)]{wang2019superglue}
+Alex Wang, Yada Pruksachatkun, Nikita Nangia, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel R. Bowman.
+\newblock SuperGLUE: A stickier benchmark for general-purpose language understanding systems.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2019.
+
+\bibitem[Raffel et~al.(2020)]{raffel2020t5}
+Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter J. Liu.
+\newblock Exploring the limits of transfer learning with a unified text-to-text transformer.
+\newblock \emph{Journal of Machine Learning Research}, 21(140):1--67, 2020.
+
+\bibitem[Radford et~al.(2021)]{radford2021clip}
+Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever.
+\newblock Learning transferable visual models from natural language supervision.
+\newblock In \emph{International Conference on Machine Learning}, 2021.
+
+
+\bibitem[Sanh et~al.(2019)]{sanh2019distilbert}
+Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas Wolf.
+\newblock DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter.
+\newblock \emph{arXiv preprint arXiv:1910.01108}, 2019.
+
+\bibitem[Ilharco et~al.(2022)]{ilharco2022taskarithmetic}
+Gabriel Ilharco, Marco Tulio Ribeiro, Mitchell Wortsman, Suchin Gururangan, Ludwig Schmidt, Hannaneh Hajishirzi, and Ali Farhadi.
+\newblock Editing models with task arithmetic.
+\newblock \emph{arXiv preprint arXiv:2212.04089}, 2022.
+
+\bibitem[Wortsman et~al.(2022)]{wortsman2022modelsoups}
+Mitchell Wortsman, Gabriel Ilharco, Samir Yitzhak Gadre, Rebecca Roelofs, Raphael Gontijo-Lopes, Ari S. Morcos, Hongseok Namkoong, Ali Farhadi, Yair Carmon, Simon Kornblith, and Ludwig Schmidt.
+\newblock Model soups: Averaging weights of multiple fine-tuned models improves accuracy without increasing inference time.
+\newblock In \emph{International Conference on Machine Learning}, 2022.
+
+\bibitem[Matena and Raffel(2022)]{matena2022fisher}
+Michael S. Matena and Colin A. Raffel.
+\newblock Merging models with Fisher-weighted averaging.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2022.
+
+\bibitem[Jin et~al.(2023)]{jin2023regmean}
+Xisen Jin, Xiang Ren, Daniel Preotiuc-Pietro, and Pengxiang Cheng.
+\newblock Dataless knowledge fusion by merging weights of language models.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+
+\bibitem[Yadav et~al.(2023)]{yadav2023ties}
+Prateek Yadav, Derek Tam, Leshem Choshen, Colin Raffel, and Mohit Bansal.
+\newblock TIES-Merging: Resolving interference when merging models.
+\newblock \emph{arXiv preprint arXiv:2306.01708}, 2023.
+
+\bibitem[Yu et~al.(2023)]{yu2023dare}
+Le Yu, Bowen Yu, Haiyang Yu, Fei Huang, and Yongbin Li.
+\newblock Language models are Super Mario: Absorbing abilities from homologous models as a free lunch.
+\newblock \emph{arXiv preprint arXiv:2311.03099}, 2023.
+
+\bibitem[Davari and Belilovsky(2023)]{davari2023breadcrumbs}
+Mohammad Davari and Eugene Belilovsky.
+\newblock Model Breadcrumbs: Scaling multi-task model merging with sparse masks.
+\newblock \emph{arXiv preprint arXiv:2312.06795}, 2023.
+
+\bibitem[Yang et~al.(2024)]{yang2024adamerging}
+Enneng Yang, Zhenyi Wang, Li Shen, Shiwei Liu, Guibing Guo, Xingwei Wang, and Dacheng Tao.
+\newblock AdaMerging: Adaptive model merging for multi-task learning.
+\newblock \emph{arXiv preprint arXiv:2310.02575}, 2024.
+
+\bibitem[Deep et~al.(2024)]{deep2024della}
+Pala Tej Deep, Rishabh Bhardwaj, and Soujanya Poria.
+\newblock DELLA-Merging: Reducing interference in model merging through magnitude-based sampling.
+\newblock \emph{arXiv preprint arXiv:2406.11617}, 2024.
+
+\bibitem[Kong et~al.(2024)]{kong2024apl}
+Fanshuang Kong, Richong Zhang, and Ziqiao Wang.
+\newblock Activated parameter locating via causal intervention for model merging.
+\newblock \emph{arXiv preprint arXiv:2408.09485}, 2024.
+
+\bibitem[He et~al.(2024)]{he2024localize}
+Shwai He, Runqi Wang, Jindong Wang, Jindong Gu, and Xing Xie.
+\newblock Localize-and-Stitch: Efficient model merging via sparse task arithmetic.
+\newblock \emph{arXiv preprint arXiv:2408.13656}, 2024.
+
+\bibitem[Lu et~al.(2024)]{lu2024twin}
+Zhenyi Lu, Chengxu Yin, Wujie Wang, and Xuebo Liu.
+\newblock Twin-Merging: Dynamic integration of modular expertise in model merging.
+\newblock \emph{arXiv preprint arXiv:2406.15479}, 2024.
+
+\bibitem[Tang et~al.(2024)]{tang2024fusionbench}
+Anke Tang, Li Shen, Yong Luo, Liang Ding, Han Hu, Bo Du, and Dacheng Tao.
+\newblock FusionBench: A comprehensive benchmark of deep model fusion.
+\newblock \emph{arXiv preprint arXiv:2406.03280}, 2024.
+
+\bibitem[Zeng et~al.(2025)]{zeng2025taskvectorbases}
+Zihan Zeng, Jiahui Chen, Lei Li, and Min Zhang.
+\newblock Efficient model editing with task vector bases: A theoretical framework and scalable approach.
+\newblock \emph{arXiv preprint arXiv:2502.01015}, 2025.
+
+\bibitem[Xiao et~al.(2024)]{xiao2024lmcocktail}
+Shitao Xiao, Zheng Liu, Peitian Zhang, and Xingrun Xing.
+\newblock LM-Cocktail: Resilient tuning of language models via model merging.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2024}, 2024.
+
+\bibitem[He et~al.(2025)]{he2025mergebench}
+Yifei He, Siqi Zeng, Yuzheng Hu, Rui Yang, Tong Zhang, and Han Zhao.
+\newblock MergeBench: A benchmark for merging domain-specialized LLMs.
+\newblock In \emph{Advances in Neural Information Processing Systems (Datasets and Benchmarks Track)}, 2025.
+
+\bibitem[Sundararajan et~al.(2017)]{sundararajan2017ig}
+Mukund Sundararajan, Ankur Taly, and Qiqi Yan.
+\newblock Axiomatic attribution for deep networks.
+\newblock In \emph{International Conference on Machine Learning}, 2017.
+
+\bibitem[Syed et~al.(2024)]{syed2024attributionpatching}
+Aaquib Syed, Can Rager, and Arthur Conmy.
+\newblock Attribution patching outperforms automated circuit discovery.
+\newblock \emph{arXiv preprint arXiv:2310.10348}, 2024.
+
+\bibitem[Kramar et~al.(2024)]{kramar2024atpstar}
+Janos Kramar, Tom Lieberum, Rohin Shah, and Neel Nanda.
+\newblock AtP*: An efficient and scalable method for localizing language model behavior to components.
+\newblock \emph{arXiv preprint arXiv:2403.00745}, 2024.
+
+\end{thebibliography}
+
+\end{document}

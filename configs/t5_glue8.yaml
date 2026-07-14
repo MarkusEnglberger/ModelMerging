@@ -1,0 +1,41 @@
+# Shared-output NLP track (proposal "secondary benchmark settings"): flan-T5-base
+# text-to-text GLUE-8. The WHOLE seq2seq model (incl. lm_head) is merged; every task
+# decodes through the same LM head => no oracle-task-id / multi-head caveat.
+# Experts = FusionBench full fine-tunes (tanganke), theta_0 = google/flan-t5-base.
+# Templates in src/apr/t5_gen.py are FusionBench's verbatim -- do not edit them.
+# Prefetch first: python scripts/prefetch_t5.py
+base_model: google/flan-t5-base
+modality: t5
+tag: t5_glue8
+output_dir: results/t5_glue8
+device: cuda
+seed: 0
+
+experts:
+  - {name: cola, lam: 0.3}
+  - {name: sst2, lam: 0.3}
+  - {name: mrpc, lam: 0.3}
+  - {name: stsb, lam: 0.3}
+  - {name: qqp,  lam: 0.3}
+  - {name: mnli, lam: 0.3}
+  - {name: qnli, lam: 0.3}
+  - {name: rte,  lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 256        # rendered prompts are longer than raw GLUE inputs
+  eval_batch_size: 64    # candidate scoring runs C teacher-forced passes per batch
+  probe_seed: 0
+  class_balanced: true
+  max_eval: null

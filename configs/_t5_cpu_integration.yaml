@@ -1,0 +1,15 @@
+# Tiny CPU integration check for the T5 track (NOT a real result). Uses
+# flan-t5-small as both base and "experts" so task vectors are ~0; exercises the
+# full t5 code path: template render, collator, replay gradients, refinement,
+# candidate-scored eval (incl. the STS-B regression grid). Runs on the login node.
+base_model: google/flan-t5-small
+modality: t5
+tag: t5_cpu_integration
+output_dir: results/_debug
+device: cpu
+seed: 0
+experts:
+  - {name: mrpc, checkpoint: google/flan-t5-small, lam: 0.4}
+  - {name: stsb, checkpoint: google/flan-t5-small, lam: 0.4}
+refine: {steps: 1, lr: 1.0, clip_frac: 1.0, gate_mode: coordinate, clip_mode: vdist_pre}
+data: {n_probe: 4, max_length: 128, eval_batch_size: 8, max_eval: 8}

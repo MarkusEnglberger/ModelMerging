@@ -1,0 +1,41 @@
+# Decoder-only LLM track (H100): MergeBench published full-SFT experts on
+# Llama-3.2-3B. POC = the interference-prone math/coding/instruction triple with
+# judge-free automatic metrics (GSM8K EM, MBPP pass@1, IFEval-lite strict).
+# Checkpoints resolve to MergeBench/Llama-3.2-3B_<domain>; theta_0 = the base model.
+# NOTE meta-llama/Llama-3.2-3B is license-gated: accept the license + `huggingface-cli
+# login` before prefetching. Prefetch: python scripts/prefetch_mergebench.py
+#
+# VALIDATE [eval0] before trusting any run: each expert must clearly beat base on its
+# own domain; if not, the prompt format does not match MergeBench's SFT recipe
+# (prompt_style is auto-detected from the tokenizer's chat template in pipeline.py).
+base_model: meta-llama/Llama-3.2-3B
+modality: causal_lm
+model_dtype: float32     # 3x 3B fp32 task vectors ~ 36 GB CPU RAM; use bfloat16 if tight
+tag: mergebench3b
+output_dir: results/mergebench3b
+device: cuda
+seed: 0
+
+experts:
+  - {name: math,        lam: 0.3}
+  - {name: coding,      lam: 0.3}
+  - {name: instruction, lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 1024        # SFT examples (question + CoT answer / code)
+  eval_batch_size: 8      # generation eval; raise on H100 if memory allows
+  probe_seed: 0
+  class_balanced: false   # REQUIRED: causal replay views have no label column
+  max_eval: 200           # subsample eval sets during sweeps; full only for finals

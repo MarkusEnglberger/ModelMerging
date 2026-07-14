@@ -76,7 +76,85 @@ def _make_backend(cfg: ExperimentConfig, device: str):
 
         return base_encoder, load_expert
 
-    raise ValueError(f"Unknown modality '{cfg.modality}' (expected 'glue' or 'clip')")
+    if cfg.modality == "t5":
+        from .t5_gen import (build_t5_assets, get_t5_task, load_t5_task_dataset,
+                             make_t5_collator, T5GenClassifier, T5_EXPERT_CKPT)
+        from transformers import T5ForConditionalGeneration
+        dtype = getattr(torch, cfg.model_dtype)
+        tokenizer, base = build_t5_assets(cfg.base_model, cache_dir=cache,
+                                          torch_dtype=dtype)
+        base_encoder = get_encoder_state(T5GenClassifier(base, tokenizer,
+                                                         get_t5_task("cola")))
+        del base
+
+        def load_expert(e):
+            spec = get_t5_task(e.name)
+            ckpt = e.checkpoint or T5_EXPERT_CKPT[spec.name]
+            _log(f"[load] t5 expert {spec.name} <- {ckpt}")
+            t5 = T5ForConditionalGeneration.from_pretrained(
+                ckpt, cache_dir=cache, torch_dtype=dtype)
+            model = T5GenClassifier(t5, tokenizer, spec)
+            train_ds, eval_ds = load_t5_task_dataset(spec, tokenizer,
+                                                     cfg.data.max_length, cache)
+            if cfg.data.max_eval is not None:
+                eval_ds = eval_ds.select(range(min(cfg.data.max_eval, len(eval_ds))))
+            collator = make_t5_collator(tokenizer, spec.is_regression)
+            return spec, model, train_ds, eval_ds, collator
+
+        return base_encoder, load_expert
+
+    if cfg.modality == "causal_lm":
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from .causal_lm import (get_causal_task, make_causal_collator,
+                                MERGEBENCH_EXPERT)
+        dtype = getattr(torch, cfg.model_dtype)
+        tokenizer = AutoTokenizer.from_pretrained(cfg.base_model, cache_dir=cache)
+        base_short = cfg.base_model.split("/")[-1]
+        base_model = AutoModelForCausalLM.from_pretrained(
+            cfg.base_model, cache_dir=cache, torch_dtype=dtype)
+        base_encoder = get_encoder_state(base_model)
+        prompt_style = ("chat" if getattr(tokenizer, "chat_template", None)
+                        else "plain")
+        del base_model
+        collator = make_causal_collator(tokenizer)
+
+        def load_expert(e):
+            spec = get_causal_task(e.name)
+            spec.tokenizer = tokenizer
+            spec.prompt_style = prompt_style
+            ckpt = e.checkpoint or MERGEBENCH_EXPERT.format(base=base_short,
+                                                            domain=spec.name)
+            _log(f"[load] causal expert {spec.name} <- {ckpt} "
+                 f"(prompt_style={prompt_style}, dtype={cfg.model_dtype})")
+            model = AutoModelForCausalLM.from_pretrained(
+                ckpt, cache_dir=cache, torch_dtype=dtype)
+            train_raw, make_fn = spec.build_replay(tokenizer, cfg.data.max_length,
+                                                   cache, prompt_style)
+            eval_rows = spec.build_eval(cache, cfg.data.max_eval)
+            # pre-materialise the SFT view so sample_replay_buffer indexes it
+            train_ds = _CausalReplayView(train_raw, make_fn)
+            return spec, model, train_ds, eval_rows, collator
+
+        return base_encoder, load_expert
+
+    raise ValueError(f"Unknown modality '{cfg.modality}' "
+                     f"(expected 'glue', 'clip', 't5' or 'causal_lm')")
+
+
+class _CausalReplayView:
+    """List-like lazy view: train_ds[i] -> tokenized SFT example. Lets the
+    shared sample_replay_buffer index causal-LM replay data without
+    materialising the whole SFT dataset."""
+
+    def __init__(self, raw_ds, make_fn):
+        self.raw = raw_ds
+        self.make = make_fn
+
+    def __len__(self):
+        return len(self.raw)
+
+    def __getitem__(self, i):
+        return self.make(self.raw[i])
 
 
 def set_seed(seed: int):
@@ -94,7 +172,8 @@ class MergeContext:
     """Reusable setup: experts loaded, merge built, base/expert/merge scored."""
 
     def __init__(self, cfg, device, handles, per_task, base_encoder, merged0,
-                 base_scores, expert_scores, merge_scores):
+                 base_scores, expert_scores, merge_scores,
+                 task_vectors=None, lambdas=None):
         self.cfg = cfg
         self.device = device
         self.handles = handles
@@ -104,6 +183,11 @@ class MergeContext:
         self.base_scores = base_scores
         self.expert_scores = expert_scores
         self.merge_scores = merge_scores
+        # task vectors tau_i and their lambda_i, kept so alternative merge
+        # points (TIES/DARE, see apr.merge_methods) can be built from the same
+        # loaded experts without re-loading (used by scripts/merge_baselines.py).
+        self.task_vectors = task_vectors or {}
+        self.lambdas = lambdas or {}
 
     @property
     def task_names(self) -> List[str]:
@@ -129,22 +213,34 @@ class MergeContext:
                 for n in self.task_names}
 
     def resample_buffers(self, n_probe: int, probe_seed: int):
-        """Re-draw each task's replay buffer (size n_probe, seed probe_seed) and
-        rebuild its gradient closure, reusing the already-loaded models/datasets.
-        Lets a budget sweep vary n without reloading experts."""
+        """Re-draw each task's replay buffer (size n_probe, seed probe_seed), rebuild
+        its gradient closure, AND update ``per_task[name]["probe_buffer"]`` so that
+        every buffer-consuming method (APR grads, but also Fisher, head-only, matched
+        AdaMerging, and the replay objective) sees the reseeded buffer. Lets a budget
+        or multi-seed sweep vary n / the seed without reloading experts."""
         for h in self.handles:
             info = self.per_task[h.name]
             buf = sample_replay_buffer(info["train_ds"], info["spec"], n_probe,
                                        probe_seed, self.cfg.data.class_balanced)
+            info["probe_buffer"] = buf
             h.grad_fn = make_grad_fn(info["model"], buf, info["collator"],
                                      self.cfg.data.eval_batch_size, self.device)
 
-    def run_refine(self, refine_cfg: RefineConfig, seed: int = 0):
-        """Refine from the shared merge point; return (refined_cpu, history)."""
-        refined, history = refine(self.merged0, self.handles, refine_cfg,
+    def run_refine_from(self, start_state: ParamDict, refine_cfg: RefineConfig,
+                        seed: int = 0):
+        """Refine from an arbitrary merge point; return (refined_cpu, history).
+
+        The expert anchoring (v = theta_i - theta) is read from the task handles
+        and is independent of the start point, so APR can be run on top of any
+        merge (task arithmetic, TIES, DARE, ...)."""
+        refined, history = refine(start_state, self.handles, refine_cfg,
                                   self.device, seed=seed, move_model=True, logger=_log)
         refined_cpu = OrderedDict((k, v.cpu()) for k, v in refined.items())
         return refined_cpu, history
+
+    def run_refine(self, refine_cfg: RefineConfig, seed: int = 0):
+        """Refine from the shared task-arithmetic merge point."""
+        return self.run_refine_from(self.merged0, refine_cfg, seed)
 
     @staticmethod
     def build(cfg: ExperimentConfig) -> "MergeContext":
@@ -165,16 +261,19 @@ class MergeContext:
                                           cfg.data.probe_seed, cfg.data.class_balanced)
             grad_fn = make_grad_fn(model, buffer, collator, cfg.data.eval_batch_size, device)
             handles.append(TaskHandle(e.name, model, expert_encoder, grad_fn))
+            # probe_buffer is kept so a label-free baseline can be given exactly the
+            # same inputs as APR's replay buffer (labels stripped) -- see the
+            # matched-budget AdaMerging variant in scripts/merge_baselines.py.
             per_task[e.name] = dict(spec=spec, model=model, eval_ds=eval_ds,
                                     collator=collator, expert_encoder=expert_encoder,
-                                    train_ds=train_ds)
+                                    train_ds=train_ds, probe_buffer=buffer)
             task_vectors[e.name] = task_vector(expert_encoder, base_encoder)
             lambdas[e.name] = e.lam
 
         merged0 = task_arithmetic_merge(base_encoder, task_vectors, lambdas)
 
         ctx = MergeContext(cfg, device, handles, per_task, base_encoder, merged0,
-                           {}, {}, {})
+                           {}, {}, {}, task_vectors=task_vectors, lambdas=lambdas)
         # score base / expert / merge (one pass each)
         ctx.base_scores = ctx.eval_encoder(base_encoder)
         ctx.expert_scores = {n: ctx.eval_encoder(per_task[n]["expert_encoder"], names=[n])[n]

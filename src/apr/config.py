@@ -62,9 +62,14 @@ class ExpertConfig:
 class ExperimentConfig:
     base_model: str  # shared pretrained checkpoint (theta_0), e.g. roberta-base
     experts: List[ExpertConfig]
-    # which modality backend to use: "glue" (RoBERTa multi-head) or
-    # "clip" (CLIP/ViT vision track). Selects the loaders in pipeline.build.
+    # which modality backend to use: "glue" (RoBERTa multi-head), "clip"
+    # (CLIP/ViT vision track), "t5" (flan-T5 text-to-text GLUE, shared LM head)
+    # or "causal_lm" (decoder-only MergeBench track). Selects pipeline loaders.
     modality: str = "glue"
+    # parameter dtype for model loading / task vectors. "float32" everywhere on
+    # the <=1B tracks; the 2-3B causal_lm track can use "bfloat16" to halve the
+    # CPU-RAM footprint (5 experts x 3B fp32 ~ 60 GB) at some gate-sign noise.
+    model_dtype: str = "float32"
     refine: RefineConfig = field(default_factory=RefineConfig)
     data: DataConfig = field(default_factory=DataConfig)
     seed: int = 0
