@@ -28,6 +28,11 @@ class RefineConfig:
     rms_normalize: bool = False  # tensor-wise RMS normalize u before applying
     random_gate_density: Optional[float] = None  # for gate_mode=random; else match
     freeze_first_gates: bool = False  # reuse sweep-0 gates (expansion-point ablation)
+    # learning-rate schedule across sweeps: "constant" | "cosine" | "linear".
+    # cosine/linear decay the effective lr from `lr` at sweep 0 to lr*lr_min_frac
+    # at the final sweep (long-horizon control: big early steps, fine late steps).
+    lr_schedule: str = "constant"
+    lr_min_frac: float = 0.05
 
 
 @dataclass

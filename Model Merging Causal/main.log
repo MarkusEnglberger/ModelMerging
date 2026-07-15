@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2024.2.9)  9 JUL 2026 20:10
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2024.2.9)  15 JUL 2026 15:22
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -524,32 +524,46 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 
 {/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [2] [3] [4]
 Package hyperref Info: bookmark level for unknown algorithm defaults to 0 on input line 164.
- [5] Excluding 'comment' comment. [6] [7] [8] [9] [10] [11]
+ [5] [6] Excluding 'comment' comment. [7] [8] [9] [10] [11]
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 425.
+ (/vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/tex/latex/lm/t1lmtt.fd
+File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+)
+Package microtype Info: Loading generic protrusion settings for font family
+(microtype)             `lmtt' (encoding: T1).
+(microtype)             For optimal results, create family-specific settings.
+(microtype)             See the microtype manual for details.
+ [12] [13]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 433.
+(Font)              <9> on input line 474.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 433.
- [12] [13] [14] [15] (./main.aux)
+(Font)              <5> on input line 474.
+ [14] [15]
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10> on input line 520.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <7> on input line 520.
+ [16] [17] [18] [19] [20] [21] [22] [23] (./main.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-22>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: 7B33A3A2BCD807B03B616D78C8B097FB;1745.
+(rerunfilecheck)             Checksum: AC69518E52EBB956F7A82946ADDFDC38;2351.
  ) 
 Here is how much of TeX's memory you used:
- 14488 strings out of 474222
- 229524 string characters out of 5736121
- 1941975 words of memory out of 5000000
- 36163 multiletter control sequences out of 15000+600000
- 652778 words of font info for 217 fonts, out of 8000000 for 9000
+ 14690 strings out of 474222
+ 232419 string characters out of 5736121
+ 1944975 words of memory out of 5000000
+ 36255 multiletter control sequences out of 15000+600000
+ 675065 words of font info for 268 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,10n,79p,2539b,614s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmex10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr12.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr17.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmri10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on main.pdf (15 pages, 368774 bytes).
+ 75i,10n,79p,3412b,627s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmex10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr12.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr17.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmr9.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmri10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmsy7.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></vast.mnt/sw/rl8/zen/app/texlive/20230313-GCC-11.3.0/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on main.pdf (23 pages, 448721 bytes).
 PDF statistics:
- 404 PDF objects out of 1000 (max. 8388607)
- 344 compressed objects within 4 object streams
- 111 named destinations out of 1000 (max. 500000)
- 51281 words of extra memory for PDF output out of 51595 (max. 10000000)
+ 542 PDF objects out of 1000 (max. 8388607)
+ 465 compressed objects within 5 object streams
+ 139 named destinations out of 1000 (max. 500000)
+ 62049 words of extra memory for PDF output out of 74296 (max. 10000000)
 

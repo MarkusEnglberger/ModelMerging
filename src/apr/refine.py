@@ -90,10 +90,28 @@ def _gate(g: torch.Tensor, v: torch.Tensor, cfg: RefineConfig,
     raise ValueError(f"Unknown gate_mode '{mode}'")
 
 
+def _sweep_lr(cfg: RefineConfig, sweep: int) -> float:
+    """Effective learning rate for a sweep under the configured schedule."""
+    if cfg.lr_schedule == "constant" or cfg.steps <= 1:
+        return cfg.lr
+    t = sweep / (cfg.steps - 1)  # 0 -> 1 over the run
+    lo = cfg.lr * cfg.lr_min_frac
+    if cfg.lr_schedule == "cosine":
+        import math
+        return lo + 0.5 * (cfg.lr - lo) * (1.0 + math.cos(math.pi * t))
+    if cfg.lr_schedule == "linear":
+        return cfg.lr + (lo - cfg.lr) * t
+    raise ValueError(f"Unknown lr_schedule '{cfg.lr_schedule}'")
+
+
 def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
                     rng_gen: Optional[torch.Generator],
-                    frozen_mask: Optional[ParamDict]) -> (ParamDict, ParamDict, dict):
-    """Return (u, mask, stats) for one task at the current state."""
+                    frozen_mask: Optional[ParamDict],
+                    lr_eff: Optional[float] = None) -> (ParamDict, ParamDict, dict):
+    """Return (u, mask, stats) for one task at the current state. ``lr_eff``
+    overrides cfg.lr (per-sweep schedule); defaults to cfg.lr."""
+    if lr_eff is None:
+        lr_eff = cfg.lr
     u = OrderedDict()
     masks = OrderedDict()
     ap_sum = 0.0
@@ -113,7 +131,7 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
             # saturating trust region: clip AFTER scaling by lr, so the move is
             # bounded by gamma*|v| for ANY lr (no overshoot for gamma<=1 => safe).
             bound = cfg.clip_frac * vi.abs()
-            pre = cfg.lr * u_raw
+            pre = lr_eff * u_raw
             u_t = torch.clamp(pre, min=-bound, max=bound)
         elif cfg.clip_mode == "none":
             pre = None
@@ -154,11 +172,12 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
 
     frozen_masks: Dict[str, ParamDict] = {}
     history: List[dict] = []
-    # for vdist_pre, lr is already folded into the clipped update inside
-    # _compute_update, so it is applied with unit step here.
-    apply_alpha = 1.0 if cfg.clip_mode == "vdist_pre" else cfg.lr
 
     for s in range(cfg.steps):
+        lr_eff = _sweep_lr(cfg, s)
+        # for vdist_pre, lr is already folded into the clipped update inside
+        # _compute_update, so it is applied with unit step here.
+        apply_alpha = 1.0 if cfg.clip_mode == "vdist_pre" else lr_eff
         sweep_order = _order_for_sweep(order_names, cfg.order, s, py_rng)
         # snapshot for aggregated-U mode (all updates computed at theta^(s))
         snapshot = pd_clone(theta) if cfg.aggregated else None
@@ -176,7 +195,7 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
 
             use_frozen = cfg.freeze_first_gates and s > 0
             frozen = frozen_masks.get(name) if use_frozen else None
-            u, masks, stats = _compute_update(g, v, cfg, gen, frozen)
+            u, masks, stats = _compute_update(g, v, cfg, gen, frozen, lr_eff=lr_eff)
             if cfg.freeze_first_gates and s == 0:
                 frozen_masks[name] = OrderedDict((n, masks[n].clone()) for n in masks)
 
@@ -195,7 +214,7 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
             # standard path, 1.0 for vdist_pre where lr is already inside u). The
             # raw |u| is NOT comparable across families with different lr.
             stats.update({"sweep": s, "task": name, "update_norm": raw_norm,
-                          "step_norm": apply_alpha * raw_norm})
+                          "step_norm": apply_alpha * raw_norm, "lr_eff": lr_eff})
             history.append(stats)
             if logger:
                 logger(f"  sweep {s} task {name}: gate_density={stats['gate_density']:.4f} "
