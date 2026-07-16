@@ -26,6 +26,10 @@
 \DeclareMathOperator{\clip}{clip}
 \DeclareMathOperator{\rms}{rms}
 
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\newtheorem{proposition}{Proposition}
+
 \title{Attribution-Patching-Guided Replay Refinement for Task-Vector Merging}
 \author{Anonymous Authors \\
 \small Draft proposal}
@@ -186,6 +190,91 @@ The robustness of the refinement comes primarily from the expert anchoring rathe
 \State \Return $\theta^{(S)}$.
 \end{algorithmic}
 \end{algorithm}
+
+The informal claim that the refinement ``stays within the expert-anchored trust region and cannot diverge'' can be made precise. Every gated, clipped step moves each coordinate between its current value and the corresponding expert coordinate, and such coordinatewise movement toward a point of the expert hull can never increase the distance to that hull. The following corollary states the resulting guarantee for Algorithm~\ref{alg:expert-gated-refinement}; it is an instance of a general geometric result, Theorem~\ref{thm:box-distance-monotonicity} in Appendix~\ref{app:box-theory}, where we also show that the axis-aligned expert box is exactly the $\ell^1$-geodesic convex hull of the experts (Proposition~\ref{prop:l1-geodesic-box-hull}), so the box is not an arbitrary safe region but the natural coordinatewise notion of the experts' convex hull.
+
+\begin{corollary}[Box-distance monotonicity of the sequential refinement]
+\label{cor:algorithm-box-distance}
+Let
+\[
+B_{\mathrm{exp}}
+:=
+\prod_{r=1}^d
+[\underline{\theta}_r,\overline{\theta}_r],
+\qquad
+\underline{\theta}_r := \min_{j\in\tasks}\theta_{j,r},
+\qquad
+\overline{\theta}_r := \max_{j\in\tasks}\theta_{j,r},
+\]
+be the axis-aligned box hull of the task experts. Then every
+within-sweep update of Algorithm~\ref{alg:expert-gated-refinement} is
+non-expansive in distance to the expert box: for every $1\le p\le\infty$,
+\[
+    d_p\!\left(\theta^{(s,k)},B_{\mathrm{exp}}\right)
+    \le
+    d_p\!\left(\theta^{(s,k-1)},B_{\mathrm{exp}}\right).
+\]
+Consequently, after any number $S$ of sweeps,
+\[
+    d_p\!\left(\theta^{(S)},B_{\mathrm{exp}}\right)
+    \le
+    d_p\!\left(\theta^{(0)},B_{\mathrm{exp}}\right)
+    \qquad\text{for every }1\le p\le\infty.
+\]
+\end{corollary}
+
+\begin{proof}
+Fix a sweep $s$, a within-sweep index $k$, and let $i=\pi_s(k)$. We first
+verify the hypothesis of Theorem~\ref{thm:box-distance-monotonicity} with
+\[
+    y=\theta^{(s,k-1)},
+    \qquad
+    z=\theta^{(s,k)},
+    \qquad
+    x_i=\theta_i.
+\]
+It is enough to check that, for every coordinate $r$, the new coordinate
+$\theta_r^{(s,k)}$ lies between the previous coordinate
+$\theta_r^{(s,k-1)}$ and the expert coordinate $\theta_{i,r}$.
+
+Write $v_r=v_{i,r}^{(s,k)}=\theta_{i,r}-\theta_r^{(s,k-1)}$. If the gate is
+off, then $m_{i,r}^{(s,k)}=0$, hence $u_{i,r}^{(s,k)}=0$, and the coordinate
+is unchanged. If the gate is on, then
+\[
+    g_{i,r}^{(s,k)} v_r < -\epsilon_{\mathrm{gate}} \le 0,
+\]
+so $-g_{i,r}^{(s,k)}$ has the same sign as $v_r$. Therefore the raw update
+$\widetilde u_{i,r}^{(s,k)}=-g_{i,r}^{(s,k)}|v_r|m_{i,r}^{(s,k)}$ points in
+the same direction as $v_r$. Multiplication by $\eta\ge0$ preserves this
+direction, possibly making the update zero, and the symmetric clip in
+Equation~\eqref{eq:clipped-update} gives an applied update with the same weak sign as $v_r$ and magnitude at most $|v_r|$.
+Thus there is an $\alpha_{i,r}^{(s,k)}\in[0,1]$ such that
+\[
+    u_{i,r}^{(s,k)}=\alpha_{i,r}^{(s,k)}v_{i,r}^{(s,k)}.
+\]
+The same representation is assumed directly in the optional post-processing
+case. Hence
+\[
+    \theta_r^{(s,k)}
+    =
+    \theta_r^{(s,k-1)}
+    +
+    \alpha_{i,r}^{(s,k)}
+    \bigl(\theta_{i,r}-\theta_r^{(s,k-1)}\bigr),
+\]
+so $\theta_r^{(s,k)}$ lies between $\theta_r^{(s,k-1)}$ and $\theta_{i,r}$.
+
+The box $B_{\mathrm{exp}}$ is exactly the axis-aligned hull of the expert
+points $\theta_1,\dots,\theta_T$. Therefore
+Theorem~\ref{thm:box-distance-monotonicity} gives
+\[
+    d_p\!\left(\theta^{(s,k)},B_{\mathrm{exp}}\right)
+    \le
+    d_p\!\left(\theta^{(s,k-1)},B_{\mathrm{exp}}\right)
+\]
+for every $1\le p\le\infty$. Chaining this inequality over
+$k=1,\dots,T$ and over sweeps $s=0,\dots,S-1$ gives the final statement.
+\end{proof}
 
 
 \subsection{A Second Perspective: Attribution Patching in Parameter Space}
@@ -781,5 +870,221 @@ Janos Kramar, Tom Lieberum, Rohin Shah, and Neel Nanda.
 \newblock \emph{arXiv preprint arXiv:2403.00745}, 2024.
 
 \end{thebibliography}
+
+\appendix
+
+\section{Box-Distance Monotonicity and the Expert Box}
+\label{app:box-theory}
+
+This appendix proves the general geometric result behind
+Corollary~\ref{cor:algorithm-box-distance}. The statement is
+self-contained: $x_1,\dots,x_n$ are arbitrary points in $\mathbb{R}^D$
+(in the application, the task experts $\theta_1,\dots,\theta_T$), and the
+superscript $d$ indexes coordinates.
+
+\begin{theorem}[Box-distance monotonicity under coordinatewise movement toward a hull point]
+\label{thm:box-distance-monotonicity}
+Let \(x_1,\dots,x_n\in \mathbb{R}^D\). Define the axis-aligned box hull
+\[
+B:=\prod_{d=1}^D [m_d,M_d],
+\qquad
+m_d:=\min_{1\le j\le n} x_j^d,
+\qquad
+M_d:=\max_{1\le j\le n} x_j^d.
+\]
+Let \(y,z\in \mathbb{R}^D\). Suppose that there exists some
+\(i\in\{1,\dots,n\}\) such that, for every coordinate \(d\in\{1,\dots,D\}\),
+the point \(z^d\) lies between \(x_i^d\) and \(y^d\). Equivalently,
+\[
+|z^d-x_i^d|\le |y^d-x_i^d|
+\]
+and \(z^d-x_i^d\) has the same sign as \(y^d-x_i^d\), allowing equality.
+
+Then, for every \(1\le p\le \infty\),
+\[
+d_p(z,B)\le d_p(y,B),
+\]
+where \(d_p(u,B)\) denotes the distance from \(u\) to \(B\) with respect to
+the \(\ell^p\)-norm.
+\end{theorem}
+
+\begin{proof}
+For each coordinate \(d\), set
+\[
+I_d:=[m_d,M_d].
+\]
+Since \(x_i\in B\), we have
+\[
+x_i^d\in I_d
+\]
+for every \(d\).
+
+Define the one-dimensional distance function
+\[
+\delta_d(t):=\operatorname{dist}(t,I_d)
+=
+\inf_{s\in I_d}|t-s|.
+\]
+
+We first prove the following elementary one-dimensional claim.
+
+\medskip
+
+\noindent
+\textbf{Claim.}
+Let \(I=[m,M]\subset \mathbb{R}\), let \(c\in I\), and suppose that
+\(z\) lies between \(c\) and \(y\). Then
+\[
+\operatorname{dist}(z,I)\le \operatorname{dist}(y,I).
+\]
+
+\medskip
+
+\noindent
+Indeed, if \(y\in I\), then since \(c\in I\) and \(I\) is an interval,
+every point between \(c\) and \(y\) also lies in \(I\). Hence \(z\in I\), so
+\[
+\operatorname{dist}(z,I)=0=\operatorname{dist}(y,I).
+\]
+
+If \(y>M\), then
+\[
+\operatorname{dist}(y,I)=y-M.
+\]
+Since \(z\) lies between \(c\in I\) and \(y>M\), we have \(z\le y\). If
+\(z\le M\), then \(\operatorname{dist}(z,I)=0\). If \(z>M\), then
+\[
+\operatorname{dist}(z,I)=z-M\le y-M=\operatorname{dist}(y,I).
+\]
+The case \(y<m\) is symmetric. This proves the claim.
+
+\medskip
+
+Now apply the claim coordinatewise with
+\[
+I=I_d,
+\qquad
+c=x_i^d.
+\]
+Because \(z^d\) lies between \(x_i^d\) and \(y^d\), we obtain
+\[
+\delta_d(z^d)\le \delta_d(y^d)
+\]
+for every \(d\in\{1,\dots,D\}\).
+
+Next, distance to an axis-aligned box separates coordinatewise. Namely, for
+\(1\le p<\infty\),
+\[
+d_p(u,B)
+=
+\left(
+\sum_{d=1}^D \delta_d(u^d)^p
+\right)^{1/p},
+\]
+and for \(p=\infty\),
+\[
+d_\infty(u,B)
+=
+\max_{1\le d\le D}\delta_d(u^d).
+\]
+This follows because the closest point of \(B\) to \(u\) is obtained by
+clipping each coordinate \(u^d\) to the interval \(I_d=[m_d,M_d]\).
+
+Since
+\[
+\delta_d(z^d)\le \delta_d(y^d)
+\]
+for every \(d\), monotonicity of the \(\ell^p\)-norm on the nonnegative
+orthant gives
+\[
+d_p(z,B)\le d_p(y,B).
+\]
+This proves the theorem.
+\end{proof}
+
+The box hull \(B\) may look like a loose relaxation of the ordinary convex
+hull of the experts, but it is canonical in its own right: it is the
+smallest set containing the experts that is convex with respect to
+\(\ell^1\)-geodesics.
+
+\begin{proposition}
+\label{prop:l1-geodesic-box-hull}
+The set \(B\) is the \(\ell^1\)-geodesic convex hull of
+\(\{x_1,\dots,x_n\}\).
+\end{proposition}
+
+\begin{proof}
+For \(a,b\in \mathbb{R}^D\), define the \(\ell^1\)-metric interval between
+\(a\) and \(b\) by
+\[
+I_1(a,b)
+:=
+\{u\in\mathbb{R}^D:
+\|a-u\|_1+\|u-b\|_1=\|a-b\|_1\}.
+\]
+We claim that
+\[
+I_1(a,b)
+=
+\prod_{d=1}^D
+[\min(a^d,b^d),\max(a^d,b^d)].
+\]
+
+Indeed, by the triangle inequality in one dimension,
+\[
+|a^d-u^d|+|u^d-b^d|\ge |a^d-b^d|
+\]
+for each coordinate \(d\). Summing over \(d\), equality in the
+\(\ell^1\)-triangle inequality holds if and only if equality holds in every
+coordinate. In one dimension, equality holds precisely when \(u^d\) lies
+between \(a^d\) and \(b^d\). Hence the displayed formula for \(I_1(a,b)\)
+follows.
+
+Now \(B\) is clearly \(\ell^1\)-geodesically convex: if \(a,b\in B\), then
+every point coordinatewise between \(a\) and \(b\) also lies in \(B\).
+
+It remains to show minimality. Let \(C\subseteq \mathbb{R}^D\) be any
+\(\ell^1\)-geodesically convex set containing \(x_1,\dots,x_n\). Since
+\(C\) is closed under \(\ell^1\)-metric intervals, it is closed under taking
+coordinatewise boxes between pairs of its points. In particular, if
+\(a,b\in C\), then both the coordinatewise minimum
+\[
+a\wedge b
+:=
+(\min(a^1,b^1),\dots,\min(a^D,b^D))
+\]
+and the coordinatewise maximum
+\[
+a\vee b
+:=
+(\max(a^1,b^1),\dots,\max(a^D,b^D))
+\]
+belong to \(C\).
+
+By induction, \(C\) therefore contains the coordinatewise minimum
+\[
+m:=(m_1,\dots,m_D)
+\]
+and the coordinatewise maximum
+\[
+M:=(M_1,\dots,M_D)
+\]
+of the points \(x_1,\dots,x_n\). Since \(C\) is \(\ell^1\)-geodesically
+convex, it contains the entire \(\ell^1\)-metric interval between \(m\) and
+\(M\). But
+\[
+I_1(m,M)
+=
+\prod_{d=1}^D [m_d,M_d]
+=
+B.
+\]
+Therefore every \(\ell^1\)-geodesically convex set containing
+\(x_1,\dots,x_n\) also contains \(B\). Hence \(B\) is the smallest such set,
+i.e.
+\[
+B=\operatorname{gconv}_{\ell^1}\{x_1,\dots,x_n\}.
+\]
+\end{proof}
 
 \end{document}
