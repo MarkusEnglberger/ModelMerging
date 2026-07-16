@@ -112,6 +112,15 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
     overrides cfg.lr (per-sweep schedule); defaults to cfg.lr."""
     if lr_eff is None:
         lr_eff = cfg.lr
+    # topk gate: global per-task threshold on |g*v| among loss-decreasing coords,
+    # computed here (not in _gate) because the threshold spans all tensors.
+    topk_thr = None
+    if cfg.gate_mode == "topk" and frozen_mask is None:
+        neg = torch.cat([torch.clamp(-(g[n] * v[n]), min=0).reshape(-1) for n in g])
+        total = neg.numel()
+        k = max(1, int(round(cfg.topk_frac * total)))
+        topk_thr = float(torch.kthvalue(neg, total - k + 1).values)
+        del neg
     u = OrderedDict()
     masks = OrderedDict()
     ap_sum = 0.0
@@ -120,7 +129,13 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
     clipped = 0  # gated coords whose step hit the +/- gamma|v| boundary
     for name in g:
         gi, vi = g[name], v[name]
-        m = frozen_mask[name] if frozen_mask is not None else _gate(gi, vi, cfg, rng_gen)
+        if frozen_mask is not None:
+            m = frozen_mask[name]
+        elif cfg.gate_mode == "topk":
+            prod = gi * vi
+            m = ((prod < 0) & (-prod >= topk_thr)).to(gi.dtype)
+        else:
+            m = _gate(gi, vi, cfg, rng_gen)
         u_raw = _base_update(gi, vi, cfg.update_mode) * m
         if cfg.clip_mode == "vdist":
             # clip THEN scale by lr (paper Eq. 18-19): move bounded by lr*gamma*|v|

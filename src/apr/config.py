@@ -33,6 +33,11 @@ class RefineConfig:
     # at the final sweep (long-horizon control: big early steps, fine late steps).
     lr_schedule: str = "constant"
     lr_min_frac: float = 0.05
+    # gate_mode="topk": keep only coordinates with g*v < 0 AND |g*v| in the top
+    # `topk_frac` fraction of ALL coordinates (global threshold per task per sweep).
+    # Tests whether the attribution signal that the eps=0 sign gate dilutes across
+    # the noise floor is recoverable by magnitude concentration.
+    topk_frac: float = 0.05
 
 
 @dataclass
