@@ -43,10 +43,19 @@ from torch.utils.data import DataLoader
 from .models import ParamDict, load_encoder_state
 
 
-def _entropy_loss(logits: torch.Tensor) -> torch.Tensor:
-    """Mean Shannon entropy of the predictive distribution over a batch."""
+def _entropy_loss(logits: torch.Tensor, mask: torch.Tensor = None) -> torch.Tensor:
+    """Mean Shannon entropy of the predictive distribution over a batch.
+
+    ``mask`` (optional, bool, same shape as logits minus the vocab dim) restricts
+    the mean to selected positions -- used by the causal-LM adaptation to score
+    only prompt positions."""
     logp = torch.log_softmax(logits, dim=-1)
-    return -(logp.exp() * logp).sum(dim=-1).mean()
+    ent = -(logp.exp() * logp).sum(dim=-1)
+    if mask is not None:
+        ent = ent[mask]
+        if ent.numel() == 0:
+            return (logits.sum() * 0.0)  # keeps the graph; contributes nothing
+    return ent.mean()
 
 
 def _infinite_batches(dataset, collator, batch_size: int, seed: int,
@@ -161,9 +170,25 @@ def adamerging(base_encoder: ParamDict, task_vectors: Dict[str, ParamDict],
             model.zero_grad(set_to_none=True)
 
             batch = next(streams[n])
-            batch.pop("labels", None)
+            labels = batch.pop("labels", None)
             batch = {k: v.to(device) for k, v in batch.items()}
-            ent = _entropy_loss(model(**batch).logits)
+            out = model(**batch)
+            mask = None
+            if out.logits.dim() == 3 and labels is not None:
+                # causal-LM adaptation: SFT batches carry prompt+response tokens
+                # with the prompt loss-masked (labels==-100). To stay honestly
+                # label-free, score predictive entropy ONLY at positions whose
+                # next token is still prompt (response tokens are the labels and
+                # must not condition the objective). Pad positions (attention 0)
+                # are excluded too.
+                lab = labels.to(device)
+                mask = lab[:, 1:] == -100
+                att = batch.get("attention_mask")
+                if att is not None:
+                    mask &= att[:, 1:].bool()
+                ent = _entropy_loss(out.logits[:, :-1, :], mask=mask)
+            else:
+                ent = _entropy_loss(out.logits)
             ent.backward()
             total_ent += float(ent)
 

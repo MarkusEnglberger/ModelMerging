@@ -73,6 +73,11 @@ def main():
     if args.n_probe is not None:
         cfg.data.n_probe = args.n_probe
     ctx = MergeContext.build(cfg)
+    # the task-vector copies are only needed to build the merge (done inside build);
+    # refinement anchors on expert_encoder, not tau. At 3B/fp32 these are ~34 GB of
+    # dead weight in this script's CPU footprint, so drop them (keeps the node-RAM
+    # request at the 1-GPU billing floor). Harmless if already empty.
+    ctx.task_vectors = {}
 
     methods = build_methods(args.steps, args.gd_lrs, args.apr_lrs, args.nogate_lrs,
                             args.gammas, clip_mode=args.clip_mode,

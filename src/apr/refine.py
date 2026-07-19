@@ -205,8 +205,16 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
                 h.model.to(device)
             load_encoder_state(h.model, state)
             g = h.grad_fn()  # encoder grads at `state`
+            # free the model off-GPU now: the gate/update math below needs only the
+            # param-dicts (g, v, u, theta), not the model. At 3B/fp32 each of these
+            # is ~12 GB, so keeping the model resident too overflows the card.
+            if move_model:
+                h.model.to("cpu")
+                if device.startswith("cuda"):
+                    torch.cuda.empty_cache()
             expert = pd_to(h.expert_encoder, device)
             v = OrderedDict((n, expert[n] - state[n]) for n in enc_names)
+            del expert  # only needed to form v; free its GPU copy before _compute_update
 
             use_frozen = cfg.freeze_first_gates and s > 0
             frozen = frozen_masks.get(name) if use_frozen else None
@@ -235,10 +243,14 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
                 logger(f"  sweep {s} task {name}: gate_density={stats['gate_density']:.4f} "
                        f"ap_sum={stats['ap_sum']:.4g} step|lr*u|={stats['step_norm']:.4g} "
                        f"(raw|u|={raw_norm:.4g})")
-            if move_model:
-                h.model.to("cpu")
-                if device.startswith("cuda"):
-                    torch.cuda.empty_cache()
+            # release this task's large GPU param-dicts before the next task's
+            # grad_fn allocates; otherwise at 3B/fp32 they accumulate across the
+            # sweep and OOM the card (a single task fits; the pile-up does not).
+            # u is already folded into theta/agg_u; masks is cloned into
+            # frozen_masks above when needed. The model was moved to CPU above.
+            del g, v, u, masks
+            if device.startswith("cuda"):
+                torch.cuda.empty_cache()
 
         if cfg.aggregated and agg_u is not None:
             for n in enc_names:

@@ -21,7 +21,8 @@ from apr.causal_lm import MERGEBENCH_EXPERT
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--base", default="meta-llama/Llama-3.2-3B")
-ap.add_argument("--domains", nargs="*", default=["math", "coding", "instruction"])
+ap.add_argument("--domains", nargs="*",
+                default=["math", "coding", "instruction", "multilingual"])
 args = ap.parse_args()
 
 print(f"[prefetch] HF_HOME={os.environ['HF_HOME']}")
@@ -35,10 +36,23 @@ for d in args.domains:
     print(f"[prefetch] expert {d} <- {ckpt}")
     AutoModelForCausalLM.from_pretrained(ckpt, torch_dtype="bfloat16")
 
-print("[prefetch] datasets: gsm8k, mbpp, google/IFEval, yahma/alpaca-cleaned")
+print("[prefetch] eval datasets: gsm8k, evalplus/mbppplus, google/IFEval")
 load_dataset("gsm8k", "main")
-load_dataset("mbpp")
+load_dataset("evalplus/mbppplus")
 load_dataset("google/IFEval")
-load_dataset("yahma/alpaca-cleaned")
+
+print("[prefetch] replay datasets: MergeBench per-domain val sets")
+for d in args.domains:
+    load_dataset(f"MergeBench/{d}_val")
+
+if "multilingual" in args.domains:
+    from apr.causal_lm import MULTILINGUAL_LANGS, _MC_BENCHES
+    for hf_name, bench in _MC_BENCHES:
+        for lang in MULTILINGUAL_LANGS:
+            print(f"[prefetch] {bench}/{lang}")
+            try:
+                load_dataset(hf_name, lang, split="test")
+            except Exception as e:
+                print(f"[prefetch]   skip {bench}/{lang}: {type(e).__name__}")
 
 print("[prefetch] done. Compute jobs can now run offline.")

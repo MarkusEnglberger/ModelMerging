@@ -42,6 +42,14 @@ def score_predictions(spec: TaskSpec, preds, labels) -> Dict[str, float]:
 
 def normalized_retention(merge: float, base: float, expert: float,
                          eps: float = EPS_METRIC) -> float:
+    # correlation metrics are NaN when predictions are degenerate (e.g. zero-shot
+    # flan-T5 on STS-B emits non-numeric strings); read "undefined" as "no signal"
+    # for the base/merge scores so one NaN cannot poison the aggregates. A NaN
+    # expert score is a broken setup and is left to propagate visibly.
+    if np.isnan(base):
+        base = 0.0
+    if np.isnan(merge):
+        merge = 0.0
     return (merge - base) / (expert - base + eps)
 
 

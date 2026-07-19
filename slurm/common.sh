@@ -5,6 +5,9 @@ cd "${SLURM_SUBMIT_DIR:-$PWD}"
 
 source .venv/bin/activate
 export HF_HOME="$PWD/.hf_cache"
+# official IFEval checkers (apr.ifeval) need nltk punkt data; prefetched on the
+# login node into scratch so offline compute nodes find it.
+export NLTK_DATA=/scratch-shared/menglberger/ModelMerging/nltk_data
 # assets are pre-fetched on the login node; run offline on compute nodes
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1

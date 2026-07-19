@@ -99,14 +99,21 @@ def extract_gsm8k_answer(text: str) -> Optional[str]:
     return nums[-1].replace(",", "").replace("$", "").rstrip(".")
 
 
-def _gsm8k_replay(tokenizer, max_length, cache_dir, style):
-    ds = load_dataset("gsm8k", "main", split="train", cache_dir=cache_dir)
-    def make(row):
-        return _sft_example(tokenizer,
-                            _wrap_prompt(GSM8K_INSTR.format(q=row["question"]),
-                                         style, tokenizer),
-                            row["answer"], max_length)
-    return ds, make
+def _mergebench_val_replay(hf_name: str, prompt_field: str, response_field: str):
+    """Replay drawn from MergeBench's released per-domain validation sets
+    (1k samples from each expert's actual SFT training distribution). This is the
+    same pool MergeBench gives its data-dependent baselines (Fisher/RegMean/L&S,
+    1,000 examples each), so an n=64 replay buffer is protocol-consistent -- and it
+    fixes the earlier objective mismatch where the instruction gradient was computed
+    on alpaca prose while the metric scored IFEval constraint compliance."""
+    def build(tokenizer, max_length, cache_dir, style):
+        ds = load_dataset(hf_name, split="train", cache_dir=cache_dir)
+        def make(row):
+            return _sft_example(tokenizer,
+                                _wrap_prompt(row[prompt_field], style, tokenizer),
+                                row[response_field], max_length)
+        return ds, make
+    return build
 
 
 def _gsm8k_eval(cache_dir, max_eval):
@@ -164,105 +171,158 @@ def run_python_tests(code: str, tests: List[str], timeout: float = 10.0) -> bool
         os.unlink(path)
 
 
-def _mbpp_replay(tokenizer, max_length, cache_dir, style):
-    ds = load_dataset("mbpp", split="train", cache_dir=cache_dir)
-    def make(row):
-        prompt = _wrap_prompt(MBPP_INSTR.format(text=row["text"],
-                                                test=row["test_list"][0]),
-                              style, tokenizer)
-        return _sft_example(tokenizer, prompt, row["code"], max_length)
-    return ds, make
-
-
 def _mbpp_eval(cache_dir, max_eval):
-    ds = load_dataset("mbpp", split="test", cache_dir=cache_dir)
+    # MBPP+ (EvalPlus): same problems as MBPP but ~35x more tests per problem, and
+    # the split MergeBench's coding numbers use (via bigcode-eval). The stronger
+    # suites separate base from expert far better than the 3 original asserts
+    # (plain-MBPP eval0 gave expert-base = 0.05, too small to carry retention).
+    ds = load_dataset("evalplus/mbppplus", split="test", cache_dir=cache_dir)
     if max_eval:
         ds = ds.select(range(min(max_eval, len(ds))))
     return list(ds)
 
 
 def _mbpp_score(rows, texts) -> Dict[str, float]:
-    hits = sum(int(run_python_tests(extract_code(t), r["test_list"]))
+    # row["test"] is a self-contained EvalPlus script (defines assertion() + all
+    # input/expected pairs and calls assertion(func(*inp), exp, 0)); append it to
+    # the candidate code and run in the sandbox. Longer timeout: plus-suites run
+    # hundreds of assertions.
+    hits = sum(int(run_python_tests(extract_code(t), [r["test"]], timeout=30.0))
                for r, t in zip(rows, texts))
     acc = hits / max(len(rows), 1)
     return {"pass@1": acc, "primary": acc}
 
 
 # ---------------------------------------------------------------------------
-# instruction: IFEval-lite (verifiable-constraint subset) + alpaca replay
+# instruction: IFEval (official checkers, all 541 prompts)
 # ---------------------------------------------------------------------------
 
-def _count_words(t): return len(re.findall(r"\b\w+\b", t))
-def _count_sentences(t): return max(1, len(re.findall(r"[.!?]+(?:\s|$)", t)))
-
-def _rel(n, relation, thr):
-    return n < thr if relation == "less than" else n >= thr
-
-# checker: (response, kwargs) -> bool. Subset of google/IFEval instruction ids.
-IFEVAL_CHECKERS: Dict[str, Callable] = {
-    "keywords:existence": lambda t, k: all(
-        re.search(rf"\b{re.escape(w)}\b", t, re.I) for w in k["keywords"]),
-    "keywords:forbidden_words": lambda t, k: not any(
-        re.search(rf"\b{re.escape(w)}\b", t, re.I) for w in k["forbidden_words"]),
-    "keywords:frequency": lambda t, k: _rel(
-        len(re.findall(rf"\b{re.escape(k['keyword'])}\b", t, re.I)),
-        k["relation"], k["frequency"]),
-    "length_constraints:number_words": lambda t, k: _rel(
-        _count_words(t), k["relation"], k["num_words"]),
-    "length_constraints:number_sentences": lambda t, k: _rel(
-        _count_sentences(t), k["relation"], k["num_sentences"]),
-    "change_case:english_lowercase": lambda t, k: t == t.lower(),
-    "change_case:english_capital": lambda t, k: t == t.upper(),
-    "startend:quotation": lambda t, k: t.strip().startswith('"') and t.strip().endswith('"'),
-    "startend:end_checker": lambda t, k: t.strip().endswith(k["end_phrase"].strip()),
-    "detectable_content:number_placeholders": lambda t, k: len(
-        re.findall(r"\[.*?\]", t)) >= k["num_placeholders"],
-    "detectable_format:number_bullet_lists": lambda t, k: len(
-        re.findall(r"^\s*[*-]\s", t, re.M)) == k["num_bullets"],
-    "detectable_format:title": lambda t, k: bool(re.search(r"<<[^\n<>]+>>", t)),
-}
-
-
 def _ifeval_eval(cache_dir, max_eval):
-    ds = load_dataset("google/IFEval", split="train", cache_dir=cache_dir)
-    rows = [r for r in ds
-            if all(i in IFEVAL_CHECKERS for i in r["instruction_id_list"])]
-    covered = len(rows) / max(len(ds), 1)
-    print(f"[ifeval-lite] {len(rows)}/{len(ds)} prompts covered "
-          f"({covered:.0%}) by {len(IFEVAL_CHECKERS)} checkers", flush=True)
+    # official checker suite (apr.ifeval) covers all 25 instruction types, so no
+    # coverage filter: the previous 12 hand-written checkers restricted scoring to
+    # a biased 223/541 subset (only the constraint families that were easy to
+    # regex), which both skewed the construct and doubled the noise.
+    rows = list(load_dataset("google/IFEval", split="train", cache_dir=cache_dir))
     if max_eval:
         rows = rows[:max_eval]
     return rows
 
 
 def _ifeval_score(rows, texts) -> Dict[str, float]:
-    """Strict prompt-level accuracy: every constraint of the prompt satisfied."""
-    hits = 0
-    for row, text in zip(rows, texts):
-        kwargs_list = row.get("kwargs") or [{}] * len(row["instruction_id_list"])
-        ok = True
-        for inst_id, kw in zip(row["instruction_id_list"], kwargs_list):
-            kw = {k: v for k, v in (kw or {}).items() if v is not None}
-            try:
-                if not IFEVAL_CHECKERS[inst_id](text, kw):
-                    ok = False
-                    break
-            except (KeyError, TypeError):
-                ok = False
-                break
-        hits += int(ok)
+    """Prompt-level STRICT accuracy with the official IFEval checkers."""
+    from .ifeval import strict_follows_all
+    hits = sum(int(strict_follows_all(row["prompt"], row["instruction_id_list"],
+                                      row.get("kwargs"), text))
+               for row, text in zip(rows, texts))
     acc = hits / max(len(rows), 1)
     return {"prompt_level_strict": acc, "primary": acc}
 
 
-def _alpaca_replay(tokenizer, max_length, cache_dir, style):
-    ds = load_dataset("yahma/alpaca-cleaned", split="train", cache_dir=cache_dir)
-    def make(row):
-        instr = row["instruction"] + (
-            f"\n\n{row['input']}" if row.get("input") else "")
-        return _sft_example(tokenizer, _wrap_prompt(instr, style, tokenizer),
-                            row["output"], max_length)
-    return ds, make
+# ---------------------------------------------------------------------------
+# multilingual: M-MMLU + M-ARC (Okapi), multiple-choice log-likelihood.
+# Scored like lm-eval's MC tasks: one forward pass per prompt, compare the
+# log-probs of the option letters at the final position. No generation at all,
+# so this eval has NONE of the decode-chaos sensitivity of the other domains
+# (a near-tie argmax flip cannot cascade), and it is ~100x cheaper per example.
+# ---------------------------------------------------------------------------
+
+MULTILINGUAL_LANGS = ["de", "es", "fr", "ru", "zh", "hi"]
+_MC_BENCHES = [("alexandrainst/m_mmlu", "m_mmlu"), ("alexandrainst/m_arc", "m_arc")]
+
+
+def _multilingual_eval(cache_dir, max_eval):
+    """Round-robin over (bench, language) streams so the subset is balanced;
+    each stream is shuffled with a fixed seed first (M-MMLU's test split is
+    subject-sorted, so taking a prefix unshuffled would bias toward one subject)."""
+    import random as _random
+    streams = []
+    for hf_name, bench in _MC_BENCHES:
+        for lang in MULTILINGUAL_LANGS:
+            try:
+                ds = load_dataset(hf_name, lang, split="test", cache_dir=cache_dir)
+            except Exception as e:  # missing language config: skip, keep balance
+                print(f"[multilingual] skip {bench}/{lang}: {type(e).__name__}", flush=True)
+                continue
+            rows = []
+            for r in ds:
+                options = []
+                for letter in ("a", "b", "c", "d", "e"):
+                    v = r.get(f"option_{letter}")
+                    if v is None or str(v).strip() in ("", "None"):
+                        continue
+                    options.append((letter.upper(), str(v)))
+                if len(options) < 2 or r["answer"] not in [o[0] for o in options]:
+                    continue
+                rows.append({"question": r["instruction"], "options": options,
+                             "answer": r["answer"], "bench": bench, "lang": lang})
+            _random.Random(0).shuffle(rows)
+            streams.append(rows)
+    out, i = [], 0
+    limit = max_eval or sum(len(s) for s in streams)
+    while len(out) < limit and any(streams):
+        s = streams[i % len(streams)]
+        if s:
+            out.append(s.pop(0))
+        i += 1
+        if i > 10_000_000:
+            break
+    return out
+
+
+def _mc_prompt(row) -> str:
+    # standard MMLU-style plain format (matches lm-eval; no SFT wrapper, so the
+    # comparison base-vs-expert is the community-standard one)
+    lines = [row["question"]]
+    lines += [f"{letter}. {text}" for letter, text in row["options"]]
+    lines.append("Answer:")
+    return "\n".join(lines)
+
+
+@torch.no_grad()
+def evaluate_mc(model, eval_rows: List[Dict], spec: CausalTaskSpec,
+                batch_size: int, device: str) -> Dict[str, float]:
+    """Multiple-choice accuracy by option-letter log-likelihood at the last
+    position. Honors spec.gen_dtype (bf16 eval) with the same cast-and-restore
+    discipline as evaluate_generation."""
+    tok = spec.tokenizer
+    model.eval()
+    model.to(device)
+    gen_dtype = getattr(spec, "gen_dtype", None)
+    orig_dtype = next(model.parameters()).dtype
+    cast = gen_dtype is not None and gen_dtype != orig_dtype
+    buf_backup = ({n: b.detach().clone() for n, b in model.named_buffers()
+                   if b.is_floating_point()} if cast else {})
+    if cast:
+        model.to(gen_dtype)
+    letter_ids = {}
+    for letter in ("A", "B", "C", "D", "E"):
+        ids = tok(" " + letter, add_special_tokens=False)["input_ids"]
+        letter_ids[letter] = ids[-1]
+    hits = 0
+    try:
+        for s in range(0, len(eval_rows), batch_size):
+            rows = eval_rows[s: s + batch_size]
+            prompts = [_mc_prompt(r) for r in rows]
+            tok.padding_side = "left"  # last position aligned across the batch
+            batch = tok(prompts, return_tensors="pt", padding=True, truncation=True,
+                        max_length=1024, add_special_tokens=True).to(device)
+            logits = model(**batch).logits[:, -1, :].float()
+            for i, r in enumerate(rows):
+                letters = [o[0] for o in r["options"]]
+                scores = torch.stack([logits[i, letter_ids[L]] for L in letters])
+                hits += int(letters[int(scores.argmax())] == r["answer"])
+    finally:
+        if cast:
+            model.to(orig_dtype)
+            for n, b in model.named_buffers():
+                if n in buf_backup:
+                    b.copy_(buf_backup[n])
+    acc = hits / max(len(eval_rows), 1)
+    return {"mc_acc": acc, "primary": acc}
+
+
+def _mc_score_stub(rows, texts):  # pragma: no cover - mc path never generates
+    raise RuntimeError("multilingual task is scored by evaluate_mc, not generation")
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +333,8 @@ def _mk_prompt_math(row, style, tok):
     return _wrap_prompt(GSM8K_INSTR.format(q=row["question"]), style, tok)
 
 def _mk_prompt_code(row, style, tok):
-    return _wrap_prompt(MBPP_INSTR.format(text=row["text"],
+    # mbppplus rows: task text in "prompt", original asserts in "test_list"
+    return _wrap_prompt(MBPP_INSTR.format(text=row["prompt"],
                                           test=row["test_list"][0]), style, tok)
 
 def _mk_prompt_instr(row, style, tok):
@@ -281,13 +342,28 @@ def _mk_prompt_instr(row, style, tok):
 
 
 CAUSAL_TASKS: Dict[str, dict] = {
-    "math": dict(metric="exact_match", replay=_gsm8k_replay, eval=_gsm8k_eval,
+    "math": dict(metric="exact_match", eval=_gsm8k_eval,
+                 replay=_mergebench_val_replay("MergeBench/math_val",
+                                               "query", "response"),
                  prompt=_mk_prompt_math, score=_gsm8k_score, max_new_tokens=400),
-    "coding": dict(metric="pass@1", replay=_mbpp_replay, eval=_mbpp_eval,
+    "coding": dict(metric="pass@1", eval=_mbpp_eval,
+                   replay=_mergebench_val_replay("MergeBench/coding_val",
+                                                 "instruction", "response"),
                    prompt=_mk_prompt_code, score=_mbpp_score, max_new_tokens=400),
-    "instruction": dict(metric="ifeval_strict", replay=_alpaca_replay,
-                        eval=_ifeval_eval, prompt=_mk_prompt_instr,
-                        score=_ifeval_score, max_new_tokens=512),
+    "instruction": dict(metric="ifeval_strict", eval=_ifeval_eval,
+                        replay=_mergebench_val_replay("MergeBench/instruction_val",
+                                                      "instruction", "output"),
+                        prompt=_mk_prompt_instr,
+                        # 1024 (was 512): 34/541 IFEval prompts carry "at least N
+                        # words" constraints (median 300, p90 800 words); at 512
+                        # tokens 15 of those were mathematically unsatisfiable,
+                        # auto-failing any model that complies. 1024 leaves ~6.
+                        score=_ifeval_score, max_new_tokens=1024),
+    "multilingual": dict(metric="mc_acc", eval=_multilingual_eval,
+                         replay=_mergebench_val_replay("MergeBench/multilingual_val",
+                                                       "inputs", "targets"),
+                         prompt=_mk_prompt_instr,  # unused: mc path never generates
+                         score=_mc_score_stub, max_new_tokens=8, eval_kind="mc"),
 }
 
 # MergeBench checkpoint naming: MergeBench/<base>_<domain>
@@ -301,7 +377,8 @@ def get_causal_task(name: str) -> CausalTaskSpec:
     return CausalTaskSpec(name=name, metric=d["metric"], build_replay=d["replay"],
                           build_eval=d["eval"], make_prompt=d["prompt"],
                           score_generations=d["score"],
-                          max_new_tokens=d["max_new_tokens"])
+                          max_new_tokens=d["max_new_tokens"],
+                          eval_kind=d.get("eval_kind", "generation"))
 
 
 # ---------------------------------------------------------------------------
@@ -344,16 +421,37 @@ def evaluate_generation(model, eval_rows: List[Dict], spec: CausalTaskSpec,
     tok = spec.tokenizer
     model.eval()
     model.to(device)
+    # Optional: run generation in a lower precision (e.g. bfloat16) to speed up the
+    # autoregressive decode, then restore the original storage dtype. This is safe
+    # for the weight-space method because the merge / task vectors / gate / refine
+    # gradients are all computed on the fp32 master ParamDict (see MergeContext),
+    # which is never touched here; the live model is scratch that has its fp32
+    # weights re-copied in before every eval and gradient step. We also snapshot and
+    # restore floating buffers (rotary inv_freq etc.) so nothing leaks across evals.
+    gen_dtype = getattr(spec, "gen_dtype", None)
+    orig_dtype = next(model.parameters()).dtype
+    cast = gen_dtype is not None and gen_dtype != orig_dtype
+    buf_backup = ({n: b.detach().clone() for n, b in model.named_buffers()
+                   if b.is_floating_point()} if cast else {})
+    if cast:
+        model.to(gen_dtype)
     texts = []
     pad_id = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
-    for s in range(0, len(eval_rows), batch_size):
-        rows = eval_rows[s: s + batch_size]
-        prompts = [spec.make_prompt(r, spec.prompt_style, tok) for r in rows]
-        tok.padding_side = "left"  # decoder-only generation needs left padding
-        batch = tok(prompts, return_tensors="pt", padding=True, truncation=True,
-                    max_length=1024, add_special_tokens=True).to(device)
-        out = model.generate(**batch, max_new_tokens=spec.max_new_tokens,
-                             do_sample=False, pad_token_id=pad_id)
-        gen = out[:, batch["input_ids"].shape[1]:]
-        texts.extend(tok.batch_decode(gen, skip_special_tokens=True))
+    try:
+        for s in range(0, len(eval_rows), batch_size):
+            rows = eval_rows[s: s + batch_size]
+            prompts = [spec.make_prompt(r, spec.prompt_style, tok) for r in rows]
+            tok.padding_side = "left"  # decoder-only generation needs left padding
+            batch = tok(prompts, return_tensors="pt", padding=True, truncation=True,
+                        max_length=1024, add_special_tokens=True).to(device)
+            out = model.generate(**batch, max_new_tokens=spec.max_new_tokens,
+                                 do_sample=False, pad_token_id=pad_id)
+            gen = out[:, batch["input_ids"].shape[1]:]
+            texts.extend(tok.batch_decode(gen, skip_special_tokens=True))
+    finally:
+        if cast:
+            model.to(orig_dtype)  # params reloaded from fp32 master before next use
+            for n, b in model.named_buffers():
+                if n in buf_backup:
+                    b.copy_(buf_backup[n])
     return spec.score_generations(eval_rows, texts)

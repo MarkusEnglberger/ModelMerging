@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=apr-t5-glue8
-#SBATCH --partition=mcs.gpu.q
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=48G
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
 #SBATCH --time=08:00:00
 #SBATCH --output=logs/t5_glue8-%j.out
 #SBATCH --error=logs/t5_glue8-%j.out

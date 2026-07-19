@@ -1,7 +1,16 @@
+.venv
 .venv/
+.hf_cache
 .hf_cache/
 __pycache__/
 *.pyc
 results/
 logs/
 experts/
+
+# SSH keys — never commit
+key.txt
+key.txt.pub
+*.pem
+id_ed25519*
+id_rsa*

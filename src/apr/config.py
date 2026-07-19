@@ -45,6 +45,12 @@ class DataConfig:
     n_probe: int = 64  # replay examples per task
     max_length: int = 128
     eval_batch_size: int = 64
+    # batch size for the refinement/gradient forward+backward. Decoupled from
+    # eval_batch_size because backprop stores the full fp32 activation graph and is
+    # far more memory-hungry than the (bf16, no-grad) generation eval. None => reuse
+    # eval_batch_size. The gradient is a mean over the buffer via accumulation, so
+    # this changes only peak memory, not the result. Small (e.g. 4) for 3B causal.
+    grad_batch_size: Optional[int] = None
     # DataLoader workers for evaluation. 0 keeps GLUE behaviour unchanged; the
     # CLIP/ViT track sets this >0 so PIL decode+resize of images runs in parallel
     # and does not starve the GPU (the dominant cost for large image test sets).
@@ -80,6 +86,12 @@ class ExperimentConfig:
     # the <=1B tracks; the 2-3B causal_lm track can use "bfloat16" to halve the
     # CPU-RAM footprint (5 experts x 3B fp32 ~ 60 GB) at some gate-sign noise.
     model_dtype: str = "float32"
+    # dtype used ONLY for the generation eval forward pass (causal_lm track). The
+    # merge, task vectors, gate and refinement gradients stay in model_dtype; the
+    # live model is transiently cast to eval_dtype for generate() and reverted, so
+    # this halves generation-decode time/memory without touching the weight-space
+    # arithmetic. None => generate in model_dtype (no change).
+    eval_dtype: Optional[str] = None
     refine: RefineConfig = field(default_factory=RefineConfig)
     data: DataConfig = field(default_factory=DataConfig)
     seed: int = 0

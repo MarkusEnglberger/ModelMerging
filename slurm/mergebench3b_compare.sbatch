@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=apr-mb3b
-#SBATCH --partition=CHANGE_ME_H100_PARTITION
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=160G
-#SBATCH --time=12:00:00
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=180G
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/mergebench3b-%j.out
 #SBATCH --error=logs/mergebench3b-%j.out
 
@@ -18,10 +18,17 @@
 # grids below are deliberately small for the first run -- bracket after eval0 sanity.
 # Requires: python scripts/prefetch_mergebench.py   (gated base: huggingface-cli login)
 source slurm/common.sh
+# reduce allocator fragmentation (~9 GB was reserved-but-unallocated at the batch-16
+# OOM); lets fp32 refinement backward reclaim that headroom on the 93 GB H100.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# Grid rationale (v3): the v2 sweep found APR flat across lr 4-16 with tiny
+# displacements (<=0.006), so the grid extends log-spaced to 64 to find where the
+# refinement actually starts to move; no-gate family dropped (per protocol
+# decision), ordinary GD kept as the labeled-replay control at its two best lrs.
 python scripts/compare_baselines.py --config configs/mergebench_llama3b.yaml \
   --steps 5 --clip_mode vdist_pre --gammas 1.0 \
-  --apr_lrs 4 8 16 \
-  --nogate_lrs 1 2 4 \
-  --gd_lrs 1e-5 5e-5 1e-4 \
+  --apr_lrs 4 16 64 \
+  --nogate_lrs \
+  --gd_lrs 5e-5 2e-4 \
   --skip_inverted \
-  --out results/compare/mergebench3b_compare.json "$@"
+  --out results/compare/mergebench3b_compare_v3.json "$@"

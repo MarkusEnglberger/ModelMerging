@@ -95,6 +95,11 @@ def main():
     ap.add_argument("--bc_densities", type=float, nargs="*", default=[0.1, 0.2])
     ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01, 0.05])
     ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.4])
+    # --- Localize-and-Stitch, data-free magnitude variant ---
+    ap.add_argument("--ls_fracs", type=float, nargs="*", default=[0.05, 0.1],
+                    help="per-task top-|tau| mask fraction")
+    ap.add_argument("--ls_lams", type=float, nargs="*", default=[1.0],
+                    help="stitch scale (paper uses 1.0)")
     # --- AdaMerging (label-free, data-dependent) ---
     ap.add_argument("--ada_variants", nargs="*", default=["task", "layer"],
                     choices=["task", "layer"])
@@ -112,12 +117,12 @@ def main():
                     choices=["eval_ds", "probe_buffer"])
     # --- APR on top ---
     ap.add_argument("--refine_from", nargs="*",
-                    default=["ta", "ties", "dareties", "bc", "ada"],
-                    choices=["ta", "ties", "dare", "dareties", "bc", "ada"])
+                    default=["ta", "ties", "dareties", "bc", "ls", "ada"],
+                    choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[2, 4, 8, 16])
     ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
     ap.add_argument("--skip_families", nargs="*", default=[],
-                    choices=["ta", "ties", "dare", "dareties", "bc", "ada"])
+                    choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
     ap.add_argument("--out", default="results/compare/merge_baselines.json")
     args = ap.parse_args()
 
@@ -202,6 +207,24 @@ def main():
                                     pd_global_norm(pd_sub(state, ctx.merged0)),
                                     density=d, outlier=o, lam=lam), nm, state)
 
+    # ---- Localize-and-Stitch, data-free magnitude variant ----
+    # (the learned-mask variant needs per-task full-d float masks -- ~12 GB each at
+    # 3B -- and lost to the magnitude variant on every track; ls_sweep.py keeps it
+    # for the encoder suites)
+    ls = Best("LS")
+    if "ls" not in skip:
+        from apr.localize_stitch import dataless_masks, stitch
+        for frac in args.ls_fracs:
+            masks = dataless_masks(ctx.task_vectors, frac)
+            for lam in args.ls_lams:
+                state, info = stitch(ctx.base_encoder, ctx.task_vectors, masks, lam=lam)
+                nm = f"merge:LS-mag@f{frac:g},l{lam:g}"
+                s, nr, ag = eval_merge(ctx, state)
+                ls.offer(record(report, nm, s, nr, ag,
+                                pd_global_norm(pd_sub(state, ctx.merged0)),
+                                sparsity=frac, lam=lam, stitch=info), nm, state)
+            del masks
+
     # ---- AdaMerging (label-free, uses unlabeled eval inputs: transductive) ----
     ada = Best("ADA")
     if "ada" not in skip:
@@ -221,7 +244,7 @@ def main():
                                  pd_global_norm(pd_sub(state, ctx.merged0)),
                                  adamerging=info), nm, state)
 
-    fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt, "bc": bc, "ada": ada}
+    fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt, "bc": bc, "ls": ls, "ada": ada}
     report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
     _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
 

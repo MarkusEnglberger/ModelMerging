@@ -15,6 +15,7 @@ refinement rules can be compared from the *same* merge point and replay buffers
 from collections import OrderedDict
 from typing import Dict, List
 import random
+import time
 
 import numpy as np
 import torch
@@ -109,6 +110,12 @@ def _make_backend(cfg: ExperimentConfig, device: str):
                                 MERGEBENCH_EXPERT)
         dtype = getattr(torch, cfg.model_dtype)
         tokenizer = AutoTokenizer.from_pretrained(cfg.base_model, cache_dir=cache)
+        # base decoder-only checkpoints (e.g. Llama-3.2-3B) ship no pad token, which
+        # breaks batched padding in both the SFT collator and generation eval. Reuse
+        # eos as pad (attention_mask masks it; no vocab resize, so task vectors are
+        # unaffected). Set on the tokenizer object so tok(..., padding=True) sees it.
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
         base_short = cfg.base_model.split("/")[-1]
         base_model = AutoModelForCausalLM.from_pretrained(
             cfg.base_model, cache_dir=cache, torch_dtype=dtype)
@@ -118,16 +125,28 @@ def _make_backend(cfg: ExperimentConfig, device: str):
         del base_model
         collator = make_causal_collator(tokenizer)
 
+        gen_dtype = getattr(torch, cfg.eval_dtype) if cfg.eval_dtype else None
+
         def load_expert(e):
             spec = get_causal_task(e.name)
             spec.tokenizer = tokenizer
             spec.prompt_style = prompt_style
+            spec.gen_dtype = gen_dtype  # bf16 generation eval; weights stay fp32
             ckpt = e.checkpoint or MERGEBENCH_EXPERT.format(base=base_short,
                                                             domain=spec.name)
             _log(f"[load] causal expert {spec.name} <- {ckpt} "
                  f"(prompt_style={prompt_style}, dtype={cfg.model_dtype})")
             model = AutoModelForCausalLM.from_pretrained(
                 ckpt, cache_dir=cache, torch_dtype=dtype)
+            # some MergeBench experts pad the embedding matrix beyond the base vocab
+            # (e.g. Llama-3.2-3B_math: 128320 vs 128256); the shared base tokenizer
+            # never produces ids >= len(tokenizer), so truncating back is lossless
+            # and keeps the task vector well-defined against base_encoder.
+            n_embed = model.get_input_embeddings().weight.shape[0]
+            if n_embed != len(tokenizer):
+                _log(f"[load] resize {spec.name} embeddings {n_embed} -> "
+                     f"{len(tokenizer)} (expert checkpoint padding)")
+                model.resize_token_embeddings(len(tokenizer))
             train_raw, make_fn = spec.build_replay(tokenizer, cfg.data.max_length,
                                                    cache, prompt_style)
             eval_rows = spec.build_eval(cache, cfg.data.max_eval)
@@ -198,10 +217,14 @@ class MergeContext:
         for name in (names or self.task_names):
             info = self.per_task[name]
             load_encoder_state(info["model"], encoder_state)
+            t0 = time.time()
             out[name] = evaluate_task(info["model"], info["eval_ds"], info["spec"],
                                       info["collator"], self.cfg.data.eval_batch_size,
                                       self.device,
                                       num_workers=self.cfg.data.eval_num_workers)["primary"]
+            # per-eval-pass heartbeat: generation eval can run many minutes silently
+            _log(f"[eval] {name}: {len(info['eval_ds'])} items -> {out[name]:.4f} "
+                 f"({time.time()-t0:.0f}s)")
             info["model"].to("cpu")
             if self.device.startswith("cuda"):
                 torch.cuda.empty_cache()
@@ -224,7 +247,8 @@ class MergeContext:
                                        probe_seed, self.cfg.data.class_balanced)
             info["probe_buffer"] = buf
             h.grad_fn = make_grad_fn(info["model"], buf, info["collator"],
-                                     self.cfg.data.eval_batch_size, self.device)
+                                     self.cfg.data.grad_batch_size
+                                     or self.cfg.data.eval_batch_size, self.device)
 
     def run_refine_from(self, start_state: ParamDict, refine_cfg: RefineConfig,
                         seed: int = 0):
@@ -259,7 +283,9 @@ class MergeContext:
             expert_encoder = get_encoder_state(model)
             buffer = sample_replay_buffer(train_ds, spec, cfg.data.n_probe,
                                           cfg.data.probe_seed, cfg.data.class_balanced)
-            grad_fn = make_grad_fn(model, buffer, collator, cfg.data.eval_batch_size, device)
+            grad_fn = make_grad_fn(model, buffer, collator,
+                                   cfg.data.grad_batch_size or cfg.data.eval_batch_size,
+                                   device)
             handles.append(TaskHandle(e.name, model, expert_encoder, grad_fn))
             # probe_buffer is kept so a label-free baseline can be given exactly the
             # same inputs as APR's replay buffer (labels stripped) -- see the
