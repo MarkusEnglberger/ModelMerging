@@ -54,9 +54,9 @@ def make_collator(tokenizer, is_regression: bool):
     return lambda feats: _collate(feats, tokenizer, is_regression)
 
 
-def sample_replay_buffer(train_ds, spec: TaskSpec, n: int, seed: int,
-                         class_balanced: bool) -> List[Dict]:
-    """Sample n replay examples (as a list of tokenized feature dicts)."""
+def _sample_indices(train_ds, spec: TaskSpec, n: int, seed: int,
+                    class_balanced: bool) -> List[int]:
+    """Draw n example indices (class-balanced when asked). Deterministic in seed."""
     rng = random.Random(seed)
     n = min(n, len(train_ds))
     if spec.is_regression or not class_balanced:
@@ -80,7 +80,29 @@ def sample_replay_buffer(train_ds, spec: TaskSpec, n: int, seed: int,
             idx.extend(remaining[: n - len(idx)])
         idx = idx[:n]
         rng.shuffle(idx)
-    return [train_ds[i] for i in idx]
+    return idx
+
+
+def sample_replay_buffer(train_ds, spec: TaskSpec, n: int, seed: int,
+                         class_balanced: bool) -> List[Dict]:
+    """Sample n replay examples (as a list of tokenized feature dicts)."""
+    return [train_ds[i] for i in _sample_indices(train_ds, spec, n, seed,
+                                                 class_balanced)]
+
+
+def sample_replay_buffer_split(train_ds, spec: TaskSpec, n_train: int, n_val: int,
+                               seed: int, class_balanced: bool):
+    """Draw n_train+n_val examples with the SAME index stream as
+    sample_replay_buffer(n_train+n_val, seed), then split DISJOINTLY.
+
+    Guarantees train/val never overlap (unlike two independent draws with
+    different seeds). With n_train=n_val=32 and the usual probe_seed, the union
+    is exactly the 64 examples earlier n_probe=64 runs used -- the honest
+    '64 labeled samples/task total' budget, now 32 for sweeps + 32 for
+    hyperparameter selection."""
+    idx = _sample_indices(train_ds, spec, n_train + n_val, seed, class_balanced)
+    train_idx, val_idx = idx[:n_train], idx[n_train:n_train + n_val]
+    return ([train_ds[i] for i in train_idx], [train_ds[i] for i in val_idx])
 
 
 def batches_from_buffer(buffer: List[Dict], collator, batch_size: int,

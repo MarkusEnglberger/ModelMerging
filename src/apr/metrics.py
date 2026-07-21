@@ -64,3 +64,41 @@ def aggregate_retention(per_task: Dict[str, float]) -> Dict[str, float]:
     clipped = np.clip(vals, 1e-6, None)
     out["hmean_normret"] = float(len(clipped) / np.sum(1.0 / clipped))
     return out
+
+
+# A task whose expert barely beats the zero-shot/base model has a near-zero
+# NormRet denominator, so its normalized retention explodes. On the 20-task CLIP
+# suite stl10 (base .9712 -> expert .9755, gap .0043) and food101 (.8271 ->
+# .8622) alone swung the mean from -1.04 to -4.94. Absolute accuracy is the
+# primary metric there; NormRet is still reported, plus a variant restricted to
+# tasks with a meaningful gap.
+DEGENERATE_GAP = 0.05
+
+
+def aggregate_absolute(scores: Dict[str, float]) -> Dict[str, float]:
+    """mean / worst ABSOLUTE per-task score (accuracy for the vision suite)."""
+    vals = np.array(list(scores.values()), dtype=float)
+    return {"mean_acc": float(vals.mean()), "worst_acc": float(vals.min())}
+
+
+def degenerate_tasks(base: Dict[str, float], expert: Dict[str, float],
+                     gap_min: float = DEGENERATE_GAP) -> List[str]:
+    """Tasks whose expert-minus-base gap is too small for NormRet to be stable."""
+    return sorted(t for t in base if (expert[t] - base[t]) < gap_min)
+
+
+def aggregate_all(scores: Dict[str, float], per_task_nr: Dict[str, float],
+                  base: Dict[str, float], expert: Dict[str, float],
+                  gap_min: float = DEGENERATE_GAP) -> Dict[str, float]:
+    """Absolute-accuracy aggregates (primary) + NormRet (secondary), plus a
+    NormRet restricted to non-degenerate-gap tasks."""
+    out = aggregate_absolute(scores)
+    out.update(aggregate_retention(per_task_nr))
+    deg = degenerate_tasks(base, expert, gap_min)
+    keep = {t: v for t, v in per_task_nr.items() if t not in deg}
+    if deg and keep:
+        sub = aggregate_retention(keep)
+        out["mean_normret_nondeg"] = sub["mean_normret"]
+        out["worst_normret_nondeg"] = sub["worst_normret"]
+    out["degenerate_tasks"] = deg
+    return out

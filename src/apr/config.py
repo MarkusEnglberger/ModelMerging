@@ -43,6 +43,10 @@ class RefineConfig:
 @dataclass
 class DataConfig:
     n_probe: int = 64  # replay examples per task
+    # held-out labeled examples per task for hyperparameter SELECTION (drawn
+    # disjointly from the same index stream as the replay buffer; 0 = off).
+    # 32/32 keeps the total labeled budget at the historical 64.
+    n_val: int = 0
     max_length: int = 128
     eval_batch_size: int = 64
     # batch size for the refinement/gradient forward+backward. Decoupled from

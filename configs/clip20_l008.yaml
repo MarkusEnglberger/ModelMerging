@@ -1,0 +1,58 @@
+# Full 20-task CLIP/ViT suite (TALL-masks / Wang et al. 2024): the 8 standard
+# task-arithmetic tasks plus CIFAR100, STL10, Flowers102, OxfordPets, PCAM,
+# FER2013 (-> 14) and EMNIST, CIFAR10, Food101, FashionMNIST, KMNIST,
+# RenderedSST2 (-> 20). Backbone theta_0 = openai/clip-vit-base-patch32 vision
+# tower; experts are the FusionBench/tanganke fine-tuned CLIPVisionModel
+# checkpoints (resolved from the task name). Mergeable encoder = vision tower;
+# each task keeps a frozen zero-shot text head.
+#
+# NOTE: lam=0.3 is the 8-task setting; the merge degrades further at 20 tasks,
+# so lam (and the APR lr below) should be retuned -- expect a smaller lam
+# (~0.1) and a lower APR lr than the 8-task lr=32/lr=8 optima.
+base_model: openai/clip-vit-base-patch32
+modality: clip
+tag: clip20_l008
+output_dir: results/clip20_l008
+device: cuda
+seed: 0
+
+experts:
+  - {name: sun397,        lam: 0.08}
+  - {name: cars,          lam: 0.08}
+  - {name: resisc45,      lam: 0.08}
+  - {name: eurosat,       lam: 0.08}
+  - {name: svhn,          lam: 0.08}
+  - {name: gtsrb,         lam: 0.08}
+  - {name: mnist,         lam: 0.08}
+  - {name: dtd,           lam: 0.08}
+  - {name: cifar100,      lam: 0.08}
+  - {name: stl10,         lam: 0.08}
+  - {name: flowers102,    lam: 0.08}
+  - {name: pets,          lam: 0.08}
+  - {name: pcam,          lam: 0.08}
+  - {name: fer2013,       lam: 0.08}
+  - {name: emnist,        lam: 0.08}
+  - {name: cifar10,       lam: 0.08}
+  - {name: food101,       lam: 0.08}
+  - {name: fashion_mnist, lam: 0.08}
+  - {name: kmnist,        lam: 0.08}
+  - {name: rendered_sst2, lam: 0.08}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  eval_batch_size: 128
+  eval_num_workers: 8  # parallel image decode/resize (8 CPUs allocated)
+  probe_seed: 0
+  class_balanced: true
+  max_eval: null

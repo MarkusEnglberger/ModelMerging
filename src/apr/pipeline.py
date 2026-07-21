@@ -24,7 +24,8 @@ from .config import ExperimentConfig, RefineConfig
 from .tasks import get_task
 from .models import (load_tokenizer, load_classifier, get_encoder_state,
                      load_encoder_state, ParamDict, pd_sub, pd_global_norm)
-from .data import (load_task_dataset, sample_replay_buffer, make_collator)
+from .data import (load_task_dataset, sample_replay_buffer,
+                   sample_replay_buffer_split, batches_from_buffer, make_collator)
 from .gradients import make_grad_fn
 from .taskvec import task_vector, task_arithmetic_merge
 from .refine import refine, TaskHandle
@@ -240,15 +241,51 @@ class MergeContext:
         its gradient closure, AND update ``per_task[name]["probe_buffer"]`` so that
         every buffer-consuming method (APR grads, but also Fisher, head-only, matched
         AdaMerging, and the replay objective) sees the reseeded buffer. Lets a budget
-        or multi-seed sweep vary n / the seed without reloading experts."""
+        or multi-seed sweep vary n / the seed without reloading experts.
+        When data.n_val > 0 the train/val split is preserved (val stays disjoint)."""
         for h in self.handles:
             info = self.per_task[h.name]
-            buf = sample_replay_buffer(info["train_ds"], info["spec"], n_probe,
-                                       probe_seed, self.cfg.data.class_balanced)
+            if self.cfg.data.n_val > 0:
+                buf, val = sample_replay_buffer_split(
+                    info["train_ds"], info["spec"], n_probe, self.cfg.data.n_val,
+                    probe_seed, self.cfg.data.class_balanced)
+                info["val_buffer"] = val
+            else:
+                buf = sample_replay_buffer(info["train_ds"], info["spec"], n_probe,
+                                           probe_seed, self.cfg.data.class_balanced)
             info["probe_buffer"] = buf
             h.grad_fn = make_grad_fn(info["model"], buf, info["collator"],
                                      self.cfg.data.grad_batch_size
                                      or self.cfg.data.eval_batch_size, self.device)
+
+    @torch.no_grad()
+    def val_scores(self, encoder_state: ParamDict, names=None) -> Dict[str, float]:
+        """Per-task score on the held-out val buffer (data.n_val > 0): accuracy
+        for classification, -MSE for regression. Selection WITHOUT the test set."""
+        out = {}
+        for name in (names or self.task_names):
+            info = self.per_task[name]
+            vb = info.get("val_buffer")
+            if not vb:
+                raise ValueError("val_scores needs data.n_val > 0")
+            load_encoder_state(info["model"], encoder_state)
+            info["model"].to(self.device).eval()
+            correct, total, sq = 0, 0, 0.0
+            for batch in batches_from_buffer(vb, info["collator"],
+                                             self.cfg.data.eval_batch_size, self.device):
+                labels = batch["labels"]
+                logits = info["model"](**batch).logits
+                if info["spec"].is_regression:
+                    sq += float(((logits.squeeze(-1) - labels) ** 2).sum())
+                else:
+                    correct += int((logits.argmax(-1) == labels).sum())
+                total += labels.numel()
+            out[name] = (-sq / max(total, 1)) if info["spec"].is_regression \
+                else correct / max(total, 1)
+            info["model"].to("cpu")
+            if self.device.startswith("cuda"):
+                torch.cuda.empty_cache()
+        return out
 
     def run_refine_from(self, start_state: ParamDict, refine_cfg: RefineConfig,
                         seed: int = 0):
@@ -281,8 +318,14 @@ class MergeContext:
         for e in cfg.experts:
             spec, model, train_ds, eval_ds, collator = load_expert(e)
             expert_encoder = get_encoder_state(model)
-            buffer = sample_replay_buffer(train_ds, spec, cfg.data.n_probe,
-                                          cfg.data.probe_seed, cfg.data.class_balanced)
+            if cfg.data.n_val > 0:
+                buffer, val_buffer = sample_replay_buffer_split(
+                    train_ds, spec, cfg.data.n_probe, cfg.data.n_val,
+                    cfg.data.probe_seed, cfg.data.class_balanced)
+            else:
+                buffer = sample_replay_buffer(train_ds, spec, cfg.data.n_probe,
+                                              cfg.data.probe_seed, cfg.data.class_balanced)
+                val_buffer = None
             grad_fn = make_grad_fn(model, buffer, collator,
                                    cfg.data.grad_batch_size or cfg.data.eval_batch_size,
                                    device)
@@ -292,7 +335,8 @@ class MergeContext:
             # matched-budget AdaMerging variant in scripts/merge_baselines.py.
             per_task[e.name] = dict(spec=spec, model=model, eval_ds=eval_ds,
                                     collator=collator, expert_encoder=expert_encoder,
-                                    train_ds=train_ds, probe_buffer=buffer)
+                                    train_ds=train_ds, probe_buffer=buffer,
+                                    val_buffer=val_buffer)
             task_vectors[e.name] = task_vector(expert_encoder, base_encoder)
             lambdas[e.name] = e.lam
 

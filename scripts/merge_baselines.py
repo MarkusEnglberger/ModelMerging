@@ -42,30 +42,41 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
-from apr.metrics import aggregate_retention
+from apr.metrics import aggregate_all
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ta_merge,
                                dare_ties_merge, breadcrumbs_merge)
 from apr.taskvec import task_arithmetic_merge
 from apr.adamerging import adamerging
+from apr.replay_baselines import make_replay_objective
 from apr.models import pd_sub, pd_global_norm
 
 
 def eval_merge(ctx, state):
     scores = ctx.eval_encoder(state)
     nr = ctx.normret(scores)
-    return scores, nr, aggregate_retention(nr)
+    return scores, nr, aggregate_all(scores, nr, ctx.base_scores, ctx.expert_scores)
+
+
+# Which aggregate drives best-per-family selection and the grid-edge warning.
+# Set from --select_by in main(); "mean_normret" preserves the pre-20-task
+# behaviour, "mean_acc" is the right choice when some task has a degenerate
+# expert-minus-base gap (see metrics.DEGENERATE_GAP).
+SELECT_BY = "mean_normret"
 
 
 def record(report, name, scores, nr, ag, disp, **extra):
     report["methods"][name] = {"scores": scores, "normret": nr, "aggregate": ag,
                                "displacement": disp, **extra}
-    _log(f"  -> {name}: mean={ag['mean_normret']:.3f} worst={ag['worst_normret']:.3f} "
+    nd = (f" nr*={ag['mean_normret_nondeg']:.3f}"
+          if "mean_normret_nondeg" in ag else "")
+    _log(f"  -> {name}: acc={ag['mean_acc']:.4f}/{ag['worst_acc']:.4f} "
+         f"nr={ag['mean_normret']:.3f}/{ag['worst_normret']:.3f}{nd} "
          f"disp={disp:.3f}")
-    return ag["mean_normret"]
+    return ag[SELECT_BY]
 
 
 class Best:
-    """Track the best-scoring cell of one family (by mean NormRet)."""
+    """Track the best-scoring cell of one family (by the SELECT_BY aggregate)."""
 
     def __init__(self, label):
         self.label, self.mean, self.name, self.state = label, None, None, None
@@ -116,6 +127,27 @@ def main():
     ap.add_argument("--ada_data", nargs="*", default=["eval_ds"],
                     choices=["eval_ds", "probe_buffer"])
     # --- APR on top ---
+    ap.add_argument("--apr_schedules", nargs="*", default=["constant"],
+                    choices=["constant", "cosine", "linear"],
+                    help="lr schedules for the APR arms; non-constant ones use "
+                         "--apr_order (mirrors the GD arms)")
+    ap.add_argument("--apr_order", choices=["fixed", "cyclic", "random"],
+                    default="random",
+                    help="task order for non-constant-schedule APR arms")
+    ap.add_argument("--gd_lrs", type=float, nargs="*", default=[],
+                    help="also run ORDINARY GD (plain -g, no gate/anchor/clip) from "
+                         "each --refine_from init. GD's lr optimum has only ever "
+                         "been tuned at the TA init, so give it a WIDE grid.")
+    ap.add_argument("--gd_steps", type=int, nargs="*", default=[],
+                    help="sweep counts for GD (default: --steps). >5 tests the "
+                         "'GD just needs more sweeps' objection.")
+    ap.add_argument("--gd_schedules", nargs="*", default=["constant"],
+                    choices=["constant", "cosine", "linear"])
+    ap.add_argument("--gd_lr_min_frac", type=float, default=0.05)
+    ap.add_argument("--gd_order", choices=["fixed", "cyclic", "random"],
+                    default="random", help="task order for annealed GD runs")
+    ap.add_argument("--nogate_lrs", type=float, nargs="*", default=[],
+                    help="also run the UNGATED anchored control from each init")
     ap.add_argument("--refine_from", nargs="*",
                     default=["ta", "ties", "dareties", "bc", "ls", "ada"],
                     choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
@@ -123,6 +155,11 @@ def main():
     ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
     ap.add_argument("--skip_families", nargs="*", default=[],
                     choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
+    ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
+                    default="mean_normret",
+                    help="aggregate used to pick best-per-family / best APR lr. "
+                         "Use mean_acc when a task has a degenerate expert-base "
+                         "gap (20-task CLIP suite: stl10, food101).")
     ap.add_argument("--out", default="results/compare/merge_baselines.json")
     args = ap.parse_args()
 
@@ -132,10 +169,17 @@ def main():
     ctx = MergeContext.build(cfg)
     steps = args.steps if args.steps is not None else cfg.refine.steps
     names = cfg.task_names
+    # replay objective (mean loss on the same n=64 labeled buffers used for the
+    # refinement gradients) recorded per refine cell so hyperparameters can be
+    # selected WITHOUT the test set (replay-honest selection, cf. replay_baselines).
+    objective, _ = make_replay_objective(ctx)
 
     report = {"config": cfg.to_dict(), "tasks": names, "steps": steps,
               "base": ctx.base_scores, "expert": ctx.expert_scores,
               "grids": vars(args), "methods": {}}
+    global SELECT_BY
+    SELECT_BY = args.select_by
+    _log(f"[select] best-per-family by {SELECT_BY}")
     skip = set(args.skip_families)
 
     # ---- task arithmetic, lambda swept (the other families tune theirs, so must this) ----
@@ -256,23 +300,57 @@ def main():
             continue
         init_label = fam.name.split(":", 1)[1]
         best_mean = None
-        for lr in args.apr_lrs:
-            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr)
-            _log(f"\n===== APR from {init_label} @ lr{lr:g} "
-                 f"({rc.gate_mode}/clip={rc.clip_mode}/g{rc.clip_frac:g}) =====")
+        for sched in args.apr_schedules:
+          for lr in args.apr_lrs:
+            rc = dataclasses.replace(
+                cfg.refine, steps=steps, lr=lr,
+                lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
+                order=args.apr_order if sched != "constant" else cfg.refine.order)
+            _log(f"\n===== APR from {init_label} @ lr{lr:g} S={steps} {sched} "
+                 f"({rc.gate_mode}/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
             refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
             gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
-            nm = f"apr:from={key}@lr{lr:g}"
+            nm = f"apr:from={key}@lr{lr:g}" + ("" if sched == "constant" else f",{sched}")
             m = record(report, nm, s, nr, ag,
                        pd_global_norm(pd_sub(refined, fam.state)),
-                       init=init_label, lr=lr, gate_density=gd)
+                       init=init_label, lr=lr, schedule=sched,
+                       gate_density=gd, replay_obj=objective(refined))
             if best_mean is None or m > best_mean:
                 best_mean = m
                 report[f"best_apr_from_{key}"] = nm
+        # ---- controls from the SAME init: ungated anchor, and ordinary GD ----
+        # Both isolate a different part of the update: nogate removes the gate but
+        # keeps the anchored/distance-scaled/clipped step; GD removes all of it.
+        for lr in args.nogate_lrs:
+            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr, gate_mode="none")
+            _log(f"\n===== nogate from {init_label} @ lr{lr:g} =====")
+            refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
+            s, nr, ag = eval_merge(ctx, refined)
+            record(report, f"nogate:from={key}@lr{lr:g}", s, nr, ag,
+                   pd_global_norm(pd_sub(refined, fam.state)), init=init_label, lr=lr,
+                   replay_obj=objective(refined))
+        for sched in args.gd_schedules:
+            for S in (args.gd_steps or [steps]):
+                for lr in args.gd_lrs:
+                    rc = dataclasses.replace(
+                        cfg.refine, steps=S, lr=lr, gate_mode="none",
+                        update_mode="grad", clip_mode="none",
+                        lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
+                        order=args.gd_order if sched != "constant" else cfg.refine.order)
+                    tag = f"gd:from={key}@lr{lr:g},S{S},{sched}"
+                    _log(f"\n===== ordinary GD from {init_label} "
+                         f"@ lr{lr:g} S={S} {sched} =====")
+                    refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
+                    s, nr, ag = eval_merge(ctx, refined)
+                    record(report, tag, s, nr, ag,
+                           pd_global_norm(pd_sub(refined, fam.state)),
+                           init=init_label, lr=lr, gd_steps=S, schedule=sched,
+                           replay_obj=objective(refined))
+
         # a peak at the grid edge means the optimum was not bracketed
         if best_mean is not None and args.apr_lrs:
-            best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1])
+            best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1].split(",")[0])
             if best_lr == min(args.apr_lrs):
                 _log(f"[warn] APR from {key} peaked at the LOW EDGE (lr={best_lr:g}) "
                      f"-- true optimum may be lower; result is a lower bound.")
@@ -285,15 +363,18 @@ def main():
 
     print("\n" + "=" * 108)
     print(f"{'method':<30} " + " ".join(f"{t[:7]:>7}" for t in names) +
-          f" | {'mean':>6} {'worst':>6} {'||disp||':>8}")
+          f" | {'mAcc':>6} {'wAcc':>6} {'mNR':>7} {'wNR':>7} {'||disp||':>8}")
     print("-" * 108)
     for n, d in sorted(report["methods"].items(),
-                       key=lambda kv: -kv[1]["aggregate"]["mean_normret"]):
+                       key=lambda kv: -kv[1]["aggregate"][SELECT_BY]):
         a = d["aggregate"]
         print(f"{n:<30} " + " ".join(f"{d['normret'][t]:>7.3f}" for t in names) +
-              f" | {a['mean_normret']:>6.3f} {a['worst_normret']:>6.3f} {d['displacement']:>8.3f}")
+              f" | {a['mean_acc']:>6.4f} {a['worst_acc']:>6.4f}"
+              f" {a['mean_normret']:>7.3f} {a['worst_normret']:>7.3f} {d['displacement']:>8.3f}")
     print("=" * 108)
-    print("(normret: 0=pretrained floor, 1=expert ceiling; higher is better)")
+    print("(mAcc/wAcc: absolute mean/worst accuracy. mNR/wNR: normalized retention, "
+          "0=pretrained floor 1=expert ceiling -- UNSTABLE for tasks whose expert "
+          "barely beats base; see aggregate.degenerate_tasks.)")
     print(f"[done] -> {args.out}")
 
 

@@ -25,15 +25,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
-from apr.metrics import aggregate_retention
+from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm
 from apr.replay_baselines import make_replay_objective
 from apr.calibrate import calibrate
 
 
 def evalcell(ctx, state, objective):
-    ag = aggregate_retention(ctx.normret(ctx.eval_encoder(state)))
-    return ag, objective(state)
+    scores = ctx.eval_encoder(state)
+    ag = aggregate_all(scores, ctx.normret(scores), ctx.base_scores,
+                       ctx.expert_scores)
+    return ag, objective(state), scores
 
 
 def main():
@@ -49,6 +51,10 @@ def main():
     ap.add_argument("--holdout_frac", type=float, default=0.25)
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[4, 8, 16])
     ap.add_argument("--steps", type=int, default=5)
+    ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
+                    default="mean_normret",
+                    help="aggregate reported/selected on; use mean_acc when a "
+                         "task has a degenerate expert-base gap (20-task suite).")
     ap.add_argument("--out", default="results/compare/calibrate_refine.json")
     args = ap.parse_args()
 
@@ -56,17 +62,25 @@ def main():
     cfg.data.n_probe = args.n_probe
     ctx = MergeContext.build(cfg)
     objective, ref = make_replay_objective(ctx)
+    # base/expert references + per-cell raw scores so scripts/rescore.py can
+    # re-aggregate this report post hoc (e.g. at a different --gap_min), exactly
+    # as it can for merge_baselines reports.
     report = {"config": cfg.to_dict(), "tasks": ctx.task_names, "grids": vars(args),
-              "cells": {}}
+              "base": ctx.base_scores, "expert": ctx.expert_scores, "cells": {}}
 
     def record(name, state, **extra):
-        ag, ro = evalcell(ctx, state, objective)
+        ag, ro, scores = evalcell(ctx, state, objective)
         disp = pd_global_norm(pd_sub(state, ctx.merged0))
         report["cells"][name] = {"mean": ag["mean_normret"], "worst": ag["worst_normret"],
+                                 "mean_acc": ag["mean_acc"], "worst_acc": ag["worst_acc"],
+                                 "mean_normret_nondeg": ag.get("mean_normret_nondeg"),
+                                 "degenerate_tasks": ag.get("degenerate_tasks"),
+                                 "scores": scores,
                                  "replay_obj": ro, "disp": disp, **extra}
-        _log(f"  -> {name}: mean={ag['mean_normret']:.3f} worst={ag['worst_normret']:.3f} "
+        _log(f"  -> {name}: acc={ag['mean_acc']:.4f}/{ag['worst_acc']:.4f} "
+             f"nr={ag['mean_normret']:.3f}/{ag['worst_normret']:.3f} "
              f"replay_obj={ro:.4f}")
-        return ag["mean_normret"], ro
+        return ag[args.select_by], ro
 
     # reference
     record("merge:TA", ctx.merged0)

@@ -77,6 +77,20 @@ VISION_TEMPLATES = {
         "a photo of the {}.",
         "i love my {}!",
     ],
+    # --- 14/20-task extension (TALL-masks suite) ---
+    "cifar10": ["a photo of a {}."],
+    "cifar100": ["a photo of a {}."],
+    "stl10": ["a photo of a {}.", "a photo of the {}."],
+    "food101": ["a photo of {}, a type of food."],
+    "fashion_mnist": ["a photo of a {}.", "an image of a {} (clothing)."],
+    "flowers102": ["a photo of a {}, a type of flower."],
+    "pets": ["a photo of a {}, a type of pet."],
+    "emnist": ['a photo of the letter "{}".'],
+    "kmnist": ["a photo of the character {}."],
+    # clip-benchmark canonical prompts for the three no-ClassLabel (wds) tasks.
+    "pcam": ["this is a photo of {}."],
+    "fer2013": ["a photo of a {} looking face."],
+    "rendered_sst2": ["a {} review of a movie."],
 }
 
 
@@ -98,6 +112,11 @@ class VisionTaskSpec:
     label_key: str = "label"
     train_split: str = "train"
     eval_split: str = "test"
+    # Explicit class names, ordered by integer label id. Only needed for datasets
+    # whose label column is a plain int (no ClassLabel ``.names``) -- the three
+    # webdataset tasks (pcam/fer2013/rendered_sst2). When None, names are read
+    # from the dataset's ClassLabel feature (which already matches the expert).
+    classnames: Optional[Tuple[str, ...]] = None
 
     @property
     def is_regression(self) -> bool:
@@ -108,9 +127,20 @@ class VisionTaskSpec:
         return VISION_TEMPLATES.get(self.name, _DEFAULT_TEMPLATES)
 
 
+# Explicit class names (ordered by label id) for the three webdataset tasks
+# whose label column is a bare int with no ClassLabel .names. These are the
+# canonical clip-benchmark names the tanganke experts were evaluated against;
+# the prefetch accuracy-check (expert acc >> zero-shot) validates the ordering.
+_PCAM_CLASSNAMES = ("lymph node",
+                    "lymph node containing metastatic tumor tissue")
+_FER2013_CLASSNAMES = ("angry", "disgusted", "fearful", "happy",
+                       "neutral", "sad", "surprised")
+_SST2_CLASSNAMES = ("negative", "positive")
+
 # Canonical CLIP/ViT task-vector suite. `num_labels` is filled in from the
 # dataset's ClassLabel feature at load time, so the literal here is just a hint.
 VISION_TASKS = {
+    # --- original 8-task task-arithmetic benchmark ---
     "sun397": VisionTaskSpec("sun397", "tanganke/sun397", 397),
     "cars": VisionTaskSpec("cars", "tanganke/stanford_cars", 196),
     "resisc45": VisionTaskSpec("resisc45", "tanganke/resisc45", 45),
@@ -119,6 +149,30 @@ VISION_TASKS = {
     "gtsrb": VisionTaskSpec("gtsrb", "tanganke/gtsrb", 43),
     "mnist": VisionTaskSpec("mnist", "mnist", 10),
     "dtd": VisionTaskSpec("dtd", "tanganke/dtd", 47),
+    # --- +6 -> 14-task suite (standard image + ClassLabel datasets) ---
+    "cifar100": VisionTaskSpec("cifar100", "tanganke/cifar100", 100),
+    "stl10": VisionTaskSpec("stl10", "tanganke/stl10", 10),
+    "flowers102": VisionTaskSpec("flowers102", "dpdl-benchmark/oxford_flowers102", 102),
+    "pets": VisionTaskSpec("pets", "timm/oxford-iiit-pet", 37),
+    "pcam": VisionTaskSpec("pcam", "clip-benchmark/wds_vtab-pcam", 2,
+                           image_key="webp", label_key="cls",
+                           classnames=_PCAM_CLASSNAMES),
+    "fer2013": VisionTaskSpec("fer2013", "clip-benchmark/wds_fer2013", 7,
+                              image_key="jpg", label_key="cls",
+                              classnames=_FER2013_CLASSNAMES),
+    # --- +6 -> 20-task suite ---
+    "emnist": VisionTaskSpec("emnist", "tanganke/emnist_letters", 26,
+                             dataset_config="emnist-letters"),
+    "cifar10": VisionTaskSpec("cifar10", "tanganke/cifar10", 10),
+    "food101": VisionTaskSpec("food101", "ethz/food101", 101,
+                              eval_split="validation"),
+    "fashion_mnist": VisionTaskSpec("fashion_mnist", "zalando-datasets/fashion_mnist", 10,
+                                    dataset_config="fashion_mnist"),
+    "kmnist": VisionTaskSpec("kmnist", "tanganke/kmnist", 10,
+                             dataset_config="kmnist"),
+    "rendered_sst2": VisionTaskSpec("rendered_sst2", "clip-benchmark/wds_renderedsst2", 2,
+                                    image_key="png", label_key="cls",
+                                    classnames=_SST2_CLASSNAMES),
 }
 
 # Fine-tuned vision encoder (expert) checkpoints, FusionBench / tanganke release.
@@ -131,12 +185,43 @@ VISION_EXPERT_CKPT = {
     "gtsrb": "tanganke/clip-vit-base-patch32_gtsrb",
     "mnist": "tanganke/clip-vit-base-patch32_mnist",
     "dtd": "tanganke/clip-vit-base-patch32_dtd",
+    "cifar100": "tanganke/clip-vit-base-patch32_cifar100",
+    "stl10": "tanganke/clip-vit-base-patch32_stl10",
+    "flowers102": "tanganke/clip-vit-base-patch32_oxford_flowers102",
+    "pets": "tanganke/clip-vit-base-patch32_oxford-iiit-pet",
+    "pcam": "tanganke/clip-vit-base-patch32_pcam",
+    "fer2013": "tanganke/clip-vit-base-patch32_fer2013",
+    "emnist": "tanganke/clip-vit-base-patch32_emnist_letters",
+    "cifar10": "tanganke/clip-vit-base-patch32_cifar10",
+    "food101": "tanganke/clip-vit-base-patch32_food101",
+    "fashion_mnist": "tanganke/clip-vit-base-patch32_fashion_mnist",
+    "kmnist": "tanganke/clip-vit-base-patch32_kmnist",
+    "rendered_sst2": "tanganke/clip-vit-base-patch32_rendered-sst2",
 }
+
+# Named suites (ordered as in the TALL-masks paper). The 8-task set is the
+# original task-arithmetic benchmark; 14 and 20 are the standard extensions.
+CLIP8_TASKS = ["sun397", "cars", "resisc45", "eurosat",
+               "svhn", "gtsrb", "mnist", "dtd"]
+CLIP14_TASKS = CLIP8_TASKS + ["cifar100", "stl10", "flowers102",
+                              "pets", "pcam", "fer2013"]
+CLIP20_TASKS = CLIP14_TASKS + ["emnist", "cifar10", "food101",
+                               "fashion_mnist", "kmnist", "rendered_sst2"]
+VISION_SUITES = {"8": CLIP8_TASKS, "14": CLIP14_TASKS, "20": CLIP20_TASKS}
 
 
 def get_vision_task(name: str) -> VisionTaskSpec:
     key = name.lower().replace("-", "_")
-    alias = {"stanford_cars": "cars", "stanfordcars": "cars"}
+    alias = {
+        "stanford_cars": "cars", "stanfordcars": "cars",
+        "oxford_flowers102": "flowers102", "flowers": "flowers102",
+        "oxford_iiit_pet": "pets", "oxford_pet": "pets", "pet": "pets",
+        "patch_camelyon": "pcam", "patchcamelyon": "pcam",
+        "emnist_letters": "emnist",
+        "fashionmnist": "fashion_mnist",
+        "sst2": "rendered_sst2", "renderedsst2": "rendered_sst2",
+        "rendered_sst": "rendered_sst2",
+    }
     key = alias.get(key, key)
     if key not in VISION_TASKS:
         raise KeyError(f"Unknown vision task '{name}'. Known: {sorted(VISION_TASKS)}")
@@ -267,7 +352,17 @@ def load_vision_dataset(spec: VisionTaskSpec, cache_dir: Optional[str] = None):
     collator so sampling/eval stay cheap."""
     kw = {} if spec.dataset_config is None else {"name": spec.dataset_config}
     ds = load_dataset(spec.dataset, cache_dir=cache_dir, **kw)
-    classnames = ds[spec.train_split].features[spec.label_key].names
+    # Class names come from the ClassLabel feature when present (order already
+    # matches the expert); the webdataset tasks have a bare int label, so fall
+    # back to the explicit names on the spec.
+    label_feat = ds[spec.train_split].features[spec.label_key]
+    classnames = getattr(label_feat, "names", None)
+    if classnames is None:
+        if spec.classnames is None:
+            raise ValueError(
+                f"Task '{spec.name}' label column '{spec.label_key}' has no "
+                f"ClassLabel.names and no explicit classnames on the spec.")
+        classnames = list(spec.classnames)
     keep = {spec.image_key, spec.label_key}
     drop = [c for c in ds[spec.train_split].column_names if c not in keep]
     if drop:

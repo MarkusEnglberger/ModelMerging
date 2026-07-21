@@ -1,0 +1,46 @@
+# 14-task CLIP/ViT suite (TALL-masks intermediate): the 8 standard task-
+# arithmetic tasks plus CIFAR100, STL10, Flowers102, OxfordPets, PCAM, FER2013.
+# Backbone theta_0 = openai/clip-vit-base-patch32 vision tower; experts are the
+# FusionBench/tanganke fine-tuned CLIPVisionModel checkpoints. Mergeable encoder
+# = vision tower; each task keeps a frozen zero-shot text head.
+base_model: openai/clip-vit-base-patch32
+modality: clip
+tag: clip14
+output_dir: results/clip14
+device: cuda
+seed: 0
+
+experts:
+  - {name: sun397,     lam: 0.3}
+  - {name: cars,       lam: 0.3}
+  - {name: resisc45,   lam: 0.3}
+  - {name: eurosat,    lam: 0.3}
+  - {name: svhn,       lam: 0.3}
+  - {name: gtsrb,      lam: 0.3}
+  - {name: mnist,      lam: 0.3}
+  - {name: dtd,        lam: 0.3}
+  - {name: cifar100,   lam: 0.3}
+  - {name: stl10,      lam: 0.3}
+  - {name: flowers102, lam: 0.3}
+  - {name: pets,       lam: 0.3}
+  - {name: pcam,       lam: 0.3}
+  - {name: fer2013,    lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  eval_batch_size: 128
+  eval_num_workers: 8
+  probe_seed: 0
+  class_balanced: true
+  max_eval: null
