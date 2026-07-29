@@ -43,6 +43,8 @@ def main():
                     help="lr schedules for the APR arms; non-constant use --apr_order")
     ap.add_argument("--apr_order", choices=["fixed", "cyclic", "random"],
                     default="random")
+    ap.add_argument("--probe_seed", type=int, default=None,
+                    help="override the replay-buffer sampling seed (multi-seed)")
     ap.add_argument("--n_val", type=int, default=0,
                     help="held-out labeled examples/task for hyperparameter "
                          "selection, drawn disjointly from the replay buffer "
@@ -75,6 +77,8 @@ def main():
     cfg = ExperimentConfig.from_yaml(args.config)
     cfg.data.n_probe = args.n_probe
     cfg.data.n_val = args.n_val
+    if args.probe_seed is not None:
+        cfg.data.probe_seed = args.probe_seed
     ctx = MergeContext.build(cfg)
     objective, _ = make_replay_objective(ctx)
     # base/expert + per-cell raw scores so scripts/rescore.py can re-aggregate.
@@ -107,9 +111,9 @@ def main():
     for gn in args.gram_ns:
         # draw gn unlabeled inputs per task for the Grams (matched 64 = the default buffer)
         if gn != args.n_probe:
-            ctx.resample_buffers(gn, probe_seed=cfg.seed)
+            ctx.resample_buffers(gn, probe_seed=cfg.data.probe_seed)
         else:
-            ctx.resample_buffers(args.n_probe, probe_seed=cfg.seed)
+            ctx.resample_buffers(args.n_probe, probe_seed=cfg.data.probe_seed)
         for nd in args.nondiag_scales:
             _log(f"\n[regmean] gram_n={gn} nondiag_scale={nd}")
             state, info = regmean_merge(ctx.base_encoder, ctx.per_task, ctx.task_names,
@@ -125,7 +129,7 @@ def main():
     _log(f"\n[best regmean] {best[1]}")
 
     # restore the matched 64-example buffer for the labeled APR stage
-    ctx.resample_buffers(args.n_probe, probe_seed=cfg.seed)
+    ctx.resample_buffers(args.n_probe, probe_seed=cfg.data.probe_seed)
     for sched in args.apr_schedules:
       for lr in args.apr_lrs:
         rc = dataclasses.replace(

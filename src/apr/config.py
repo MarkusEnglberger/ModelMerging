@@ -37,6 +37,12 @@ class RefineConfig:
     # `topk_frac` fraction of ALL coordinates (global threshold per task per sweep).
     # Tests whether the attribution signal that the eps=0 sign gate dilutes across
     # the noise floor is recoverable by magnitude concentration.
+    # gate_mode="topk_g": keep g*v < 0 AND |g| in the top `topk_frac` fraction of
+    # ITS TENSOR (per-tensor quantile, per task per sweep). Thresholds only the
+    # NOISY factor: v is deterministic, so |g*v| selection is biased toward
+    # large-|v| coordinates whose sign is a coin flip (noise amplified by
+    # distance); |g| is the natural significance statistic, and the per-tensor
+    # quantile removes cross-tensor gradient-scale heterogeneity.
     topk_frac: float = 0.05
 
 

@@ -134,6 +134,14 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         elif cfg.gate_mode == "topk":
             prod = gi * vi
             m = ((prod < 0) & (-prod >= topk_thr)).to(gi.dtype)
+        elif cfg.gate_mode == "topk_g":
+            # significance filter on |g| (the only noisy factor), per-tensor
+            # quantile; toward-expert prior stays sign(g*v)<0.
+            absg = gi.abs()
+            total_t = absg.numel()
+            k = max(1, int(round(cfg.topk_frac * total_t)))
+            thr = torch.kthvalue(absg.reshape(-1), total_t - k + 1).values
+            m = ((gi * vi < 0) & (absg >= thr)).to(gi.dtype)
         else:
             m = _gate(gi, vi, cfg, rng_gen)
         u_raw = _base_update(gi, vi, cfg.update_mode) * m

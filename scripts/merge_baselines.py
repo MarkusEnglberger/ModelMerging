@@ -93,6 +93,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--n_probe", type=int, default=None)
+    ap.add_argument("--probe_seed", type=int, default=None,
+                    help="override the replay-buffer sampling seed (multi-seed "
+                         "replication varies THIS; cfg.seed / refine order stay fixed)")
     # --- checkpoint-only grids ---
     ap.add_argument("--ta_lams", type=float, nargs="*", default=[0.2, 0.3, 0.4, 0.5])
     ap.add_argument("--ties_densities", type=float, nargs="*", default=[0.1, 0.2])
@@ -134,6 +137,13 @@ def main():
     ap.add_argument("--apr_order", choices=["fixed", "cyclic", "random"],
                     default="random",
                     help="task order for non-constant-schedule APR arms")
+    ap.add_argument("--apr_gate_modes", nargs="*", default=[],
+                    choices=["coordinate", "none", "topk", "topk_g"],
+                    help="gate variants for the APR arms (default: config's mode). "
+                         "topk_g = sign(g*v)<0 AND |g| in the per-tensor top "
+                         "topk_frac (significance on the noisy factor only)")
+    ap.add_argument("--topk_fracs", type=float, nargs="*", default=[0.05],
+                    help="kept fraction(s) for topk/topk_g gate arms")
     ap.add_argument("--gd_lrs", type=float, nargs="*", default=[],
                     help="also run ORDINARY GD (plain -g, no gate/anchor/clip) from "
                          "each --refine_from init. GD's lr optimum has only ever "
@@ -166,6 +176,8 @@ def main():
     cfg = ExperimentConfig.from_yaml(args.config)
     if args.n_probe is not None:
         cfg.data.n_probe = args.n_probe
+    if args.probe_seed is not None:
+        cfg.data.probe_seed = args.probe_seed
     ctx = MergeContext.build(cfg)
     steps = args.steps if args.steps is not None else cfg.refine.steps
     names = cfg.task_names
@@ -300,21 +312,32 @@ def main():
             continue
         init_label = fam.name.split(":", 1)[1]
         best_mean = None
-        for sched in args.apr_schedules:
-          for lr in args.apr_lrs:
+        gate_modes = args.apr_gate_modes or [cfg.refine.gate_mode]
+        for gmode in gate_modes:
+         fracs = args.topk_fracs if gmode.startswith("topk") else [None]
+         for frac in fracs:
+          for sched in args.apr_schedules:
+           for lr in args.apr_lrs:
             rc = dataclasses.replace(
-                cfg.refine, steps=steps, lr=lr,
+                cfg.refine, steps=steps, lr=lr, gate_mode=gmode,
+                topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
                 lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
                 order=args.apr_order if sched != "constant" else cfg.refine.order)
             _log(f"\n===== APR from {init_label} @ lr{lr:g} S={steps} {sched} "
-                 f"({rc.gate_mode}/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
+                 f"({rc.gate_mode}"
+                 f"{'' if frac is None else f'@{frac:g}'}"
+                 f"/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
             refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
             gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
-            nm = f"apr:from={key}@lr{lr:g}" + ("" if sched == "constant" else f",{sched}")
+            nm = (f"apr:from={key}@lr{lr:g}"
+                  + ("" if sched == "constant" else f",{sched}")
+                  + ("" if gmode == cfg.refine.gate_mode and frac is None
+                     else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
             m = record(report, nm, s, nr, ag,
                        pd_global_norm(pd_sub(refined, fam.state)),
-                       init=init_label, lr=lr, schedule=sched,
+                       init=init_label, lr=lr, schedule=sched, gate_mode=gmode,
+                       topk_frac=frac,
                        gate_density=gd, replay_obj=objective(refined))
             if best_mean is None or m > best_mean:
                 best_mean = m
