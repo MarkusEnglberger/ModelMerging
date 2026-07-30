@@ -40,7 +40,10 @@ from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
 from apr.models import pd_sub, pd_global_norm
 from apr.taskvec import task_arithmetic_merge
-from apr.merge_methods import ties_combined_tau, ties_merge
+from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
+                               breadcrumbs_merge)
+from apr.adamerging import adamerging
+from apr.regmean import regmean_merge
 from apr.refine import refine
 
 DEFAULT_HELDOUT = ["sun397", "stl10", "cifar10", "pets", "food101", "flowers102"]
@@ -55,8 +58,38 @@ def main():
     ap.add_argument("--ta_lams", type=float, nargs="*", default=[0.08, 0.1, 0.15, 0.2])
     ap.add_argument("--ties_densities", type=float, nargs="*", default=[0.1])
     ap.add_argument("--ties_lams", type=float, nargs="*", default=[0.6, 0.8])
+    # --- additional merge baselines, all built from the TRAIN tasks only ---
+    ap.add_argument("--dt_drops", type=float, nargs="*", default=[0.5])
+    ap.add_argument("--dt_trims", type=float, nargs="*", default=[0.1])
+    ap.add_argument("--dt_lams", type=float, nargs="*", default=[0.4])
+    ap.add_argument("--bc_densities", type=float, nargs="*", default=[0.1])
+    ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01])
+    ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.2])
+    ap.add_argument("--ada", action="store_true",
+                    help="AdaMerging-layer over the TRAIN tasks (entropy-min on "
+                         "their unlabeled inputs only)")
+    ap.add_argument("--ada_init_lam", type=float, default=0.05)
+    ap.add_argument("--ada_steps", type=int, default=300)
+    ap.add_argument("--ada_lr", type=float, default=1e-3)
+    ap.add_argument("--ada_bs", type=int, default=16)
+    ap.add_argument("--ada_workers", type=int, default=0)
+    ap.add_argument("--regmean", action="store_true",
+                    help="RegMean over the TRAIN tasks (Grams from their probe "
+                         "buffers). Its raw distance is dominated by "
+                         "activation-null-space components, so its retention is "
+                         "an independent test of that account.")
+    ap.add_argument("--regmean_nd", type=float, default=1.0)
+    ap.add_argument("--regmean_eps", type=float, default=1e-3)
+    # --- refinement arms ---
     ap.add_argument("--apr_base_lrs", type=float, nargs="*", default=[4, 8])
     ap.add_argument("--apr_ta_lrs", type=float, nargs="*", default=[4])
+    ap.add_argument("--apr_ada_lrs", type=float, nargs="*", default=[],
+                    help="APR from the AdaMerging merge (needs --ada)")
+    ap.add_argument("--gd_base_lrs", type=float, nargs="*", default=[],
+                    help="ordinary GD from the base model (the descent probe on "
+                         "the retention axis)")
+    ap.add_argument("--nogate_base_lrs", type=float, nargs="*", default=[],
+                    help="ungated anchored update from the base model")
     ap.add_argument("--steps", type=int, default=30)
     ap.add_argument("--apr_schedule", default="cosine",
                     choices=["constant", "cosine", "linear"])
@@ -128,25 +161,78 @@ def main():
                                combined=combined)
             record(f"merge:TIES14@d{d:g},l{lam:g}", state, density=d, lam=lam)
 
+    # --- DARE-TIES and Breadcrumbs (checkpoint-only tier) -------------------
+    for dd in args.dt_drops:
+        for t in args.dt_trims:
+            for lam in args.dt_lams:
+                state = dare_ties_merge(ctx.base_encoder, tv_train, lam=lam,
+                                        drop_density=dd, trim_density=t,
+                                        seed=cfg.seed)
+                record(f"merge:DARETIES14@dd{dd:g},t{t:g},l{lam:g}", state, lam=lam)
+    for d in args.bc_densities:
+        for o in args.bc_outliers:
+            for lam in args.bc_lams:
+                state = breadcrumbs_merge(ctx.base_encoder, tv_train,
+                                          {n: lam for n in train},
+                                          density=d, outlier_frac=o)
+                record(f"merge:BC14@d{d:g},o{o:g},l{lam:g}", state, lam=lam)
+
+    # --- AdaMerging over the TRAIN tasks (label-free, data-dependent) --------
+    ada_state = None
+    if args.ada:
+        _log(f"\n[AdaMerging-layer] entropy minimisation over {len(train)} train "
+             f"tasks ({args.ada_steps} steps, lr={args.ada_lr}, "
+             f"init_lam={args.ada_init_lam})")
+        ada_state, ada_info = adamerging(
+            ctx.base_encoder, tv_train, ctx.per_task, train, ctx.device,
+            layerwise=True, steps=args.ada_steps, lr=args.ada_lr,
+            batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
+            num_workers=args.ada_workers, data_key="eval_ds", logger=_log)
+        record("merge:ADA14-layer", ada_state,
+               ada_lam_per_task=ada_info.get("lam_per_task"))
+
+    # --- RegMean over the TRAIN tasks (label-free, data-dependent) ----------
+    if args.regmean:
+        _log(f"\n[RegMean] Grams from the {len(train)} train tasks' probe buffers")
+        rgm_state, rgm_info = regmean_merge(
+            ctx.base_encoder, ctx.per_task, train, ctx.device,
+            buffer_key="probe_buffer", nondiag_scale=args.regmean_nd,
+            eps=args.regmean_eps, batch_size=args.ada_bs, logger=_log)
+        record(f"merge:RegMean14@nd{args.regmean_nd:g}", rgm_state)
+
     # --- APR refinement restricted to the TRAIN handles ----------------------
-    def run_apr(start, lr, tag):
-        rc = dataclasses.replace(
-            cfg.refine, steps=args.steps, lr=lr,
-            lr_schedule=args.apr_schedule, lr_min_frac=args.lr_min_frac,
-            order=(args.apr_order if args.apr_schedule != "constant"
-                   else cfg.refine.order))
-        _log(f"\n===== APR ({tag}) @ lr{lr:g} S={args.steps} "
-             f"{args.apr_schedule}/{rc.order} on {len(handles_train)} tasks =====")
+    def run_refine(start, lr, tag, kind="apr"):
+        """kind: apr (gated anchored) | nogate (ungated anchored) | gd (plain)."""
+        over = dict(steps=args.steps, lr=lr, lr_schedule=args.apr_schedule,
+                    lr_min_frac=args.lr_min_frac,
+                    order=(args.apr_order if args.apr_schedule != "constant"
+                           else cfg.refine.order))
+        if kind == "nogate":
+            over.update(gate_mode="none")
+        elif kind == "gd":
+            over.update(gate_mode="none", update_mode="grad", clip_mode="none")
+        rc = dataclasses.replace(cfg.refine, **over)
+        _log(f"\n===== {kind.upper()} ({tag}) @ lr{lr:g} S={args.steps} "
+             f"{args.apr_schedule}/{rc.order} on {len(handles_train)} tasks "
+             f"({rc.gate_mode}/{rc.update_mode}/clip={rc.clip_mode}) =====")
         refined, _ = refine(start, handles_train, rc, ctx.device,
                             seed=cfg.seed, move_model=True, logger=_log)
         refined_cpu = OrderedDict((k, v.cpu()) for k, v in refined.items())
-        record(f"apr:{tag}@lr{lr:g}", refined_cpu, lr=lr, steps=args.steps,
-               schedule=args.apr_schedule)
+        record(f"{kind}:{tag}@lr{lr:g}", refined_cpu, lr=lr, steps=args.steps,
+               schedule=args.apr_schedule, kind=kind)
 
     for lr in args.apr_base_lrs:
-        run_apr(ctx.base_encoder, lr, "from=base14")
+        run_refine(ctx.base_encoder, lr, "from=base14", "apr")
+    for lr in args.nogate_base_lrs:
+        run_refine(ctx.base_encoder, lr, "from=base14", "nogate")
+    for lr in args.gd_base_lrs:
+        run_refine(ctx.base_encoder, lr, "from=base14", "gd")
     for lr in args.apr_ta_lrs:
-        run_apr(best_ta[2], lr, "from=ta14")
+        run_refine(best_ta[2], lr, "from=ta14", "apr")
+    if args.apr_ada_lrs:
+        assert ada_state is not None, "--apr_ada_lrs requires --ada"
+        for lr in args.apr_ada_lrs:
+            run_refine(ada_state, lr, "from=ada14", "apr")
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:
