@@ -10,3 +10,5 @@ pillow  # CLIP/ViT vision track: image decoding for CLIPImageProcessor
 pyyaml
 accelerate==0.34.2
 pandas
+# MaTS/T0 P3 benchmark templates (optional unless modality=t5_mats).
+promptsource==0.2.3

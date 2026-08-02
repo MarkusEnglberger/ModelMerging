@@ -1,0 +1,46 @@
+# Classifier-free MaTS benchmark from Tam et al., using the reproducible IA3
+# p3_eight_qa experts. All eight tasks share one frozen T5 language-model head;
+# only the 282,624 internal IA3 scaling parameters are merged/refined.
+#
+# Before running:
+#   1. install promptsource==0.2.3 (included in requirements.txt)
+#   2. prefetch official P3 Parquet + r-three IA3 experts:
+#      python scripts/prefetch_mats_t5.py
+base_model: google/t5-large-lm-adapt
+modality: t5_mats_ia3
+model_dtype: float32
+tag: mats_t5_8
+output_dir: results/mats_t5_8
+device: cuda
+seed: 0
+
+experts:
+  - {name: cosmos_qa, lam: 0.3}
+  - {name: social_iqa, lam: 0.3}
+  - {name: quail, lam: 0.3}
+  - {name: wiki_qa, lam: 0.3}
+  - {name: quartz, lam: 0.3}
+  - {name: qasc, lam: 0.3}
+  - {name: ropes, lam: 0.3}
+  - {name: paws, lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 512
+  eval_batch_size: 8
+  grad_batch_size: 4
+  probe_seed: 0
+  # ROPES is generative and has no scalar class label.
+  class_balanced: false
+  max_eval: null

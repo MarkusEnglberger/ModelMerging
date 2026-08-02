@@ -2,6 +2,7 @@
 .venv/
 .hf_cache
 .hf_cache/
+.mats_data/
 __pycache__/
 *.pyc
 results/

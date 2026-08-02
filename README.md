@@ -52,7 +52,7 @@ tests/            synthetic unit tests for the gate + Algorithm 1
 python3 -m venv .venv && source .venv/bin/activate
 pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu121
 pip install transformers==4.44.2 datasets==2.21.0 evaluate==0.4.3 \
-            scikit-learn scipy pyyaml accelerate==0.34.2 pandas
+            scikit-learn scipy pyyaml accelerate==0.34.2 pandas promptsource==0.2.3
 ```
 
 Assets (checkpoints + GLUE) are cached under `.hf_cache/` (`HF_HOME`). Pre-fetch on a
@@ -99,6 +99,25 @@ python scripts/prefetch_clip.py --tasks eurosat gtsrb mnist   # or --all
 sbatch slurm/clip_poc.sbatch
 ```
 
+## MaTS shared-output T5 track
+
+`configs/mats_t5_8.yaml` reproduces the IA3 `p3_eight_qa` suite from Tam
+et al.: CosmosQA, SocialIQA, QuAIL, WikiQA, QuaRTz, QASC, ROPES, and PAWS. The
+282,624 internal IA3 scaling parameters in `google/t5-large-lm-adapt` are
+merged; its one shared LM head is frozen, so there are no task-specific
+classifiers. It uses the authors'
+PromptSource filtering, train-tail holdouts, example/template cross-product for
+replay, cyclic evaluation templates, candidate log-likelihood accuracy, and
+SQuAD EM/F1 for ROPES.
+
+Prefetch the base model, official `r-three/eight-qa-*-ia3` experts, and safe
+pre-rendered BigScience P3 Parquet snapshots on a networked node:
+
+```bash
+python scripts/prefetch_mats_t5.py
+python scripts/run_merge.py --config configs/mats_t5_8.yaml
+```
+
 ## Status
 
 Implemented: core framework + Algorithm 1, GLUE multi-head merging, the DistilRoBERTa
@@ -114,5 +133,6 @@ retention positive. Notably the AP gate helps on CLIP at both 3 and 8 tasks (it
 rescues the fragile Cars/SUN397 tasks), unlike GLUE-8 where ungated anchoring tied it. The
 ablation/baseline knobs (gate mode, update mode, aggregated-U, task order,
 clipping/normalization, expansion point) are wired in `RefineConfig` and apply to both
-modalities. Deferred: full GLUE-8 sweep, full 8-task CLIP suite (+ vision hyperparameter
-sweep and baselines), the T5 shared-head track, and the full baseline suite.
+modalities. The classifier-free MaTS/T0 eight-task shared-head implementation is
+also available in `configs/mats_t5_8.yaml`. Deferred: full GLUE-8 sweep, further
+vision hyperparameter sweeps, MaTS experiments, and the full baseline suite.
