@@ -10,6 +10,7 @@ constructed and what (if anything) refines it.
     merge:TIES@d,l             trim -> sign-elect -> disjoint mean      (Yadav 2023)
     merge:DARE@d,s             drop+rescale -> task arithmetic          (CONTROL, Yu 2023)
     merge:DARETIES@dd,t,l      drop+rescale -> TIES                     (Yu 2023 x Yadav 2023)
+    merge:DELLA@d,w,l,s        magnitude-sample -> TIES                 (Deep 2024)
     merge:BC@d,o,l             magnitude-band mask -> task arithmetic   (Breadcrumbs, Davari 2023)
   Data-dependent, label-free
     merge:ADA-{task,layer}     unlabeled test-time entropy minimisation (AdaMerging, Yang 2024)
@@ -44,17 +45,26 @@ from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
 from apr.metrics import aggregate_all
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ta_merge,
-                               dare_ties_merge, breadcrumbs_merge)
+                               dare_ties_merge, della_merge, breadcrumbs_merge)
 from apr.taskvec import task_arithmetic_merge
 from apr.adamerging import adamerging
 from apr.replay_baselines import make_replay_objective
 from apr.models import pd_sub, pd_global_norm
 
 
+# tasks whose retention enters the aggregate (and hence best-cell selection).
+# None = all. Set from --retention_tasks: on the MergeBench track the multilingual
+# expert does not beat base on the MC metric (denominator ~0, sign unstable), so
+# its normret is undefined and would corrupt means and family-best selection.
+# Raw scores for excluded tasks are still recorded per cell.
+RETENTION_TASKS = None
+
+
 def eval_merge(ctx, state):
     scores = ctx.eval_encoder(state)
     nr = ctx.normret(scores)
-    return scores, nr, aggregate_all(scores, nr, ctx.base_scores, ctx.expert_scores)
+    nr_agg = ({t: nr[t] for t in RETENTION_TASKS} if RETENTION_TASKS else nr)
+    return scores, nr, aggregate_all(scores, nr_agg, ctx.base_scores, ctx.expert_scores)
 
 
 # Which aggregate drives best-per-family selection and the grid-edge warning.
@@ -106,6 +116,12 @@ def main():
     ap.add_argument("--dt_trims", type=float, nargs="*", default=[0.1, 0.2])
     ap.add_argument("--dt_lams", type=float, nargs="*", default=[0.8, 1.0])
     ap.add_argument("--dt_seed", type=int, default=0)
+    ap.add_argument("--della_densities", type=float, nargs="*", default=[0.7],
+                    help="mean MagPrune keep probabilities")
+    ap.add_argument("--della_windows", type=float, nargs="*", default=[0.14],
+                    help="full row-wise keep-probability window")
+    ap.add_argument("--della_lams", type=float, nargs="*", default=[1.1])
+    ap.add_argument("--della_seeds", type=int, nargs="*", default=[42])
     ap.add_argument("--bc_densities", type=float, nargs="*", default=[0.1, 0.2])
     ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01, 0.05])
     ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.4])
@@ -159,19 +175,29 @@ def main():
     ap.add_argument("--nogate_lrs", type=float, nargs="*", default=[],
                     help="also run the UNGATED anchored control from each init")
     ap.add_argument("--refine_from", nargs="*",
-                    default=["ta", "ties", "dareties", "bc", "ls", "ada"],
-                    choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
+                    default=["ta", "ties", "dareties", "della", "bc", "ls", "ada"],
+                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[2, 4, 8, 16])
+    ap.add_argument("--control_gd_lrs", type=float, nargs="*", default=[],
+                    help="also run ordinary replay GD from each refine_from init "
+                         "at these lrs (the composition control)")
     ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
     ap.add_argument("--skip_families", nargs="*", default=[],
-                    choices=["ta", "ties", "dare", "dareties", "bc", "ls", "ada"])
+                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
     ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
                     default="mean_normret",
                     help="aggregate used to pick best-per-family / best APR lr. "
                          "Use mean_acc when a task has a degenerate expert-base "
                          "gap (20-task CLIP suite: stl10, food101).")
+    ap.add_argument("--retention_tasks", nargs="*", default=None,
+                    help="restrict retention aggregates/selection to these tasks "
+                         "(excluded tasks keep raw scores in the report)")
     ap.add_argument("--out", default="results/compare/merge_baselines.json")
     args = ap.parse_args()
+    if args.retention_tasks:
+        global RETENTION_TASKS
+        RETENTION_TASKS = list(args.retention_tasks)
+        _log(f"[retention] aggregates/selection over {RETENTION_TASKS} only")
 
     cfg = ExperimentConfig.from_yaml(args.config)
     if args.n_probe is not None:
@@ -181,10 +207,19 @@ def main():
     ctx = MergeContext.build(cfg)
     steps = args.steps if args.steps is not None else cfg.refine.steps
     names = cfg.task_names
-    # replay objective (mean loss on the same n=64 labeled buffers used for the
-    # refinement gradients) recorded per refine cell so hyperparameters can be
-    # selected WITHOUT the test set (replay-honest selection, cf. replay_baselines).
-    objective, _ = make_replay_objective(ctx)
+    if args.refine_from:
+        # Recorded per refine cell so hyperparameters can be selected without
+        # the test set (replay-honest selection, cf. replay_baselines).
+        objective, _ = make_replay_objective(ctx)
+    else:
+        # no APR composition in this run -> the expert-anchor clones (one full
+        # encoder copy per task; 4 x 12 GB fp32 at 3B) are never used. Freeing
+        # them keeps the CPU-RAM request at the 1-GPU billing share. eval0 has
+        # already consumed them (expert scores are computed inside build()).
+        for h in ctx.handles:
+            h.expert_encoder = None
+        for n in names:
+            ctx.per_task[n]["expert_encoder"] = None
 
     report = {"config": cfg.to_dict(), "tasks": names, "steps": steps,
               "base": ctx.base_scores, "expert": ctx.expert_scores,
@@ -248,6 +283,24 @@ def main():
                                     pd_global_norm(pd_sub(state, ctx.merged0)),
                                     drop=dd, trim=tr, lam=lam), nm, state)
 
+    # ---- DELLA (row-wise magnitude-ranked sampling, then sign election) ----
+    della = Best("DELLA")
+    if "della" not in skip:
+        for d in args.della_densities:
+            for w in args.della_windows:
+                for lam in args.della_lams:
+                    for sd in args.della_seeds:
+                        state = della_merge(ctx.base_encoder, ctx.task_vectors,
+                                            lam=lam, density=d, window_size=w,
+                                            seed=sd)
+                        nm = f"merge:DELLA@d{d:g},w{w:g},l{lam:g},s{sd}"
+                        s, nr, ag = eval_merge(ctx, state)
+                        della.offer(record(
+                            report, nm, s, nr, ag,
+                            pd_global_norm(pd_sub(state, ctx.merged0)),
+                            density=d, window_size=w, lam=lam, seed=sd),
+                            nm, state)
+
     # ---- Model Breadcrumbs ----
     bc = Best("BC")
     if "bc" not in skip:
@@ -292,7 +345,10 @@ def main():
                     ctx.base_encoder, ctx.task_vectors, ctx.per_task, names, ctx.device,
                     layerwise=(variant == "layer"), steps=args.ada_steps, lr=args.ada_lr,
                     batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
-                    num_workers=args.ada_workers, data_key=dkey, logger=_log)
+                    num_workers=args.ada_workers, data_key=dkey,
+                    # 3B/fp32: resident task vectors (12 GB/task) + vocab-sized
+                    # entropy logits OOM the 93 GB card; stream from CPU instead
+                    tv_on_gpu=(cfg.modality != "causal_lm"), logger=_log)
                 tag = variant if dkey == "eval_ds" else f"{variant}-matched"
                 nm = f"merge:ADA-{tag}"
                 s, nr, ag = eval_merge(ctx, state)
@@ -300,9 +356,17 @@ def main():
                                  pd_global_norm(pd_sub(state, ctx.merged0)),
                                  adamerging=info), nm, state)
 
-    fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt, "bc": bc, "ls": ls, "ada": ada}
+    fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt,
+            "della": della, "bc": bc, "ls": ls, "ada": ada}
     report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
     _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
+
+    # every family that consumes task vectors has run by here; the refinement
+    # anchors on the expert encoders (v = theta_i - theta), never on tau, so the
+    # vectors are dead weight from this point. At 4 x 3B fp32 that is ~48 GB of
+    # CPU RAM, which is what lets refine_from co-exist with the retained anchors
+    # inside the 1-GPU-share memory request.
+    ctx.task_vectors = {}
 
     # ---- APR on top of each init (same lr grid for every init = equal budget) ----
     for key in args.refine_from:
@@ -371,6 +435,19 @@ def main():
                            init=init_label, lr=lr, gd_steps=S, schedule=sched,
                            replay_obj=objective(refined))
 
+        # ordinary replay GD from the SAME init: the control that separates
+        # "APR composes with better merges" from "any labeled replay step does".
+        # Same replay buffers, same sweep count; free -g steps, no gate, no clip.
+        for lr in args.control_gd_lrs:
+            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr,
+                                     gate_mode="none", update_mode="grad",
+                                     clip_mode="none")
+            _log(f"\n===== ordinary GD from {init_label} @ lr{lr:g} =====")
+            refined, _hist = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
+            s, nr, ag = eval_merge(ctx, refined)
+            record(report, f"gd:from={key}@lr{lr:g}", s, nr, ag,
+                   pd_global_norm(pd_sub(refined, fam.state)),
+                   init=init_label, lr=lr, replay_obj=objective(refined))
         # a peak at the grid edge means the optimum was not bracketed
         if best_mean is not None and args.apr_lrs:
             best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1].split(",")[0])

@@ -39,7 +39,12 @@ from .models import ParamDict, load_encoder_state, pd_clone
 
 
 def _topk_mask(scores: ParamDict, fraction: float) -> ParamDict:
-    """Binary mask keeping the top `fraction` of coordinates by score (global)."""
+    """Binary mask keeping exactly the top fraction of coordinates globally.
+
+    Selecting by ``value >= kth_value`` can retain vastly more than requested
+    when learned sigmoid scores saturate and tie.  Explicit flat indices make
+    the cardinality exact (apart from the requested rounding of ``k``).
+    """
     allv = torch.cat([v.reshape(-1) for v in scores.values()])
     n = allv.numel()
     k = int(round(fraction * n))
@@ -47,8 +52,16 @@ def _topk_mask(scores: ParamDict, fraction: float) -> ParamDict:
         return OrderedDict((kk, torch.ones_like(v, dtype=torch.bool)) for kk, v in scores.items())
     if k <= 0:
         return OrderedDict((kk, torch.zeros_like(v, dtype=torch.bool)) for kk, v in scores.items())
-    thr = float(torch.kthvalue(allv, n - k + 1).values)
-    return OrderedDict((kk, v >= thr) for kk, v in scores.items())
+    indices = torch.topk(allv, k, sorted=False).indices
+    flat_mask = torch.zeros(n, dtype=torch.bool, device=allv.device)
+    flat_mask[indices] = True
+    out = OrderedDict()
+    start = 0
+    for name, value in scores.items():
+        end = start + value.numel()
+        out[name] = flat_mask[start:end].reshape(value.shape)
+        start = end
+    return out
 
 
 def dataless_masks(task_vectors: Dict[str, ParamDict],
@@ -61,15 +74,67 @@ def dataless_masks(task_vectors: Dict[str, ParamDict],
 def learn_mask(model, buffer, collator, base_encoder: ParamDict, tau: ParamDict,
                device: str, steps: int = 200, lr: float = 0.1, gamma: float = 1e-4,
                batch_size: int = 16, init_logit: float = 0.0,
+               init_sparsity: Optional[float] = None, init_on: float = 3.0,
+               optimizer: str = "adam", move_model: bool = True,
                logger=None, tag: str = "") -> ParamDict:
     """Optimise sigmoid mask logits S for one task; returns sigmoid(S) (CPU floats)."""
     keys = list(base_encoder.keys())
     base_d = {k: base_encoder[k].to(device) for k in keys}
     tau_d = {k: tau[k].to(device) for k in keys}
-    S = [torch.full_like(tau_d[k], float(init_logit), requires_grad=True) for k in keys]
-    opt = torch.optim.Adam(S, lr=lr)
+    if init_sparsity is None:
+        S = [torch.full_like(tau_d[k], float(init_logit), requires_grad=True) for k in keys]
+    else:
+        initial_masks = _topk_mask(
+            OrderedDict((k, tau_d[k].abs()) for k in keys), init_sparsity)
+        S = [torch.where(initial_masks[k],
+                         torch.full_like(tau_d[k], float(init_on)),
+                         torch.full_like(tau_d[k], float(init_logit))).requires_grad_()
+             for k in keys]
+    if optimizer == "adam":
+        opt = torch.optim.Adam(S, lr=lr)
+    elif optimizer == "sgd":
+        opt = torch.optim.SGD(S, lr=lr)
+    elif optimizer == "official":
+        opt = None
+    else:
+        raise ValueError(f"Unknown localization optimizer '{optimizer}'")
 
     step, last = 0, None
+    if optimizer == "official":
+        # Faithful to uiuctml/Localize-and-Stitch's train_graft: one mask
+        # update per epoch, with loss gradients summed over all minibatches at
+        # the same interpolated model. Their manual update is plain SGD and the
+        # sign regularizer pushes logits away from the rounding boundary.
+        while step < steps:
+            with torch.no_grad():
+                sig = [torch.sigmoid(s) for s in S]
+                theta = OrderedDict((k, base_d[k] + sig[j] * tau_d[k])
+                                    for j, k in enumerate(keys))
+            if move_model:
+                model.to(device)
+            model.eval()
+            load_encoder_state(model, theta)
+            accumulated = [torch.zeros_like(tau_d[k]) for k in keys]
+            for batch in batches_from_buffer(buffer, collator, batch_size, device):
+                model.zero_grad(set_to_none=True)
+                loss = model(**batch).loss
+                loss.backward()
+                grads = {n: p.grad for n, p in model.named_parameters()
+                         if p.grad is not None}
+                with torch.no_grad():
+                    for j, k in enumerate(keys):
+                        if k in grads:
+                            accumulated[j].add_(grads[k] * tau_d[k])
+                last = float(loss)
+            with torch.no_grad():
+                for j, s in enumerate(S):
+                    derivative = sig[j] * (1.0 - sig[j])
+                    regularizer = gamma * torch.where(
+                        s > 0, derivative, -derivative)
+                    s.sub_(lr * accumulated[j] * derivative - regularizer)
+            model.zero_grad(set_to_none=True)
+            step += 1
+
     while step < steps:
         for batch in batches_from_buffer(buffer, collator, batch_size, device):
             if step >= steps:
@@ -78,7 +143,8 @@ def learn_mask(model, buffer, collator, base_encoder: ParamDict, tau: ParamDict,
                 sig = [torch.sigmoid(s) for s in S]
                 theta = OrderedDict((k, base_d[k] + sig[j] * tau_d[k])
                                     for j, k in enumerate(keys))
-            model.to(device)
+            if move_model:
+                model.to(device)
             model.eval()
             load_encoder_state(model, theta)
             model.zero_grad(set_to_none=True)
@@ -104,8 +170,9 @@ def learn_mask(model, buffer, collator, base_encoder: ParamDict, tau: ParamDict,
         mean_sig = float(torch.cat([v.reshape(-1) for v in out.values()]).mean())
     if logger:
         logger(f"  [localize] {tag}: loss={last:.4f} mean_sigmoid={mean_sig:.4f}")
-    model.to("cpu")
-    if device.startswith("cuda"):
+    if move_model:
+        model.to("cpu")
+    if device.startswith("cuda") and move_model:
         torch.cuda.empty_cache()
     del S, base_d, tau_d
     return out
@@ -140,7 +207,9 @@ def stitch(base_encoder: ParamDict, task_vectors: Dict[str, ParamDict],
 
 
 def learn_sigmoids(ctx, steps: int = 200, lr: float = 0.1, gamma: float = 1e-4,
-                   batch_size: int = 16, logger=None) -> Dict[str, ParamDict]:
+                   batch_size: int = 16, init_logit: float = 0.0,
+                   init_sparsity: Optional[float] = None, init_on: float = 3.0,
+                   optimizer: str = "adam", logger=None) -> Dict[str, ParamDict]:
     """Train the mask logits for every task and return sigmoid(S) per task.
 
     Sparsity is applied afterwards by :func:`_topk_mask`, so ONE training run serves an
@@ -151,6 +220,9 @@ def learn_sigmoids(ctx, steps: int = 200, lr: float = 0.1, gamma: float = 1e-4,
         out[n] = learn_mask(info["model"], info["probe_buffer"], info["collator"],
                             ctx.base_encoder, ctx.task_vectors[n], ctx.device,
                             steps=steps, lr=lr, gamma=gamma, batch_size=batch_size,
+                            init_logit=init_logit, init_sparsity=init_sparsity,
+                            init_on=init_on, optimizer=optimizer,
+                            move_model=not ctx.keep_model_on_device,
                             logger=logger, tag=n)
     return out
 
@@ -158,3 +230,10 @@ def learn_sigmoids(ctx, steps: int = 200, lr: float = 0.1, gamma: float = 1e-4,
 def masks_from_sigmoids(sigmoids: Dict[str, ParamDict],
                         sparsity: float) -> Dict[str, ParamDict]:
     return {n: _topk_mask(sig, sparsity) for n, sig in sigmoids.items()}
+
+
+def threshold_masks(sigmoids: Dict[str, ParamDict],
+                    threshold: float = 0.5) -> Dict[str, ParamDict]:
+    """Paper-style rounding of learned sigmoid masks to binary masks."""
+    return {n: OrderedDict((k, value > threshold) for k, value in sig.items())
+            for n, sig in sigmoids.items()}

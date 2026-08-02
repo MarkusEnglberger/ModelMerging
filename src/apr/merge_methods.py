@@ -1,4 +1,4 @@
-"""Checkpoint-only interference-aware merge baselines: TIES and DARE.
+"""Checkpoint-only interference-aware merge baselines: TIES, DARE, and DELLA.
 
 These are *data-free* alternatives to the plain task-arithmetic merge
 (``taskvec.task_arithmetic_merge``, Eq. 4). They consume the same task vectors
@@ -14,6 +14,10 @@ baseline) or used as the starting point for APR refinement.
         probability ``1-density`` and rescale the survivors by ``1/density``
         (preserving the expectation), then merge by ordinary task arithmetic
         (DARE-TA) with the per-task lambdas.
+  DELLA (Deep et al. 2024): rank coordinates by magnitude within each row,
+        linearly assign larger keep probabilities to larger coordinates, rescale
+        each survivor by its inverse keep probability, then sign-elect and
+        disjoint-mean as in TIES; scale the result by a single lambda.
 
 All operations are per-tensor and run on whatever device the task vectors live
 on (CPU in the current pipeline), so they add no GPU memory pressure. The trim
@@ -217,6 +221,98 @@ def dare_ties_merge(base_encoder: ParamDict, task_vectors: TaskVectors,
 
     thresholds = {n: _global_threshold(lambda k, n=n: get(n, k), keys, trim_density)
                   for n in names}
+    combined = _ties_disjoint_mean(names, keys, get, thresholds)
+    merged = pd_clone(base_encoder)
+    pd_axpy_(merged, lam, combined)
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# DELLA: magnitude-ranked sampling, then TIES sign election
+# ---------------------------------------------------------------------------
+
+def _della_keep_probabilities(v: torch.Tensor, density: float,
+                              window_size: float) -> torch.Tensor:
+    """Return DELLA/MagPrune keep probabilities for one tensor.
+
+    Probabilities are assigned row-wise in ascending magnitude-rank order,
+    spanning ``density +/- window_size/2``. For tensors above rank two, trailing
+    dimensions are flattened so each first-axis slice (for example, one output
+    convolutional filter) is a row. This preserves the paper implementation for
+    matrices while defining the same operation for convolutional tensors. A
+    one-element row has no rank range, so it receives the mean probability.
+    """
+    if not 0 < density <= 1:
+        raise ValueError(f"density must be in (0, 1], got {density}")
+    if window_size < 0:
+        raise ValueError(f"window_size must be non-negative, got {window_size}")
+    if density == 1:
+        return torch.ones_like(v, dtype=torch.float32)
+    half_window = window_size / 2
+    if half_window > min(density, 1 - density):
+        raise ValueError(
+            "window_size produces keep probabilities outside [0, 1]: "
+            f"density={density}, window_size={window_size}")
+
+    row_count = v.shape[0] if v.ndim >= 2 else 1
+    rows = v.reshape(row_count, -1)
+    cols = rows.shape[1]
+    if cols == 1:
+        return torch.full_like(v, density, dtype=torch.float32)
+
+    order = torch.argsort(rows.abs(), dim=1, descending=False)
+    ranks = torch.empty_like(order)
+    rank_values = torch.arange(cols, device=v.device).expand_as(order)
+    ranks.scatter_(1, order, rank_values)
+    normalized_ranks = ranks.to(torch.float32) / (cols - 1)
+    probabilities = density - half_window + normalized_ranks * window_size
+    return probabilities.reshape(v.shape)
+
+
+def _della_sampled(v: torch.Tensor, density: float, window_size: float,
+                   base_seed: int, task: str, key: str) -> torch.Tensor:
+    """Apply deterministic MagPrune sampling to a task-vector tensor."""
+    probabilities = _della_keep_probabilities(v, density, window_size)
+    if density == 1:
+        # Match the paper implementation: density=1 disables sampling even when
+        # a nonzero window is supplied.
+        return v
+    generator = torch.Generator(device=v.device).manual_seed(
+        _tensor_seed(base_seed, task, key))
+    keep = torch.rand(v.shape, generator=generator, device=v.device) < probabilities
+    work_dtype = (v.dtype if v.device.type != "cpu" or v.dtype == torch.bfloat16
+                  else torch.float32)
+    sampled = v.to(work_dtype) * keep.to(work_dtype) / probabilities.to(work_dtype)
+    return sampled.to(v.dtype)
+
+
+def della_merge(base_encoder: ParamDict, task_vectors: TaskVectors,
+                lam: float = 1.0, density: float = 0.7,
+                window_size: float = 0.14, seed: int = 42) -> ParamDict:
+    """DELLA-Merging: MagPrune -> sign election -> disjoint mean.
+
+    ``density`` is the mean keep probability (one minus the paper's drop rate),
+    and ``window_size`` is the full probability interval. Thus the least- and
+    greatest-magnitude entries in each row receive keep probabilities
+    ``density-window_size/2`` and ``density+window_size/2``, respectively.
+    Sampling is reproducible per task/tensor and independent of dict order.
+    """
+    if not task_vectors:
+        return pd_clone(base_encoder)
+    # Validate even if an empty/malformed base dict would otherwise skip work.
+    probe = next(iter(next(iter(task_vectors.values())).values()))
+    _della_keep_probabilities(probe, density, window_size)
+
+    names = list(task_vectors.keys())
+    keys = list(base_encoder.keys())
+
+    def get(n, k):
+        return _della_sampled(task_vectors[n][k], density, window_size,
+                              seed, n, k)
+
+    # MagPrune is stochastic, not a deterministic trim, so every nonzero sampled
+    # value participates in DELLA's TIES-style election.
+    thresholds = {n: -1.0 for n in names}
     combined = _ties_disjoint_mean(names, keys, get, thresholds)
     merged = pd_clone(base_encoder)
     pd_axpy_(merged, lam, combined)

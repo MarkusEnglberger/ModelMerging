@@ -85,8 +85,10 @@ def main():
     report = {"config": cfg.to_dict(), "tasks": ctx.task_names, "grids": vars(args),
               "base": ctx.base_scores, "expert": ctx.expert_scores, "cells": {}}
 
-    def record(name, state, **extra):
-        scores = ctx.eval_encoder(state)
+    def record(name, state, scores=None, **extra):
+        # MergeContext.build already evaluated the configured TA merge. Reusing
+        # those scores avoids another full pass over all 20 test sets.
+        scores = ctx.eval_encoder(state) if scores is None else scores
         ag = aggregate_all(scores, ctx.normret(scores), ctx.base_scores,
                            ctx.expert_scores)
         cell = {"mean": ag["mean_normret"], "worst": ag["worst_normret"],
@@ -105,15 +107,15 @@ def main():
              f"nr={ag['mean_normret']:.3f}/{ag['worst_normret']:.3f}{vtxt}")
         return ag[args.select_by], cell["replay_obj"]
 
-    record("merge:TA", ctx.merged0)
+    record("merge:TA", ctx.merged0, scores=ctx.merge_scores)
 
     best = None  # (replay_obj, name, state)
+    current_n = args.n_probe
     for gn in args.gram_ns:
         # draw gn unlabeled inputs per task for the Grams (matched 64 = the default buffer)
-        if gn != args.n_probe:
+        if gn != current_n:
             ctx.resample_buffers(gn, probe_seed=cfg.data.probe_seed)
-        else:
-            ctx.resample_buffers(args.n_probe, probe_seed=cfg.data.probe_seed)
+            current_n = gn
         for nd in args.nondiag_scales:
             _log(f"\n[regmean] gram_n={gn} nondiag_scale={nd}")
             state, info = regmean_merge(ctx.base_encoder, ctx.per_task, ctx.task_names,
@@ -129,7 +131,8 @@ def main():
     _log(f"\n[best regmean] {best[1]}")
 
     # restore the matched 64-example buffer for the labeled APR stage
-    ctx.resample_buffers(args.n_probe, probe_seed=cfg.data.probe_seed)
+    if current_n != args.n_probe:
+        ctx.resample_buffers(args.n_probe, probe_seed=cfg.data.probe_seed)
     for sched in args.apr_schedules:
       for lr in args.apr_lrs:
         rc = dataclasses.replace(

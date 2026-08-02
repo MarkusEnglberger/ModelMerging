@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=240G
+#SBATCH --mem=180G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/merge_mb3b-%j.out
 #SBATCH --error=logs/merge_mb3b-%j.out
@@ -16,9 +16,9 @@
 # TIES/DARE/BC are skipped for now: sign-election families need their own careful
 # lr re-centering for composition and can be a follow-up once the landscape is known.
 #
-# --mem 240G (not the 180G billing floor): unlike the compare script this one must
-# RETAIN the task vectors (4 x 3B fp32 ~ 48 GB) to build the merge grid; billing
-# rises to ~256 SBU/hr (mem fraction 1/3 > gpu 1/4).
+# --mem 180G (the 1-GPU billing floor): the task vectors (4 x 3B fp32 ~ 48 GB) must be
+# retained to build the merge grid, but with --refine_from empty the script frees the
+# unused expert-anchor clones (another 48 GB), which keeps the peak under 180G.
 source slurm/common.sh
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 python scripts/merge_baselines.py --config configs/mergebench_llama3b.yaml \

@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=prefetch-clip20
-#SBATCH --partition=mcs.default.q
+#SBATCH --partition=staging
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=12:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=logs/prefetch_clip20-%j.out
 #SBATCH --error=logs/prefetch_clip20-%j.out
 

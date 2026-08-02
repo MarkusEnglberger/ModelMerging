@@ -115,7 +115,8 @@ def adamerging(base_encoder: ParamDict, task_vectors: Dict[str, ParamDict],
                layerwise: bool = True, steps: int = 300, lr: float = 1e-3,
                batch_size: int = 16, init_lam: float = 0.3, seed: int = 0,
                num_workers: int = 0, log_every: int = 50,
-               data_key: str = "eval_ds", logger=None) -> (ParamDict, dict):
+               data_key: str = "eval_ds", tv_on_gpu: bool = True,
+               logger=None) -> (ParamDict, dict):
     """Learn merge coefficients by unlabeled entropy minimisation.
 
     Returns (merged_encoder_cpu, info) where info records the learned lambdas
@@ -132,14 +133,21 @@ def adamerging(base_encoder: ParamDict, task_vectors: Dict[str, ParamDict],
 
     # task vectors on device: T*|theta| (~2.8 GB CLIP / ~4 GB GLUE-8) so the
     # per-step build+contract are not PCIe-bound. Fall back to CPU streaming.
+    # tv_on_gpu=False forces the CPU path: at 3B/fp32 the vectors are 12 GB PER
+    # TASK, and resident copies leave no headroom for the vocab-sized entropy
+    # logits (~4 GB/batch) -- the transfer succeeds but the backward OOMs later,
+    # which the try/except below cannot catch.
     tv_dev = task_vectors
-    try:
-        tv_dev = {n: OrderedDict((k, v.to(device)) for k, v in tv.items())
-                  for n, tv in task_vectors.items()}
-    except RuntimeError as e:  # pragma: no cover - OOM path
-        if logger:
-            logger(f"[adamerging] task vectors stay on CPU ({e.__class__.__name__})")
-        tv_dev = task_vectors
+    if tv_on_gpu:
+        try:
+            tv_dev = {n: OrderedDict((k, v.to(device)) for k, v in tv.items())
+                      for n, tv in task_vectors.items()}
+        except RuntimeError as e:  # pragma: no cover - OOM path
+            if logger:
+                logger(f"[adamerging] task vectors stay on CPU ({e.__class__.__name__})")
+            tv_dev = task_vectors
+    elif logger:
+        logger("[adamerging] task vectors stream from CPU (tv_on_gpu=False)")
 
     # unlabeled batch streams; regression tasks contribute no entropy term
     ent_tasks = [n for n in names if not per_task[n]["spec"].is_regression]
