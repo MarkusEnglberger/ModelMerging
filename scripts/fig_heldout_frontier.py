@@ -41,6 +41,7 @@ LABELS = {  # selective direct labels: frontier + cautionary points
     "merge:RegMean14@nd1": ("RegMean (dist 386)", (-40, -13)),
     "merge:TIES14@d0.1,l0.8": (r"TIES $\lambda$=0.8", (6, -3)),
     "nogate:from=base14@lr2": ("ungated lr2", (4, -11)),
+    "nogate:from=base14@lr8": ("ungated lr8", (5, -3)),
 }
 
 
@@ -54,9 +55,16 @@ def family(name):
     return "merge"
 
 
+SRC2 = os.path.join(HERE, "..", "results/compare/heldout_nogate_sweep.json")
+
+
 def main():
     d = json.load(open(SRC))
     pts = {k: (v["train_mean"], v["held_mean"]) for k, v in d["cells"].items()}
+    if os.path.exists(SRC2):
+        for k, v in json.load(open(SRC2))["cells"].items():
+            if k.startswith("nogate") and k not in pts:
+                pts[k] = (v["train_mean"], v["held_mean"])
 
     # Pareto frontier (maximize both axes)
     front = []
