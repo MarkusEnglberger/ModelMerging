@@ -233,6 +233,10 @@ def main():
     parser.add_argument("--n_select", type=int, default=None,
                         help="disjoint validation examples/task; default=n_probe")
     parser.add_argument("--selection_seed", type=int, default=1)
+    parser.add_argument("--probe_seed", type=int, default=None,
+                        help="replay-buffer draw seed; default=config value. "
+                             "Vary with --selection_seed to replicate over "
+                             "independent buffer draws.")
     parser.add_argument("--families", nargs="+", default=None,
                         help="optional subset of baseline family names")
     parser.add_argument("--grad_batch_size", type=int, default=32,
@@ -246,6 +250,12 @@ def main():
     started = time.time()
     cfg = ExperimentConfig.from_yaml(args.config)
     cfg.data.n_probe = args.n_probe
+    if args.probe_seed is not None:
+        cfg.data.probe_seed = args.probe_seed
+    if cfg.data.probe_seed == args.selection_seed:
+        parser.error(f"probe seed and --selection_seed are both "
+                     f"{args.selection_seed}; the two buffers stay disjoint by "
+                     f"construction but would be drawn from one RNG stream")
     if args.grad_batch_size <= 0:
         parser.error("--grad_batch_size must be positive")
     cfg.data.grad_batch_size = args.grad_batch_size
