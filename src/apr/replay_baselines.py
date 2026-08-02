@@ -46,41 +46,47 @@ from .taskvec import task_arithmetic_merge
 # ---------------------------------------------------------------------------
 
 @torch.no_grad()
-def buffer_loss(model, buffer, collator, batch_size: int, device: str) -> float:
+def buffer_loss(model, buffer, collator, batch_size: int, device: str,
+                move_model: bool = True) -> float:
     """Mean task loss over the replay buffer at the model's current weights."""
     model.eval()
-    model.to(device)
+    if move_model:
+        model.to(device)
     tot, n = 0.0, 0
     for batch in batches_from_buffer(buffer, collator, batch_size, device):
         bn = int(batch["labels"].shape[0])
         tot += float(model(**batch).loss) * bn
         n += bn
-    model.to("cpu")
-    if device.startswith("cuda"):
+    if move_model:
+        model.to("cpu")
+    if device.startswith("cuda") and move_model:
         torch.cuda.empty_cache()
     return tot / max(n, 1)
 
 
-def replay_losses(ctx, state: ParamDict) -> Dict[str, float]:
+def replay_losses(ctx, state: ParamDict,
+                  buffer_key: str = "probe_buffer") -> Dict[str, float]:
     out = {}
     for n in ctx.task_names:
         info = ctx.per_task[n]
         load_encoder_state(info["model"], state)
-        out[n] = buffer_loss(info["model"], info["probe_buffer"], info["collator"],
-                             ctx.cfg.data.eval_batch_size, ctx.device)
+        out[n] = buffer_loss(info["model"], info[buffer_key], info["collator"],
+                             ctx.cfg.data.eval_batch_size, ctx.device,
+                             move_model=not ctx.keep_model_on_device)
     return out
 
 
-def make_replay_objective(ctx) -> Tuple[Callable[[ParamDict], float], Dict[str, float]]:
+def make_replay_objective(ctx, buffer_key: str = "probe_buffer"
+                          ) -> Tuple[Callable[[ParamDict], float], Dict[str, float]]:
     """Scale-free replay objective: mean over tasks of L_t(theta) / L_t(theta_merge).
 
     Raw losses are not commensurable across tasks (cross-entropy vs. MSE for STS-B), so
     each is normalised by its value at the fixed task-arithmetic merge point. Lower is
     better; the merge point scores exactly 1.0."""
-    ref = replay_losses(ctx, ctx.merged0)
+    ref = replay_losses(ctx, ctx.merged0, buffer_key=buffer_key)
 
     def objective(state: ParamDict) -> float:
-        L = replay_losses(ctx, state)
+        L = replay_losses(ctx, state, buffer_key=buffer_key)
         return sum(L[n] / max(ref[n], 1e-8) for n in L) / len(L)
 
     return objective, ref
@@ -174,10 +180,12 @@ def cocktail_merge(ctx, lams: List[float], objective, temperature: float = 1.0,
 # 3. Fisher merging (diagonal empirical Fisher from the replay buffer)
 # ---------------------------------------------------------------------------
 
-def _diag_fisher(model, buffer, collator, device: str, enc_names: List[str]) -> ParamDict:
+def _diag_fisher(model, buffer, collator, device: str, enc_names: List[str],
+                 move_model: bool = True) -> ParamDict:
     """F[r] = (1/n) sum_x (d loss(x) / d theta_r)^2, per-example (batch size 1)."""
     model.eval()
-    model.to(device)
+    if move_model:
+        model.to(device)
     F = OrderedDict((n, torch.zeros_like(p, device="cpu"))
                     for n, p in model.named_parameters() if n in set(enc_names))
     count = 0
@@ -189,8 +197,9 @@ def _diag_fisher(model, buffer, collator, device: str, enc_names: List[str]) -> 
                 F[n].add_((p.grad.detach() ** 2).cpu())
         count += 1
     model.zero_grad(set_to_none=True)
-    model.to("cpu")
-    if device.startswith("cuda"):
+    if move_model:
+        model.to("cpu")
+    if device.startswith("cuda") and move_model:
         torch.cuda.empty_cache()
     for n in F:
         F[n].div_(max(count, 1))
@@ -212,7 +221,7 @@ def fisher_merge(ctx, lams: List[float], objective, eps: float = 1e-12,
         info = ctx.per_task[n]
         load_encoder_state(info["model"], info["expert_encoder"])  # Fisher AT the expert
         F = _diag_fisher(info["model"], info["probe_buffer"], info["collator"],
-                         ctx.device, keys)
+                         ctx.device, keys, move_model=not ctx.keep_model_on_device)
         tau = ctx.task_vectors[n]
         for k in keys:
             num[k].add_(F[k] * tau[k])

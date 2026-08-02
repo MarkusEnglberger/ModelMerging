@@ -22,6 +22,10 @@ def evaluate_task(model, eval_ds, spec: TaskSpec, collator, batch_size: int,
     if getattr(spec, "eval_kind", "classification") == "mc":
         from .causal_lm import evaluate_mc
         return evaluate_mc(model, eval_ds, spec, batch_size, device)
+    if getattr(spec, "eval_kind", "classification") == "mats_p3":
+        from .mats_t5 import evaluate_mats
+        return evaluate_mats(model, eval_ds, spec, collator, batch_size, device,
+                             num_workers=num_workers)
     model.eval()
     model.to(device)
     loader = DataLoader(eval_ds, batch_size=batch_size, collate_fn=collator,

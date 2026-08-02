@@ -158,6 +158,40 @@ def test_aggregated_vs_sequential_differ():
     print("ok: sequential != aggregated-U")
 
 
+def test_constant_trajectory_checkpoints_match_independent_runs():
+    """A constant-LR long run must contain the exact shorter-horizon states."""
+    torch.manual_seed(4)
+    d = 7
+    expert = torch.randn(d)
+    target = torch.randn(d)
+    start = torch.randn(d)
+    base = OrderedDict({"enc.w": start.clone()})
+
+    captured = {}
+
+    def capture(step, state):
+        if step in {2, 5}:
+            captured[step] = state["enc.w"].clone()
+
+    h_long, _ = make_handle("t", d, expert, target)
+    long_cfg = RefineConfig(steps=5, lr=0.2, gate_mode="none",
+                            update_mode="grad", clip_mode="none",
+                            lr_schedule="constant")
+    long_state, _ = refine(base, [h_long], long_cfg, device="cpu",
+                           move_model=False, checkpoint_callback=capture)
+
+    for steps in (2, 5):
+        h_short, _ = make_handle("t", d, expert, target)
+        short_cfg = RefineConfig(steps=steps, lr=0.2, gate_mode="none",
+                                 update_mode="grad", clip_mode="none",
+                                 lr_schedule="constant")
+        short_state, _ = refine(base, [h_short], short_cfg, device="cpu",
+                                move_model=False)
+        assert torch.equal(captured[steps], short_state["enc.w"])
+    assert torch.equal(captured[5], long_state["enc.w"])
+    print("ok: constant-LR checkpoints exactly match independent horizons")
+
+
 if __name__ == "__main__":
     test_gate_matches_sign_condition()
     test_clip_respects_trust_region()
@@ -166,4 +200,5 @@ if __name__ == "__main__":
     test_vdist_pre_is_safe_at_huge_lr()
     test_vdist_pre_contrast_paper_clip_diverges()
     test_aggregated_vs_sequential_differ()
+    test_constant_trajectory_checkpoints_match_independent_runs()
     print("\nAll synthetic refinement tests passed.")

@@ -44,8 +44,17 @@ refine:
 data:
   n_probe: 64
   max_length: 1024        # SFT examples (question + CoT answer / code)
-  eval_batch_size: 16     # bf16 eval halves memory; 16 is a safe 2x over fp32-batch-8 (raise once headroom confirmed)
+  eval_batch_size: 48     # generation decode is weight-bandwidth-bound; batching
+                          # amortizes it (bf16 weights 6.4G + KV@48x2048 ~11G on a
+                          # 93G card). NOTE: changing this invalidates eval0_cache
+                          # entries (scores are deterministic only per batch size).
   grad_batch_size: 4      # fp32 backward is memory-heavy; keep the refine grad batch small (result is batch-invariant)
   probe_seed: 0
   class_balanced: false   # REQUIRED: causal replay views have no label column
   max_eval: 300           # subsample eval sets during sweeps; full only for finals
+  eval0_cache: true       # base/expert/merge scores are deterministic; stop re-buying
+                          # ~3 GPU-hours of identical eval0 in every job
+  max_eval_by_task:       # cheap eval kinds get far more items at negligible cost
+    multilingual: 5000    # MC loglik: ~2 s per 300 items, so 5000 costs ~35 s and
+                          # gives +-1.4 pt precision (300 items gave +-2.9, too
+                          # coarse to resolve the merge-vs-expert gap at all)

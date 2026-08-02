@@ -72,6 +72,17 @@ class DataConfig:
     # eval/validation split untouched for reporting.
     probe_source: str = "train"
     max_eval: Optional[int] = None  # truncate eval split (debugging/fast iteration)
+    # per-task override of max_eval. The single global cap is calibrated for the
+    # most expensive eval kind, which badly under-samples the cheap ones: on the
+    # causal track a 300-item generation pass costs ~10 min while a 300-item
+    # multiple-choice pass costs ~2 s, yet 300 MC items cannot resolve a 5-point
+    # accuracy difference (needs ~800). Raise the cheap tasks here.
+    max_eval_by_task: Optional[Dict[str, int]] = None
+    # reuse base/expert/merge scores across jobs (results/eval0_cache/, keyed by
+    # model+experts+eval protocol). They are deterministic given the key -- eval0
+    # was reproduced bit-identically across 4 separate jobs on the causal track,
+    # where re-scoring costs ~3 GPU-hours per job. Opt-in per config.
+    eval0_cache: bool = False
 
 
 @dataclass
@@ -89,8 +100,9 @@ class ExperimentConfig:
     base_model: str  # shared pretrained checkpoint (theta_0), e.g. roberta-base
     experts: List[ExpertConfig]
     # which modality backend to use: "glue" (RoBERTa multi-head), "clip"
-    # (CLIP/ViT vision track), "t5" (flan-T5 text-to-text GLUE, shared LM head)
-    # or "causal_lm" (decoder-only MergeBench track). Selects pipeline loaders.
+    # (CLIP/ViT vision track), "t5" (flan-T5 text-to-text GLUE), "t5_mats"
+    # (MaTS full-model T5), "t5_mats_ia3" (reproducible MaTS IA3 experts), or
+    # "causal_lm" (MergeBench). Selects loaders.
     modality: str = "glue"
     # parameter dtype for model loading / task vectors. "float32" everywhere on
     # the <=1B tracks; the 2-3B causal_lm track can use "bfloat16" to halve the

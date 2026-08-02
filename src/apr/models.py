@@ -35,11 +35,15 @@ def load_classifier(checkpoint: str, num_labels: int, cache_dir: Optional[str] =
 
 def encoder_param_names(model) -> List[str]:
     """Names of mergeable encoder parameters (under base_model_prefix)."""
+    if hasattr(model, "mergeable_param_names"):
+        return list(model.mergeable_param_names())
     prefix = model.base_model_prefix + "."
     return [n for n, _ in model.named_parameters() if n.startswith(prefix)]
 
 
 def is_head_param(model, name: str) -> bool:
+    if hasattr(model, "mergeable_param_names"):
+        return name not in set(model.mergeable_param_names())
     return not name.startswith(model.base_model_prefix + ".")
 
 

@@ -55,16 +55,19 @@ def make_collator(tokenizer, is_regression: bool):
 
 
 def _sample_indices(train_ds, spec: TaskSpec, n: int, seed: int,
-                    class_balanced: bool) -> List[int]:
-    """Draw n example indices (class-balanced when asked). Deterministic in seed."""
+                    class_balanced: bool, exclude_indices=None) -> List[int]:
+    """Draw deterministic example indices, optionally excluding a prior draw."""
     rng = random.Random(seed)
-    n = min(n, len(train_ds))
+    excluded = set(exclude_indices or [])
+    available = [i for i in range(len(train_ds)) if i not in excluded]
+    n = min(n, len(available))
     if spec.is_regression or not class_balanced:
-        idx = rng.sample(range(len(train_ds)), n)
+        idx = rng.sample(available, n)
     else:
         labels = train_ds["labels"]
         by_label: Dict[int, List[int]] = {}
-        for i, y in enumerate(labels):
+        for i in available:
+            y = labels[i]
             by_label.setdefault(int(y), []).append(i)
         classes = sorted(by_label)
         per = max(1, n // len(classes))
@@ -75,7 +78,7 @@ def _sample_indices(train_ds, spec: TaskSpec, n: int, seed: int,
             idx.extend(pool[:per])
         # top up / trim to exactly n
         if len(idx) < n:
-            remaining = [i for i in range(len(train_ds)) if i not in set(idx)]
+            remaining = [i for i in available if i not in set(idx)]
             rng.shuffle(remaining)
             idx.extend(remaining[: n - len(idx)])
         idx = idx[:n]
@@ -84,14 +87,22 @@ def _sample_indices(train_ds, spec: TaskSpec, n: int, seed: int,
 
 
 def sample_replay_buffer(train_ds, spec: TaskSpec, n: int, seed: int,
-                         class_balanced: bool) -> List[Dict]:
-    """Sample n replay examples (as a list of tokenized feature dicts)."""
-    return [train_ds[i] for i in _sample_indices(train_ds, spec, n, seed,
-                                                 class_balanced)]
+                         class_balanced: bool, exclude_indices=None,
+                         return_indices: bool = False):
+    """Sample replay examples, optionally excluding a previously drawn subset.
+
+    ``return_indices`` lets callers construct and verify disjoint replay and
+    selection buffers.
+    """
+    idx = _sample_indices(train_ds, spec, n, seed, class_balanced,
+                          exclude_indices=exclude_indices)
+    buffer = [train_ds[i] for i in idx]
+    return (buffer, idx) if return_indices else buffer
 
 
 def sample_replay_buffer_split(train_ds, spec: TaskSpec, n_train: int, n_val: int,
-                               seed: int, class_balanced: bool):
+                               seed: int, class_balanced: bool,
+                               return_indices: bool = False):
     """Draw n_train+n_val examples with the SAME index stream as
     sample_replay_buffer(n_train+n_val, seed), then split DISJOINTLY.
 
@@ -102,7 +113,11 @@ def sample_replay_buffer_split(train_ds, spec: TaskSpec, n_train: int, n_val: in
     hyperparameter selection."""
     idx = _sample_indices(train_ds, spec, n_train + n_val, seed, class_balanced)
     train_idx, val_idx = idx[:n_train], idx[n_train:n_train + n_val]
-    return ([train_ds[i] for i in train_idx], [train_ds[i] for i in val_idx])
+    train = [train_ds[i] for i in train_idx]
+    val = [train_ds[i] for i in val_idx]
+    if return_indices:
+        return train, val, train_idx, val_idx
+    return train, val
 
 
 def batches_from_buffer(buffer: List[Dict], collator, batch_size: int,

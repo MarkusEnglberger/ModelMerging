@@ -14,6 +14,9 @@ refinement rules can be compared from the *same* merge point and replay buffers
 
 from collections import OrderedDict
 from typing import Dict, List
+import hashlib
+import json
+import os
 import random
 import time
 
@@ -31,6 +34,57 @@ from .taskvec import task_vector, task_arithmetic_merge
 from .refine import refine, TaskHandle
 from .eval import evaluate_task
 from .metrics import normalized_retention, aggregate_retention
+
+
+EVAL0_CACHE_DIR = "results/eval0_cache"
+# bump when eval SEMANTICS change (prompt templates, scoring rules, eval-set
+# construction) in a way the config key below cannot see. Forgetting to bump
+# reuses stale scores silently -- when in doubt, bump.
+EVAL0_CACHE_VERSION = 1
+
+
+def _eval0_cache_key(cfg: ExperimentConfig) -> dict:
+    """Everything that determines base/expert/merge scores. Scores are
+    deterministic given these (verified across runs), but only per batch size
+    (kernel selection differs), hence eval_batch_size is part of the key."""
+    return {
+        "v": EVAL0_CACHE_VERSION,
+        "base_model": cfg.base_model, "modality": cfg.modality,
+        "model_dtype": cfg.model_dtype, "eval_dtype": cfg.eval_dtype,
+        "experts": [{"name": e.name, "checkpoint": e.checkpoint, "lam": e.lam}
+                    for e in cfg.experts],
+        "max_eval": cfg.data.max_eval,
+        "max_eval_by_task": cfg.data.max_eval_by_task,
+        "eval_batch_size": cfg.data.eval_batch_size,
+        "max_length": cfg.data.max_length,
+    }
+
+
+def _eval0_cache_path(cfg: ExperimentConfig) -> str:
+    key = json.dumps(_eval0_cache_key(cfg), sort_keys=True)
+    return os.path.join(EVAL0_CACHE_DIR,
+                        hashlib.sha1(key.encode()).hexdigest()[:16] + ".json")
+
+
+def _eval0_cache_load(cfg: ExperimentConfig):
+    path = _eval0_cache_path(cfg)
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        blob = json.load(f)
+    if blob.get("key") != _eval0_cache_key(cfg):  # hash collision guard
+        return None
+    _log(f"[eval0] loaded from cache {path} (delete the file to force re-scoring)")
+    return blob
+
+
+def _eval0_cache_save(cfg: ExperimentConfig, base, expert, merge):
+    os.makedirs(EVAL0_CACHE_DIR, exist_ok=True)
+    path = _eval0_cache_path(cfg)
+    with open(path, "w") as f:
+        json.dump({"key": _eval0_cache_key(cfg), "base_scores": base,
+                   "expert_scores": expert, "merge_scores": merge}, f, indent=2)
+    _log(f"[eval0] cached -> {path}")
 
 
 def _make_backend(cfg: ExperimentConfig, device: str):
@@ -105,6 +159,61 @@ def _make_backend(cfg: ExperimentConfig, device: str):
 
         return base_encoder, load_expert
 
+    if cfg.modality == "t5_mats":
+        from .mats_t5 import (build_mats_assets, get_mats_task,
+                              load_mats_task_dataset, make_mats_collator,
+                              MatsT5Model, load_mats_expert, mats_checkpoint)
+        dtype = getattr(torch, cfg.model_dtype)
+        tokenizer, base = build_mats_assets(cfg.base_model, cache_dir=cache,
+                                            torch_dtype=dtype)
+        base_encoder = get_encoder_state(
+            MatsT5Model(base, tokenizer, get_mats_task("cosmos_qa")))
+        del base
+        collator = make_mats_collator(tokenizer)
+
+        def load_expert(e):
+            spec = get_mats_task(e.name)
+            ckpt = e.checkpoint or mats_checkpoint(spec.name)
+            _log(f"[load] MaTS T5 expert {spec.name} <- {ckpt}")
+            t5 = load_mats_expert(cfg.base_model, ckpt, cache_dir=cache,
+                                  torch_dtype=dtype)
+            model = MatsT5Model(t5, tokenizer, spec)
+            train_ds, eval_ds = load_mats_task_dataset(
+                spec, tokenizer, cfg.data.max_length, cache)
+            if cfg.data.max_eval is not None:
+                eval_ds = eval_ds.select(range(min(cfg.data.max_eval, len(eval_ds))))
+            return spec, model, train_ds, eval_ds, collator
+
+        return base_encoder, load_expert
+
+    if cfg.modality == "t5_mats_ia3":
+        from .mats_t5 import (build_mats_ia3_assets, get_mats_task,
+                              load_mats_task_dataset, make_mats_collator,
+                              MatsIA3Model, apply_mats_ia3_expert,
+                              MATS_IA3_REPOS)
+        dtype = getattr(torch, cfg.model_dtype)
+        tokenizer, base = build_mats_ia3_assets(
+            cfg.base_model, cache_dir=cache, torch_dtype=dtype)
+        shared_model = MatsIA3Model(base, tokenizer, get_mats_task("cosmos_qa"))
+        base_encoder = get_encoder_state(shared_model)
+        collator = make_mats_collator(tokenizer)
+
+        def load_expert(e):
+            spec = get_mats_task(e.name)
+            source = e.checkpoint or spec.name
+            shown = e.checkpoint or MATS_IA3_REPOS[spec.name]
+            _log(f"[load] MaTS IA3 expert {spec.name} <- {shown}")
+            # All tasks share the frozen T5 and LM head. Only the tiny IA3 state
+            # is replaced before it is snapshotted by MergeContext.build.
+            model = apply_mats_ia3_expert(shared_model, source, cache_dir=cache)
+            train_ds, eval_ds = load_mats_task_dataset(
+                spec, tokenizer, cfg.data.max_length, cache)
+            if cfg.data.max_eval is not None:
+                eval_ds = eval_ds.select(range(min(cfg.data.max_eval, len(eval_ds))))
+            return spec, model, train_ds, eval_ds, collator
+
+        return base_encoder, load_expert
+
     if cfg.modality == "causal_lm":
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from .causal_lm import (get_causal_task, make_causal_collator,
@@ -150,7 +259,9 @@ def _make_backend(cfg: ExperimentConfig, device: str):
                 model.resize_token_embeddings(len(tokenizer))
             train_raw, make_fn = spec.build_replay(tokenizer, cfg.data.max_length,
                                                    cache, prompt_style)
-            eval_rows = spec.build_eval(cache, cfg.data.max_eval)
+            max_eval = (cfg.data.max_eval_by_task or {}).get(spec.name,
+                                                             cfg.data.max_eval)
+            eval_rows = spec.build_eval(cache, max_eval)
             # pre-materialise the SFT view so sample_replay_buffer indexes it
             train_ds = _CausalReplayView(train_raw, make_fn)
             return spec, model, train_ds, eval_rows, collator
@@ -158,7 +269,8 @@ def _make_backend(cfg: ExperimentConfig, device: str):
         return base_encoder, load_expert
 
     raise ValueError(f"Unknown modality '{cfg.modality}' "
-                     f"(expected 'glue', 'clip', 't5' or 'causal_lm')")
+                     f"(expected 'glue', 'clip', 't5', 't5_mats', "
+                     f"'t5_mats_ia3' or 'causal_lm')")
 
 
 class _CausalReplayView:
@@ -208,6 +320,10 @@ class MergeContext:
         # loaded experts without re-loading (used by scripts/merge_baselines.py).
         self.task_vectors = task_vectors or {}
         self.lambdas = lambdas or {}
+        self.shared_model = len({id(h.model) for h in handles}) == 1
+        self.keep_model_on_device = self.shared_model and cfg.modality == "t5_mats_ia3"
+        if self.keep_model_on_device:
+            handles[0].model.to(device)
 
     @property
     def task_names(self) -> List[str]:
@@ -226,8 +342,9 @@ class MergeContext:
             # per-eval-pass heartbeat: generation eval can run many minutes silently
             _log(f"[eval] {name}: {len(info['eval_ds'])} items -> {out[name]:.4f} "
                  f"({time.time()-t0:.0f}s)")
-            info["model"].to("cpu")
-            if self.device.startswith("cuda"):
+            if not self.keep_model_on_device:
+                info["model"].to("cpu")
+            if self.device.startswith("cuda") and not self.keep_model_on_device:
                 torch.cuda.empty_cache()
         return out
 
@@ -246,14 +363,17 @@ class MergeContext:
         for h in self.handles:
             info = self.per_task[h.name]
             if self.cfg.data.n_val > 0:
-                buf, val = sample_replay_buffer_split(
+                buf, val, indices, val_indices = sample_replay_buffer_split(
                     info["train_ds"], info["spec"], n_probe, self.cfg.data.n_val,
-                    probe_seed, self.cfg.data.class_balanced)
+                    probe_seed, self.cfg.data.class_balanced, return_indices=True)
                 info["val_buffer"] = val
+                info["val_indices"] = val_indices
             else:
-                buf = sample_replay_buffer(info["train_ds"], info["spec"], n_probe,
-                                           probe_seed, self.cfg.data.class_balanced)
+                buf, indices = sample_replay_buffer(
+                    info["train_ds"], info["spec"], n_probe, probe_seed,
+                    self.cfg.data.class_balanced, return_indices=True)
             info["probe_buffer"] = buf
+            info["probe_indices"] = indices
             h.grad_fn = make_grad_fn(info["model"], buf, info["collator"],
                                      self.cfg.data.grad_batch_size
                                      or self.cfg.data.eval_batch_size, self.device)
@@ -295,9 +415,47 @@ class MergeContext:
         and is independent of the start point, so APR can be run on top of any
         merge (task arithmetic, TIES, DARE, ...)."""
         refined, history = refine(start_state, self.handles, refine_cfg,
-                                  self.device, seed=seed, move_model=True, logger=_log)
+                                  self.device, seed=seed,
+                                  move_model=not self.keep_model_on_device, logger=_log)
         refined_cpu = OrderedDict((k, v.cpu()) for k, v in refined.items())
         return refined_cpu, history
+
+    def run_refine_checkpoints_from(self, start_state: ParamDict,
+                                    refine_cfg: RefineConfig,
+                                    checkpoint_steps, seed: int = 0):
+        """Refine once and retain CPU states at selected sweep counts.
+
+        This is intended for constant-schedule horizon grids: the state after,
+        for example, 20 sweeps of an 80-sweep constant-LR trajectory is exactly
+        the state produced by a separate 20-sweep run.  Horizon-dependent
+        schedules such as cosine decay must continue to use separate runs.
+        """
+        wanted = set(checkpoint_steps)
+        invalid = sorted(step for step in wanted
+                         if step < 0 or step > refine_cfg.steps)
+        if invalid:
+            raise ValueError(f"checkpoint steps outside [0, {refine_cfg.steps}]: "
+                             f"{invalid}")
+
+        checkpoints = OrderedDict()
+
+        def save_checkpoint(step, state):
+            if step in wanted:
+                checkpoints[step] = OrderedDict(
+                    (name, value.detach().cpu().clone())
+                    for name, value in state.items())
+
+        if 0 in wanted:
+            save_checkpoint(0, start_state)
+        _refined, history = refine(
+            start_state, self.handles, refine_cfg, self.device, seed=seed,
+            move_model=not self.keep_model_on_device, logger=_log,
+            checkpoint_callback=save_checkpoint)
+        missing = wanted - set(checkpoints)
+        if missing:
+            raise RuntimeError(f"failed to capture refinement steps: "
+                               f"{sorted(missing)}")
+        return checkpoints, history
 
     def run_refine(self, refine_cfg: RefineConfig, seed: int = 0):
         """Refine from the shared task-arithmetic merge point."""
@@ -319,13 +477,15 @@ class MergeContext:
             spec, model, train_ds, eval_ds, collator = load_expert(e)
             expert_encoder = get_encoder_state(model)
             if cfg.data.n_val > 0:
-                buffer, val_buffer = sample_replay_buffer_split(
+                buffer, val_buffer, probe_indices, val_indices = sample_replay_buffer_split(
                     train_ds, spec, cfg.data.n_probe, cfg.data.n_val,
-                    cfg.data.probe_seed, cfg.data.class_balanced)
+                    cfg.data.probe_seed, cfg.data.class_balanced, return_indices=True)
             else:
-                buffer = sample_replay_buffer(train_ds, spec, cfg.data.n_probe,
-                                              cfg.data.probe_seed, cfg.data.class_balanced)
+                buffer, probe_indices = sample_replay_buffer(
+                    train_ds, spec, cfg.data.n_probe, cfg.data.probe_seed,
+                    cfg.data.class_balanced, return_indices=True)
                 val_buffer = None
+                val_indices = None
             grad_fn = make_grad_fn(model, buffer, collator,
                                    cfg.data.grad_batch_size or cfg.data.eval_batch_size,
                                    device)
@@ -336,7 +496,8 @@ class MergeContext:
             per_task[e.name] = dict(spec=spec, model=model, eval_ds=eval_ds,
                                     collator=collator, expert_encoder=expert_encoder,
                                     train_ds=train_ds, probe_buffer=buffer,
-                                    val_buffer=val_buffer)
+                                    val_buffer=val_buffer, val_indices=val_indices,
+                                    probe_indices=probe_indices)
             task_vectors[e.name] = task_vector(expert_encoder, base_encoder)
             lambdas[e.name] = e.lam
 
@@ -345,13 +506,26 @@ class MergeContext:
         ctx = MergeContext(cfg, device, handles, per_task, base_encoder, merged0,
                            {}, {}, {}, task_vectors=task_vectors, lambdas=lambdas)
         # score base / expert / merge (one pass each)
-        ctx.base_scores = ctx.eval_encoder(base_encoder)
-        ctx.expert_scores = {n: ctx.eval_encoder(per_task[n]["expert_encoder"], names=[n])[n]
-                             for n in cfg.task_names}
-        ctx.merge_scores = ctx.eval_encoder(merged0)
+        cached = _eval0_cache_load(cfg) if cfg.data.eval0_cache else None
+        if cached is not None:
+            ctx.base_scores = cached["base_scores"]
+            ctx.expert_scores = cached["expert_scores"]
+            ctx.merge_scores = cached["merge_scores"]
+            suffix = " (cached)"
+        else:
+            ctx.base_scores = ctx.eval_encoder(base_encoder)
+            ctx.expert_scores = {n: ctx.eval_encoder(per_task[n]["expert_encoder"],
+                                                     names=[n])[n]
+                                 for n in cfg.task_names}
+            ctx.merge_scores = ctx.eval_encoder(merged0)
+            if cfg.data.eval0_cache:
+                _eval0_cache_save(cfg, ctx.base_scores, ctx.expert_scores,
+                                  ctx.merge_scores)
+            suffix = ""
         for n in cfg.task_names:
             _log(f"[eval0] {n}: base={ctx.base_scores[n]:.4f} "
-                 f"expert={ctx.expert_scores[n]:.4f} merge={ctx.merge_scores[n]:.4f}")
+                 f"expert={ctx.expert_scores[n]:.4f} "
+                 f"merge={ctx.merge_scores[n]:.4f}{suffix}")
         return ctx
 
 

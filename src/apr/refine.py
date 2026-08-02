@@ -183,8 +183,17 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
 def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
            device: str, seed: int = 0,
            move_model: bool = True,
-           logger=None) -> (ParamDict, List[dict]):
-    """Run S sweeps of refinement. Returns (refined_encoder, history)."""
+           logger=None,
+           checkpoint_callback: Optional[Callable[[int, ParamDict], None]] = None
+           ) -> (ParamDict, List[dict]):
+    """Run S sweeps of refinement. Returns ``(refined_encoder, history)``.
+
+    When provided, ``checkpoint_callback`` is called after each complete sweep
+    with the one-based sweep count and current parameter state.  The callback
+    must clone any state it wants to retain because refinement continues in
+    place.  This supports exact checkpoint reuse for constant-schedule sweeps
+    without changing the existing return type or other callers.
+    """
     enc_names = list(base_merged.keys())
     theta = pd_to(pd_clone(base_merged), device)
     by_name = {h.name: h for h in handles}
@@ -263,5 +272,8 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
         if cfg.aggregated and agg_u is not None:
             for n in enc_names:
                 theta[n].add_(agg_u[n], alpha=apply_alpha)
+
+        if checkpoint_callback is not None:
+            checkpoint_callback(s + 1, theta)
 
     return theta, history
