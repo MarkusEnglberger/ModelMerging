@@ -10,35 +10,48 @@
 
 # The decisive regime-map test at 3B (~1.2e7 params per replay example):
 # gated APR vs ungated anchored vs ordinary GD, all from the SAME tuned
-# TA@l0.5 init (pinned: the selected winner of the composition job's sweep,
-# same config -> exact cross-job comparability; apr@lr64 repeated as the
-# cross-job anchor cell).
+# TA@l0.5 init (pinned: the selected winner of the composition job's sweep;
+# apr@lr64 repeated as the cross-job anchor cell).
 #
 # Registered predictions (before results): GD's best cell below both anchored
-# arms, worst-task gap larger; at least one GD cell in {3e-4, 1e-3}
-# catastrophically below the init; ungated >= gated on mean.
+# arms, worst-task gap larger; a catastrophic GD cell at the top of its grid;
+# ungated >= gated on mean.
 #
-# PRIOR EVIDENCE AGAINST prediction 1, recorded for honesty: jobs 24650025 and
-# 24739458 (logs only, never written to JSON) both had GD >= APR. They are not
-# decisive -- 3 tasks, untuned lambda=0.3, an eval protocol still being repaired
-# (the two runs disagree on eval0 for the SAME merge), and APR capped at lr16
-# when its optimum later proved to be lr64 -- but they are the reason GD's grid
-# below reaches down to 3e-6: GD peaked at 1e-5/5e-5 there, so a grid starting
-# at 3e-5 risked edge-clipping the arm this experiment exists to test fairly.
+# PRIOR EVIDENCE AGAINST prediction 1, recorded for honesty: results/compare/
+# mergebench3b_compare{,_v2}.json both had GD >= APR. They are not decisive --
+# 3 tasks, untuned lambda=0.3, an eval protocol still being repaired (the two
+# disagree on eval0 for the SAME merge), and APR capped at lr16 when its optimum
+# later proved to be lr64 -- but they are why GD's grid reaches below 1e-5:
+# GD peaked at 1e-5/5e-5 there, so a grid starting higher would edge-clip the
+# arm this experiment exists to test fairly.
 #
-# GD gets the WIDE lr grid the CLI help demands. S is the config's 5 for all
-# arms; the S=20 "GD just needs more sweeps" follow-up runs only at the 2 best
-# GD lrs in a later job (GD runs are not checkpointed, so S=20 costs 4x).
+# COST CONTROL (this is a REDUCED first pass; see the two TODOs below).
+# The first attempt at this job (25178513) was cancelled 2h26m in: it needed 17
+# evaluation passes at ~67 min each (~19-21 h) against a 16 h limit, and the
+# report is only written at the end, so it would have produced nothing. The cost
+# is dominated by IFEval generation (2853 s/eval, ~72% of every pass). Two
+# reductions bring it to ~10 h with margin:
+#   1. configs/mergebench_llama3b_sweep.yaml halves instruction eval (300->150).
+#   2. The grid is trimmed 13 -> 9 cells. GD keeps the widest coverage of the
+#      three arms because it is the arm under test; the anchored arms are cut
+#      harder, which biases AGAINST our own method rather than for it.
+#
+# TODO(extend): after this lands, re-run selected cells with the full
+# configs/mergebench_llama3b.yaml (instruction=300) before any number enters the
+# paper -- the 150-item instruction scores are not comparable to the 300-item
+# runs already on disk.
+# TODO(extend): restore the dropped cells (apr 256 is kept; nogate 16/64/256 and
+# gd 3e-6/3e-5/3e-4 were dropped) once the coarse picture is known.
 
 set -euo pipefail
 source slurm/common.sh
 
 python scripts/merge_baselines.py \
-  --config configs/mergebench_llama3b.yaml \
+  --config configs/mergebench_llama3b_sweep.yaml \
   --ta_lams 0.5 \
   --skip_families ties dare dareties della bc ls ada \
   --refine_from ta \
   --apr_lrs 64 128 256 \
-  --nogate_lrs 16 64 128 256 \
-  --control_gd_lrs 3e-6 1e-5 3e-5 1e-4 3e-4 1e-3 \
-  --out results/compare/mb3b_gd_matrix.json
+  --nogate_lrs 32 128 \
+  --control_gd_lrs 1e-5 1e-4 3e-4 1e-3 \
+  --out results/compare/mb3b_gd_matrix_sweep.json

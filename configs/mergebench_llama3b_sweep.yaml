@@ -1,0 +1,70 @@
+# Decoder-only LLM track (H100): MergeBench published full-SFT experts on
+# Llama-3.2-3B. POC = the interference-prone math/coding/instruction triple with
+# judge-free automatic metrics (GSM8K EM, MBPP pass@1, IFEval-lite strict).
+# Checkpoints resolve to MergeBench/Llama-3.2-3B_<domain>; theta_0 = the base model.
+# NOTE meta-llama/Llama-3.2-3B is license-gated: accept the license + `huggingface-cli
+# login` before prefetching. Prefetch: python scripts/prefetch_mergebench.py
+#
+# VALIDATE [eval0] before trusting any run: each expert must clearly beat base on its
+# own domain; if not, the prompt format does not match MergeBench's SFT recipe
+# (prompt_style is auto-detected from the tokenizer's chat template in pipeline.py).
+base_model: meta-llama/Llama-3.2-3B
+modality: causal_lm
+# bf16 for the whole causal track: fp32 3B needs ~130 GB host RAM (base+3 experts+
+# 3 task-vectors+merge) and OOM-killed the job; bf16 halves host+GPU memory and uses
+# H100 tensor cores. Tradeoff: bf16 task vectors/grads add gate-sign noise near
+# g.v=0, slightly muddying the APR-vs-nogate gate ablation -- note this in the paper.
+model_dtype: bfloat16
+eval_dtype: bfloat16     # no-op now that model is bf16; kept for the fp32-model case
+tag: mb3b_sweep
+output_dir: results/mergebench3b
+device: cuda
+seed: 0
+
+experts:
+  - {name: math,        lam: 0.3}
+  - {name: coding,      lam: 0.3}
+  - {name: instruction, lam: 0.3}
+  # multilingual: Aya-SFT expert, scored by MC log-likelihood on M-MMLU/M-ARC
+  # (6 languages, balanced subset) -- no generation, so this domain is immune to
+  # decode-chaos noise and is the cheapest eval per example.
+  - {name: multilingual, lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist_pre
+  aggregated: false
+
+data:
+  n_probe: 64
+  max_length: 1024        # SFT examples (question + CoT answer / code)
+  eval_batch_size: 48     # generation decode is weight-bandwidth-bound; batching
+                          # amortizes it (bf16 weights 6.4G + KV@48x2048 ~11G on a
+                          # 93G card). NOTE: changing this invalidates eval0_cache
+                          # entries (scores are deterministic only per batch size).
+  grad_batch_size: 4      # fp32 backward is memory-heavy; keep the refine grad batch small (result is batch-invariant)
+  probe_seed: 0
+  class_balanced: false   # REQUIRED: causal replay views have no label column
+  max_eval: 300           # subsample eval sets during sweeps; full only for finals
+  eval0_cache: true       # base/expert/merge scores are deterministic; stop re-buying
+                          # ~3 GPU-hours of identical eval0 in every job
+  max_eval_by_task:       # per-task eval sizes (part of the eval0 cache key)
+    instruction: 150      # SWEEP SETTING, deliberately reduced from 300. IFEval
+                          # generation dominates the whole track: it averages
+                          # 2853 s/eval vs 624 (math), 475 (coding), 39
+                          # (multilingual), i.e. ~72% of every evaluation pass.
+                          # Halving it roughly halves the cost of the campaign.
+                          # COST: +-4-5 pt per-cell noise instead of +-2.9, and
+                          # instruction numbers are NOT comparable to the 300-item
+                          # runs (mb3b_composition.json et al.). Selected cells
+                          # must be re-scored with configs/mergebench_llama3b.yaml
+                          # before anything enters the paper.
+    multilingual: 5000    # MC loglik: ~2 s per 300 items, so 5000 costs ~35 s and
+                          # gives +-1.4 pt precision (300 items gave +-2.9, too
+                          # coarse to resolve the merge-vs-expert gap at all)
