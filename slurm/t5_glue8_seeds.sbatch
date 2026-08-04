@@ -32,14 +32,34 @@ source slurm/common.sh
 
 : "${STEPS:?set STEPS (5|20)}"
 : "${SEED:?set SEED}"
+: "${NPROBE:=}"          # empty => config n_probe (64)
 
+# Pinned cells per horizon. At n=64 one lr per arm (the seed-0 selections).
+# At n=8 the S=5 lists ALSO pin the two dramatic single-seed cells whose
+# reproducibility is the question: nogate@16 (catastrophic, -1.98) and
+# gd@0.01 (the n=64 optimum that collapsed to +0.284) -- replicating only the
+# winners would test the claim while ignoring its most load-bearing part.
 if [ "${STEPS}" = 5 ]; then
-  APR_LR=128; NG_LR=32; GD_LR=0.01
+  if [ "${NPROBE}" = 8 ]; then
+    APR_LRS="512"; NG_LRS="8 16"; GD_LRS="0.003 0.01"
+  else
+    APR_LRS="128"; NG_LRS="32"; GD_LRS="0.01"
+  fi
 else
-  APR_LR=32;  NG_LR=2;  GD_LR=0.003
+  if [ "${NPROBE}" = 8 ]; then
+    APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003"
+  else
+    APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003"
+  fi
 fi
-OUT="results/compare/t5_glue8_seeds_S${STEPS}_seed${SEED}.json"
-echo "[job] pinned cells S=${STEPS} seed=${SEED}: apr@${APR_LR} nogate@${NG_LR} gd@${GD_LR} -> ${OUT}"
+if [ -n "${NPROBE}" ]; then
+  OUT="results/compare/t5_glue8_seeds_S${STEPS}_n${NPROBE}_seed${SEED}.json"
+  NPROBE_ARG=(--n_probe "${NPROBE}")
+else
+  OUT="results/compare/t5_glue8_seeds_S${STEPS}_seed${SEED}.json"
+  NPROBE_ARG=()
+fi
+echo "[job] pinned cells S=${STEPS} n=${NPROBE:-64} seed=${SEED}: apr@{${APR_LRS}} nogate@{${NG_LRS}} gd@{${GD_LRS}} -> ${OUT}"
 
 python scripts/merge_baselines.py \
   --config configs/t5_glue8.yaml \
@@ -48,7 +68,8 @@ python scripts/merge_baselines.py \
   --refine_from ta \
   --steps "${STEPS}" \
   --probe_seed "${SEED}" \
-  --apr_lrs "${APR_LR}" \
-  --nogate_lrs "${NG_LR}" \
-  --control_gd_lrs "${GD_LR}" \
+  "${NPROBE_ARG[@]}" \
+  --apr_lrs ${APR_LRS} \
+  --nogate_lrs ${NG_LRS} \
+  --control_gd_lrs ${GD_LRS} \
   --out "${OUT}"
