@@ -10,10 +10,9 @@
 \usepackage{graphicx}
 \usepackage{enumitem}
 \usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage{algorithmic}
 \usepackage{float}
 \usepackage{natbib}
-\usepackage{comment}
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
 
@@ -162,26 +161,26 @@ The robustness of the refinement comes primarily from the expert anchoring rathe
 \caption{Sequential expert-direction-gated replay refinement}
 \label{alg:expert-gated-refinement}
 \begin{algorithmic}[1]
-\Require Pretrained encoder $\thetab$; task experts $\{\theta_i\}_{i=1}^T$; task heads; replay buffers $\{\data_i^{\mathrm{probe}}\}_{i=1}^T$; task-arithmetic weights $\{\lambda_i\}_{i=1}^T$; steps $S$; learning rate $\eta$; gate threshold $\epsilon_{\mathrm{gate}}$.
-\State $\taskvec_i \gets \theta_i-\thetab$ for all tasks $i$.
-\State $\theta^{(0)} \gets \thetab + \sum_{i=1}^{T}\lambda_i\taskvec_i$. \Comment{or any other merge point (TIES, RegMean, \ldots)}
-\For{$s=0,\ldots,S-1$}
-    \State $\theta^{(s,0)} \gets \theta^{(s)}$.
-    \State Choose a task order $\pi_s$ over $\{1,\ldots,T\}$.
-    \For{$k=1,\ldots,T$}
-        \State $i \gets \pi_s(k)$.
-        \State $g_i^{(s,k)} \gets \nabla_\theta \loss_i(\theta^{(s,k-1)};\data_i^{\mathrm{probe}})$ using task $i$'s head.
-        \State $v_i^{(s,k)} \gets \theta_i - \theta^{(s,k-1)}$.
-        \For{each mergeable coordinate $r$}
-            \State $m_{i,r}^{(s,k)} \gets \ind\{g_{i,r}^{(s,k)}v_{i,r}^{(s,k)} < -\epsilon_{\mathrm{gate}}\}$.
-            \State $\widetilde u_{i,r}^{(s,k)} \gets -g_{i,r}^{(s,k)} |v_{i,r}^{(s,k)}| m_{i,r}^{(s,k)}$.
-            \State $u_{i,r}^{(s,k)} \gets \clip(\eta\,\widetilde u_{i,r}^{(s,k)},- |v_{i,r}^{(s,k)}|, |v_{i,r}^{(s,k)}|)$. \Comment{clip after learning-rate scaling}
-        \EndFor
-        \State $\theta^{(s,k)} \gets \theta^{(s,k-1)} + u_i^{(s,k)}$.
-    \EndFor
-    \State $\theta^{(s+1)} \gets \theta^{(s,T)}$.
-\EndFor
-\State \Return $\theta^{(S)}$.
+\REQUIRE Pretrained encoder $\thetab$; task experts $\{\theta_i\}_{i=1}^T$; task heads; replay buffers $\{\data_i^{\mathrm{probe}}\}_{i=1}^T$; task-arithmetic weights $\{\lambda_i\}_{i=1}^T$; steps $S$; learning rate $\eta$; gate threshold $\epsilon_{\mathrm{gate}}$.
+\STATE $\taskvec_i \gets \theta_i-\thetab$ for all tasks $i$.
+\STATE $\theta^{(0)} \gets \thetab + \sum_{i=1}^{T}\lambda_i\taskvec_i$. \COMMENT{or any other merge point (TIES, RegMean, \ldots)}
+\FOR{$s=0,\ldots,S-1$}
+    \STATE $\theta^{(s,0)} \gets \theta^{(s)}$.
+    \STATE Choose a task order $\pi_s$ over $\{1,\ldots,T\}$.
+    \FOR{$k=1,\ldots,T$}
+        \STATE $i \gets \pi_s(k)$.
+        \STATE $g_i^{(s,k)} \gets \nabla_\theta \loss_i(\theta^{(s,k-1)};\data_i^{\mathrm{probe}})$ using task $i$'s head.
+        \STATE $v_i^{(s,k)} \gets \theta_i - \theta^{(s,k-1)}$.
+        \FOR{each mergeable coordinate $r$}
+            \STATE $m_{i,r}^{(s,k)} \gets \ind\{g_{i,r}^{(s,k)}v_{i,r}^{(s,k)} < -\epsilon_{\mathrm{gate}}\}$.
+            \STATE $\widetilde u_{i,r}^{(s,k)} \gets -g_{i,r}^{(s,k)} |v_{i,r}^{(s,k)}| m_{i,r}^{(s,k)}$.
+            \STATE $u_{i,r}^{(s,k)} \gets \clip(\eta\,\widetilde u_{i,r}^{(s,k)},- |v_{i,r}^{(s,k)}|, |v_{i,r}^{(s,k)}|)$. \COMMENT{clip after learning-rate scaling}
+        \ENDFOR
+        \STATE $\theta^{(s,k)} \gets \theta^{(s,k-1)} + u_i^{(s,k)}$.
+    \ENDFOR
+    \STATE $\theta^{(s+1)} \gets \theta^{(s,T)}$.
+\ENDFOR
+\STATE \RETURN $\theta^{(S)}$.
 \end{algorithmic}
 \end{algorithm}
 
@@ -661,6 +660,31 @@ Table~\ref{tab:t5} reproduces, in a setting with a single shared generation head
 \paragraph{Caveats.}
 Three limitations are explicit. The track is single-seed. Nearly every refinement family's tuned optimum lies at the top of its learning-rate grid ($\eta=8$ ungated, $\eta=32$ for the compositions), so the labeled-tier values are lower bounds and the grids need re-centering upward before these numbers are final. And the far edge already shows the familiar warning sign: extending APR from task arithmetic to $\eta=64$ raises mean retention ($0.537\to0.557$) while flipping worst-task retention negative ($+0.024\to-0.103$)---the same edge-of-stability signature documented for GLUE-8 at $\eta=32$, so chasing the unbracketed optima will require the same interior-of-the-stable-range discipline used there.
 
+\paragraph{Small replay budgets: a draw-fragility boundary for unconstrained descent.}
+The multi-head studies left open what happens to the labeled-replay tier when the replay budget shrinks. We repeat the three-arm comparison (gated APR, the ungated anchored update, ordinary replay GD) from the tuned task-arithmetic merge at $n\in\{16,8\}$ examples per task and two horizons $S\in\{5,20\}$, with constant learning rate throughout. Each (budget, horizon, arm) grid was re-centered until the selected cell is the \emph{interior} optimum of its learning-rate arc---the re-centering that Table~\ref{tab:t5}'s caveat called for---and, following the twenty-task protocol of Table~\ref{tab:clip20seeds}, every selected configuration was then replicated over three replay-buffer draws with the configuration pinned, so the variance isolates the draw. Table~\ref{tab:t5budget} reports the outcome.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Replay-budget study on the shared-output track: $n\in\{16,8\}$ examples per task, $S\in\{5,20\}$ sweeps, constant learning rate, evaluation-selected grids re-centered until every selected cell is interior. Mean normalized retention over the seven classification tasks (STS-B excluded; by the convention check in the text this changes no ordering), mean $\pm$ std over three replay-buffer draws with the configuration pinned at the seed-0 selection. ``$k/3$ collapse'' marks pinned cells that diverge to the degenerate state ($\approx-6.2$ mean retention, the same attractor as the inverted-gate control of Table~\ref{tab:t5}) on $k$ of the three draws; surviving-draw values are shown. Bold: best arm that is stable across all three draws.}
+\label{tab:t5budget}
+\begin{tabular}{llcc}
+\toprule
+Budget & Method & $S=5$ & $S=20$ \\
+\midrule
+$n=16$ & APR                 & $\mathbf{0.570\pm0.017}$ & $\mathbf{0.601\pm0.007}$ \\
+       & ungated anchored    & $0.516\pm0.044$          & $0.452\pm0.098$ \\
+       & ordinary replay GD  & $0.631$;\ \emph{2/3 collapse} & $0.698$;\ \emph{2/3 collapse} \\
+\midrule
+$n=8$  & APR                 & $\mathbf{0.567\pm0.017}$ & $\mathbf{0.557\pm0.007}$ \\
+       & ungated anchored    & $0.430\pm0.066$          & $0.401\pm0.088$ \\
+       & ordinary replay GD  & $0.483\pm0.036$          & $0.63/0.39$;\ \emph{1/3 collapse} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three findings. First, the gated update is the best stable arm in all four cells, with draw-to-draw spreads of $0.007$--$0.017$---the smallest of any arm---and no gated cell anywhere in the re-centered grids finished below the merge on any draw. Second, unconstrained descent crosses a reliability boundary between $n=64$ and $n=16$: at $n=16$ its evaluation-selected optimum collapses on two of three buffer draws \emph{at both horizons}, reaching the same degenerate state as the inverted-gate control ($-6.19$), and at $n=8$ its surviving configuration trails APR by $0.08$--$0.09$ while the learning rate that is optimal at larger budgets collapses on most draws. Third, the hazard is a property of the \emph{draw}, not the cell: the ungated update at $n=8$, $\eta=16$ is catastrophic on one draw ($-1.98$) and produces its best small-budget value on another ($+0.68$)---so no selection procedure operating on a replay buffer can certify a descent-family configuration as safe, the same phenomenon as the buffer-redraw divergence documented on the twenty-task suite. At these budgets the gate is the operative stabilizer, not merely the anchor: the ungated update inherits draw-dependent catastrophes that the gated update never exhibits. This is the first NLP setting in which the gate earns its keep on outcome rather than diagnostics, and it sharpens the twenty-task conclusion: the gate's residual value is protection in fragile regimes---scarce data here, fragile tasks there---rather than mean accuracy, which remains the anchored step's contribution.
+
 \subsection{Scaling to twenty tasks: the high-interference regime}
 \label{sec:clip20}
 
@@ -856,7 +880,7 @@ Base, $n{=}8$        & APR      & $0.626\pm0.005$ & $0.170\pm0.017$ \\
 Five claims survive the full campaign, each with its evidence. (i)~\emph{The anchored refinement improves every initialization it is given}---six merges spanning the checkpoint-only, label-free, and data-fitted tiers, and the base model itself---with the gain shrinking as the initialization improves but never vanishing (Tables~\ref{tab:clip20matrix},~\ref{tab:clip20budget}); the headline cells carry five-seed error bars of $0.002$--$0.006$ (Table~\ref{tab:clip20seeds}). (ii)~\emph{The load-bearing ingredient is the anchored, distance-scaled, clipped step, not the attribution gate}: the gate is neutral on mean accuracy (five-seed paired differences within $\pm0.006$), its thresholded variants cannot help because the gradient's coordinate-level selection carries no transferable structure (the held-out audit), and its residual value is initialization-dependent worst-task repair---and held-out retention, where the ungated update's entire learning-rate arc stays below APR's frontier. (iii)~\emph{Safety is the method's clearest practical advantage}: across every learning rate, horizon, budget, and buffer draw tested, no anchored-refinement run ever fell below its initialization or the zero-shot floor, while the unconstrained-descent probe has catastrophic cells at adjacent learning rates, overfits small buffers at long horizons, and can diverge under nothing more than a replay-buffer redraw. (iv)~\emph{The method works in the small-data regime}: eight labeled examples per task suffice to beat the tuned task-arithmetic merge from the base model alone, with the budget's cost concentrated in worst-task accuracy (Table~\ref{tab:clip20nbudget}). (v)~\emph{Refinement offers an accuracy--retention frontier that merging does not}: on tasks never merged or refined, the frontier's high-accuracy half is populated entirely by the refinement, every merge is dominated, and the best cell gains $0.146$ training accuracy over the best merge at equal held-out retention (Figure~\ref{fig:clip20heldout}).
 
 \paragraph{What is still missing.}
-The baseline tiers are now populated (checkpoint-only, label-free with RegMean and AdaMerging, and the matched labeled tier including learned Localize-and-Stitch), and the headline configurations carry error bars. The remaining gaps are protocol-level: the hyperparameter \emph{sweeps} behind Tables~\ref{tab:mergebaselines}, \ref{tab:clip8}, and the twenty-task tables of Section~\ref{sec:clip20} are still single-seed, and are evaluation-selected except for the disjoint-holdout pilot reported there (which found the selection gap negligible); the headline twenty-task cells now carry five-seed error bars (Table~\ref{tab:clip20seeds}) but the full grids behind Tables~\ref{tab:clip20budget} and~\ref{tab:clip20nbudget} remain single-seed; the predicted functional-anchor fix for the RegMean initialization is not yet run; the retention study's frontier arms carry four-seed error bars but its remaining cells are single-seed; the shared-output track of Section~\ref{sec:t5} is single-seed with refinement grids whose optima are not yet bracketed; and the decoder-LLM setting promised in the experimental protocol remains the subject of ongoing work. The matched-budget comparison already answers the central alternative explanation---that a small labeled sample would help \emph{any} reasonable method equally: at $64$ labeled examples per task, most alternative uses of the same data are markedly worse than the refinement, and the strongest competitors are themselves parameter-space edits of the merge.
+The baseline tiers are now populated (checkpoint-only, label-free with RegMean and AdaMerging, and the matched labeled tier including learned Localize-and-Stitch), and the headline configurations carry error bars. The remaining gaps are protocol-level: the hyperparameter \emph{sweeps} behind Tables~\ref{tab:mergebaselines}, \ref{tab:clip8}, and the twenty-task tables of Section~\ref{sec:clip20} are still single-seed, and are evaluation-selected except for the disjoint-holdout pilot reported there (which found the selection gap negligible); the headline twenty-task cells now carry five-seed error bars (Table~\ref{tab:clip20seeds}) but the full grids behind Tables~\ref{tab:clip20budget} and~\ref{tab:clip20nbudget} remain single-seed; the predicted functional-anchor fix for the RegMean initialization is not yet run; the retention study's frontier arms carry four-seed error bars but its remaining cells are single-seed; on the shared-output track of Section~\ref{sec:t5}, the standard-budget comparison of Table~\ref{tab:t5} remains single-seed with the unbracketed optima noted there, while the small-budget study of Table~\ref{tab:t5budget} is fully bracketed with three-seed pinned-cell replication; and the decoder-LLM setting promised in the experimental protocol remains the subject of ongoing work. The matched-budget comparison already answers the central alternative explanation---that a small labeled sample would help \emph{any} reasonable method equally: at $64$ labeled examples per task, most alternative uses of the same data are markedly worse than the refinement, and the strongest competitors are themselves parameter-space edits of the merge.
 
 \section{Expected Contribution}
 The expected contribution is an attribution-patching perspective on replay-guided model merging. Rather than using attribution scores to build a pre-merge sparsification mask, the method starts from a standard task-arithmetic merge and asks a local intervention question: for task $i$, which coordinates would reduce the replay loss if the current model moved toward expert $i$? The answer is the sign of the coordinate-wise product $g_{i,r}v_{i,r}$, which coincides with a trust-region acceptance rule that keeps each step moving toward its expert, so the attribution-patching and replay-refinement views motivate the same procedure. This leads to a simple implementable algorithm: mask out expert directions that are locally loss-increasing, scale the remaining negative-gradient update by distance to the expert, clip each per-task update by a trust-region fraction, and immediately apply that task's update before computing the next task's gradient and gate. Empirically, the refinement is best understood as a \emph{complement} to merging rather than a replacement for it: it improves every merge initialization we have tried---task arithmetic, TIES, DARE-TIES, Breadcrumbs, AdaMerging, and RegMean---and the strongest results always come from composing with the strongest available merge, never from plain task arithmetic. Where the thresholded gate adds nothing over the ungated anchored step (GLUE encoders, and the twenty-task CLIP suite), a longer refinement with randomized task order and an annealed step size is currently the more robust choice; the anchored trust-region step itself, however, retains its advantage and its hyperparameter safety at every scale tested. Two further findings sharpen the picture at scale: on the twenty-task suite the refinement remains useful but its margin shrinks as the initialization improves, and running it directly from the \emph{pretrained} model reaches merge-level accuracy while staying several times closer to the base weights---a minimal-drift operating point that merging does not offer, and one whose promise is confirmed by direct measurement: on tasks never merged or refined, the refinement populates the accuracy--retention Pareto frontier while every merge in the comparison is dominated. On the shared-output T5 track (Section~\ref{sec:t5}), which drops the oracle-task-identity assumption entirely, the same composition picture recurs. The proposal also contributes a stricter empirical protocol: fair labeled-replay baselines, an aggregated-update ablation, mask-stability tests, systematic GLUE pair/subset evaluations, and secondary shared-head or CLIP/ViT benchmarks. If successful, the method would provide a lightweight bridge between checkpoint-only task arithmetic and full multitask fine-tuning with replay buffers, while making clear which gains come from the attribution gate rather than from supervised replay alone.
