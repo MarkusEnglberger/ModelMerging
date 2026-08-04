@@ -77,6 +77,14 @@ else
 fi
 echo "[job] three-arm bracketing, S=${STEPS} n_probe=${NPROBE:-config} -> ${OUT}"
 
+# Optional grid overrides (space-separated), e.g. APR_LRS="64 128 256 512".
+# Added for the n=8 arm: at n=16 the anchored arms hit their grid edges (APR
+# rising at the top, nogate falling at the bottom), so smaller buffers get
+# grids shifted one octave outward instead of a second extension round.
+: "${APR_LRS:=32 64 128 256}"
+: "${NG_LRS:=8 16 32 64}"
+: "${GD_LRS:=1e-3 3e-3 1e-2 3e-2}"
+
 python scripts/merge_baselines.py \
   --config configs/t5_glue8.yaml \
   --ta_lams 0.3 \
@@ -84,7 +92,7 @@ python scripts/merge_baselines.py \
   --refine_from ta \
   --steps "${STEPS}" \
   "${NPROBE_ARG[@]}" \
-  --apr_lrs 32 64 128 256 \
-  --nogate_lrs 8 16 32 64 \
-  --control_gd_lrs 1e-3 3e-3 1e-2 3e-2 \
+  --apr_lrs ${APR_LRS} \
+  --nogate_lrs ${NG_LRS} \
+  --control_gd_lrs ${GD_LRS} \
   --out "${OUT}"
