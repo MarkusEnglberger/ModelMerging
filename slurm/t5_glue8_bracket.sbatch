@@ -68,11 +68,17 @@ source slurm/common.sh
 : "${STEPS:=5}"
 : "${NPROBE:=}"          # empty => the config's n_probe (64)
 
+: "${TAG:=}"             # optional suffix; REQUIRED when re-running a (STEPS,
+                         # NPROBE) combination with different grids, or the new
+                         # report overwrites the old one (nearly lost the n=16
+                         # GD arcs to this -- jobs 25205711/12 were submitted
+                         # without it and the originals survived only by a cp
+                         # before they landed)
 if [ -n "${NPROBE}" ]; then
-  OUT="results/compare/t5_glue8_bracket_S${STEPS}_n${NPROBE}.json"
+  OUT="results/compare/t5_glue8_bracket_S${STEPS}_n${NPROBE}${TAG:+_$TAG}.json"
   NPROBE_ARG=(--n_probe "${NPROBE}")
 else
-  OUT="results/compare/t5_glue8_bracket_S${STEPS}.json"
+  OUT="results/compare/t5_glue8_bracket_S${STEPS}${TAG:+_$TAG}.json"
   NPROBE_ARG=()
 fi
 echo "[job] three-arm bracketing, S=${STEPS} n_probe=${NPROBE:-config} -> ${OUT}"
