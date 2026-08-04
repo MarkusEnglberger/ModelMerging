@@ -40,17 +40,20 @@ source slurm/common.sh
 # gd@0.01 (the n=64 optimum that collapsed to +0.284) -- replicating only the
 # winners would test the claim while ignoring its most load-bearing part.
 if [ "${STEPS}" = 5 ]; then
-  if [ "${NPROBE}" = 8 ]; then
-    APR_LRS="512"; NG_LRS="8 16"; GD_LRS="0.003 0.01"
-  else
-    APR_LRS="128"; NG_LRS="32"; GD_LRS="0.01"
-  fi
+  case "${NPROBE}" in
+    8)  APR_LRS="512"; NG_LRS="8 16"; GD_LRS="0.003 0.01" ;;
+    16) APR_LRS="512"; NG_LRS="8";    GD_LRS="0.01" ;;   # gd@0.01 = the cell that
+                                                          # diverged at n=64 and
+                                                          # collapsed at n=8:
+                                                          # fragility-onset probe
+    *)  APR_LRS="128"; NG_LRS="32";   GD_LRS="0.01" ;;
+  esac
 else
-  if [ "${NPROBE}" = 8 ]; then
-    APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003"
-  else
-    APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003"
-  fi
+  case "${NPROBE}" in
+    8)  APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003" ;;
+    16) APR_LRS="32"; NG_LRS="1"; GD_LRS="0.003" ;;
+    *)  APR_LRS="32"; NG_LRS="2"; GD_LRS="0.003" ;;
+  esac
 fi
 if [ -n "${NPROBE}" ]; then
   OUT="results/compare/t5_glue8_seeds_S${STEPS}_n${NPROBE}_seed${SEED}.json"
