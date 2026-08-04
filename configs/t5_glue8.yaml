@@ -38,4 +38,5 @@ data:
   eval_batch_size: 64    # candidate scoring runs C teacher-forced passes per batch
   probe_seed: 0
   class_balanced: true
+  eval0_cache: true   # base/expert/merge deterministic; probe_seed does not enter the key
   max_eval: null
