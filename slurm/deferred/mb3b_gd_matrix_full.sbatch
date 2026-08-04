@@ -8,6 +8,12 @@
 #SBATCH --output=logs/mb3b_full-%j.out
 #SBATCH --error=logs/mb3b_full-%j.out
 
+# DEFERRED -- do not submit until the (lr, S) grid is settled at the cheap
+# protocol. Cancelled once at 9 min (job 25193797) for exactly that reason: it
+# re-scores the S=5 winners at 300 items, but the S=20 job running alongside it
+# may move which cells win, which would make ~12 h of full-precision evaluation
+# measure the wrong cells. Buy precision once, at the end.
+#
 # Extension of the reduced sweep (results/compare/mb3b_gd_matrix_sweep.json),
 # which found the anchored arms above ordinary GD at 3B but could not be quoted:
 # instruction ran at 150 items (+-0.039 se) and the headline separation rides on
