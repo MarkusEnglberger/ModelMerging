@@ -18,6 +18,7 @@
 \usepackage{xcolor}
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
+\usepackage{caption}
 
 \newcommand{\thetab}{\theta_0}
 \newcommand{\taskvec}{\tau}
@@ -116,6 +117,7 @@ Because the clip follows the learning-rate scaling, per-coordinate movement is b
 \begin{algorithm}[H]
 \caption{Sequential expert-direction-gated replay refinement}
 \label{alg:expert-gated-refinement}
+\footnotesize
 \begin{algorithmic}[1]
 \REQUIRE Task experts $\{\theta_i\}_{i=1}^T$; task heads; replay buffers $\{\data_i^{\mathrm{probe}}\}_{i=1}^T$; initial model $\theta^{(0)}$ (any weight-space merge of the experts, or the pretrained model $\thetab$ itself); steps $S$; learning rate $\eta$; gate threshold $\epsilon_{\mathrm{gate}}$.
 \FOR{$s=0,\ldots,S-1$}
@@ -158,7 +160,7 @@ Every gated, clipped step moves each coordinate between its current value and th
 
 \subsection{A Second Perspective: Attribution Patching in Parameter Space}
 \label{sec:ap-view}
-The same per-coordinate update arises from an interpretability-style argument that treats each move toward a task expert as a parameter-space intervention. Let $\vartheta$ denote the current merged encoder immediately before a single task update, $v_i(\vartheta)=\theta_i-\vartheta$ the merge-to-expert direction, and $g_i(\vartheta)=\nabla_\theta\loss_i(\vartheta;\data_i^{\mathrm{probe}})$ the task gradient under task $i$'s head. A first-order attribution-patching approximation to the loss change caused by moving from $\vartheta$ toward expert $i$ along the path $\vartheta+\alpha v_i(\vartheta)$, $\alpha\in[0,1]$, is $\Delta_i^{\mathrm{AP}}(\vartheta)=\langle g_i(\vartheta),v_i(\vartheta)\rangle=\sum_{r=1}^{d}g_{i,r}(\vartheta)v_{i,r}(\vartheta)$, whose coordinate-wise contribution $g_{i,r}v_{i,r}$ is negative exactly when moving coordinate $r$ toward the expert is locally predicted to reduce task $i$'s loss. The loss-decreasing expert gate is therefore
+The same per-coordinate update arises from an interpretability-style argument that treats each move toward a task expert as a parameter-space intervention. Let $\vartheta$ denote the current encoder, $v_i(\vartheta)=\theta_i-\vartheta$ the merge-to-expert direction, and $g_i(\vartheta)$ the task gradient under task $i$'s head. The first-order attribution-patching estimate of the loss change from moving $\vartheta$ toward expert $i$ is $\Delta_i^{\mathrm{AP}}(\vartheta)=\langle g_i(\vartheta),v_i(\vartheta)\rangle$, whose coordinate-wise contribution $g_{i,r}v_{i,r}$ is negative exactly when moving coordinate $r$ toward the expert is locally predicted to reduce task $i$'s loss. The loss-decreasing expert gate is therefore
 \begin{equation}
     m_{i,r}(\vartheta)
     =
@@ -222,12 +224,12 @@ On CLIP-8, layer-wise AdaMerging---which uses no labels---is statistically indis
 \small
 \caption{Multi-seed replication of the headline configurations (five replay-buffer seeds; mean $\pm$ std of mean normalized retention, worst-task in parentheses). Each cell re-runs the sweep-best configuration with a fresh replay buffer per seed; the random gate is density-matched to the attribution gate.}
 \label{tab:multiseed}
+\footnotesize
 \begin{tabular}{lcc}
 \toprule
  & CLIP-8 & GLUE-8 \\
 Method & mean $\pm$ std (worst $\pm$ std) & mean $\pm$ std (worst $\pm$ std) \\
 \midrule
-TIES (deterministic)          & $0.528\ (+0.255)$ & $0.302\ (0.000)$ \\
 Ordinary replay GD $\leftarrow$ TA & $0.460\pm.002\ (-0.200\pm.007)$ & $0.483\pm.017\ (-0.048\pm.058)$ \\
 Random gate $\leftarrow$ TA   & $0.498\pm.117\ (-0.564\pm.888)$ & $0.568\pm.031\ (+0.030\pm.043)$ \\
 Ungated $\leftarrow$ TA       & $0.547\pm.007\ (-0.068\pm.016)$ & $0.593\pm.040\ (+0.085\pm.096)$ \\
@@ -261,24 +263,26 @@ The shared-output track removes the oracle-task-identity assumption entirely: fu
 \footnotesize
 \begin{tabular}{lc}
 \toprule
-Method & mean (worst) \\
+\emph{Checkpoint-only} & mean (worst) \\
 \midrule
-\multicolumn{2}{l}{\emph{Checkpoint-only (no data)}}\\
-Task arithmetic, $\lambda$ tuned          & $0.383\ (-0.250)$ \\
-DARE-TIES                                 & $0.391\ (-0.417)$ \\
-Model Breadcrumbs                         & $0.409\ (\ \ 0.000)$ \\
-DARE (control)                            & $0.427\ (\ \ 0.000)$ \\
-TIES                                      & $0.457\ (+0.008)$ \\
+Task arith., $\lambda$ tuned & $0.383\ (-0.250)$ \\
+DARE-TIES                    & $0.391\ (-0.417)$ \\
+Model Breadcrumbs            & $0.409\ (\ \ 0.000)$ \\
+DARE (control)               & $0.427\ (\ \ 0.000)$ \\
+TIES                         & $0.457\ (+0.008)$ \\
+Inverted-gate control        & $-6.185\ (-16.714)$ \\
+\bottomrule
+\end{tabular}\hspace{1.5em}
+\begin{tabular}{lc}
+\toprule
+\emph{Labeled replay ($n=64$)} & mean (worst) \\
 \midrule
-\multicolumn{2}{l}{\emph{Labeled replay ($n=64$)}}\\
-Ordinary replay GD                        & $0.414\ (\ \ 0.000)$ \\
-Ungated distance-scaled                   & $0.594\ (+0.031)$ \\
-APR $\leftarrow$ task arithmetic          & $0.537\ (+0.024)$ \\
-APR $\leftarrow$ Breadcrumbs              & $0.468\ (+0.058)$ \\
-APR $\leftarrow$ TIES                     & $0.619\ (+0.166)$ \\
-APR $\leftarrow$ DARE-TIES                & $\mathbf{0.687}\ (+0.108)$ \\
-\midrule
-Inverted-gate control                     & $-6.185\ (-16.714)$ \\
+Ordinary replay GD           & $0.414\ (\ \ 0.000)$ \\
+Ungated distance-scaled      & $0.594\ (+0.031)$ \\
+APR $\leftarrow$ task arith. & $0.537\ (+0.024)$ \\
+APR $\leftarrow$ Breadcrumbs & $0.468\ (+0.058)$ \\
+APR $\leftarrow$ TIES        & $0.619\ (+0.166)$ \\
+APR $\leftarrow$ DARE-TIES   & $\mathbf{0.687}\ (+0.108)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -310,7 +314,7 @@ $n=8$  & APR                 & $\mathbf{0.567\pm0.017}$ & $\mathbf{0.557\pm0.007
 
 \subsection{Scaling to twenty tasks: the high-interference regime}
 \label{sec:clip20}
-We next scale the vision track to the twenty-task suite of \citet{wang2024tall}, using the published fine-tuned ViT-B/32 encoders. The scale forces two protocol changes: the conventional $\lambda_i=0.3$ is catastrophic here (merge $0.364$, \emph{below} the $0.550$ zero-shot floor; tuned $\lambda\approx0.08$ reaches $0.604$), and normalized retention degenerates on near-zero expert-base gaps, so we report absolute mean and worst-task top-1 accuracy (floor $0.550$, ceiling $0.896$). Unless noted, cells are single-seed at $n=64$ with evaluation-split selection applied symmetrically to every method; a disjoint-holdout selection pilot changes results negligibly ($0.001$), and the headline cells carry five-seed error bars (Table~\ref{tab:clip20seeds}).
+We next scale the vision track to the twenty-task suite of \citet{wang2024tall}, using the published fine-tuned ViT-B/32 encoders. The scale forces two protocol changes: the conventional $\lambda_i=0.3$ is catastrophic here (merge $0.364$, \emph{below} the $0.550$ zero-shot floor; tuned $\lambda\approx0.08$ reaches $0.604$), and normalized retention degenerates on near-zero expert-base gaps, so we report absolute mean and worst-task top-1 accuracy (floor $0.550$, ceiling $0.896$). Cells are single-seed at $n=64$ with evaluation-split selection applied symmetrically (a disjoint-holdout pilot moves results by $0.001$); headline cells carry five-seed error bars (Table~\ref{tab:clip20seeds}).
 
 \begin{table}[t]
 \centering
@@ -318,6 +322,7 @@ We next scale the vision track to the twenty-task suite of \citet{wang2024tall},
 \setlength{\tabcolsep}{4pt}
 \caption{Twenty-task CLIP suite: initialization $\times$ method at matched budget ($n=64$, $S=5$, single seed); mean top-1 accuracy (worst-task in parentheses), floor $0.550$, ceiling $0.896$. Learning rates tuned per cell; the ungated-from-RegMean cell peaked at its grid edge and is a lower bound.}
 \label{tab:clip20matrix}
+\footnotesize
 \begin{tabular}{lccc}
 \toprule
 Initialization & Merge alone & $+$\,ungated & $+$\,APR \\
@@ -331,57 +336,6 @@ RegMean                          & $0.723\ (0.234)$ & $0.756\ (0.520)$ & $0.749\
 \bottomrule
 \end{tabular}
 \end{table}
-
-
-\paragraph{The anchored step, not the gate, is load-bearing.}
-Across an initialization$\times$method matrix (six initializations; Table~\ref{tab:clip20matrix}), APR and the ungated anchored update agree within $\pm0.01$ everywhere (five-seed paired differences $-0.002\pm0.006$ from TIES, $+0.001\pm0.005$ from AdaMerging), while the inverted gate collapses to $0.100$: the attribution \emph{sign} carries signal, but thresholding at zero adds nothing over no gate. Refinement improves every initialization and preserves their ordering. A held-out audit explains why: first-order attributions transfer to a disjoint buffer only weakly and uniformly across magnitude buckets---the gradient's transferable contribution is step magnitude, not coordinate choice (Appendix~\ref{app:clip20}).
-
-\paragraph{Longer horizons, and safety.}
-Unlike at eight tasks, $S=30$ (cosine, re-randomized order) still pays---${\approx}{+}0.01$ mean, worst-task $0.262\to0.386$ from TIES---with returns exhausted by thirty sweeps (Table~\ref{tab:clip20budget}, Appendix~\ref{app:clip20}). Safety is the clearest practical advantage: of the $23$ APR cells run on this suite, none fell below its initialization or the zero-shot floor (worst cell $0.614$, at double the optimal rate), and the optimum $\eta\approx4$--$8$ transfers across all checkpoint-space initializations. The unconstrained-descent probe, by contrast, can diverge under nothing more than a replay-buffer redraw (three of twenty pinned runs, e.g.\ $0.694\to0.132$), while the anchored update had zero failures with seed spreads of $0.002$--$0.006$. Relatedly, GD overfits small buffers at long horizons ($9$ of $36$ small-$n$ cells deteriorate while replay loss still improves), whereas the anchored update never shows the signature (largest decline $0.003$ across ${\approx}48$ cells): once every coordinate is capped, additional sweeps have nowhere damaging to go (Appendix~\ref{app:clip20}).
-
-\paragraph{Composition, and the RegMean anchor.}
-RegMean is the best label-free initialization ($0.723$), and APR lifts it to $0.764$/$0.502$---the best configuration in the study---at an interior $\eta=0.5$, an order of magnitude below the checkpoint-space rates, exactly as the far-initialization step-size law predicts. RegMean is also the one initialization where plain descent finishes ahead, by a small but seed-consistent $0.003\pm0.002$: its merge point lies $>450$ from the base model, mostly in inference-invisible directions, so the anchor $v_i$ inherits a large non-functional component. This predicts that anchoring on the functional part of $v_i$ would remove the handicap (not yet run), and implies RegMean's drift must be measured in output space (Appendix~\ref{app:clip20}).
-
-\paragraph{Geometry, and refining from the base model.}
-At the tuned merge every expert sits at distance ${\approx}2.4$, yet the best refined solutions lie only $0.14$--$0.23$ from a strong initialization: the two length scales that coincided at three and eight tasks decouple at twenty, which explains both the shrinking gate advantage and the shrinking matched-budget margin over GD---and predicts that from the \emph{base model}, where the destination genuinely is far, the distance-scaled step should dominate again. It does ($+0.058$ over GD at matched budget; $0.683$ vs.\ $0.625$ at $S=30$). APR from base reaches $0.644$ at $S=5$---already above the tuned task-arithmetic merge ($0.604$)---while ending only $0.29$ from $\theta_0$ (the merge: $1.04$), and $0.683$ at displacement $0.59$: an accuracy--proximity frontier that dominates every checkpoint-space merge on both axes (Table~\ref{tab:clip20dist}, Appendix~\ref{app:clip20}).
-
-\paragraph{Held-out-task retention: the minimal-drift point, measured.}
-Splitting the suite into $14$ specialized training tasks and the $6$ strongest natural-image tasks---evaluated purely zero-shot through frozen heads, so the held-out axis measures how much of the \emph{pretrained} model's capability survives merging and refinement (base mean $0.802$)---turns that proximity into a measured claim (Table~\ref{tab:clip20heldout}; Figure~\ref{fig:clip20heldout}): \textbf{the accuracy--retention Pareto frontier is populated almost entirely by the refinement}, and every merge is dominated. Its high-accuracy end is APR from AdaMerging ($0.682$ train at a $-0.022$ retention drop: $+0.146$ training accuracy over the best merge at \emph{equal} retention); GD from base matches APR's retention only by barely moving, and the ungated update's entire learning-rate arc stays below APR's frontier---the first setting in which the gate is clearly beneficial rather than neutral, plausibly because it avoids collateral damage to the shared features that zero-shot transfer depends on. Parameter distance fails as a drift proxy across families (RegMean at distance $386$ loses only $0.059$ held-out; task arithmetic at distance $2.2$ loses $0.208$), so retention must be measured, not proxied; tuning $\lambda$ on the merged tasks alone is actively harmful ($-0.187$ held-out). The frontier arms replicate over four buffer seeds with spreads of $0.001$--$0.006$.
-
-\begin{table}[t]
-\centering
-\small
-\setlength{\tabcolsep}{5pt}
-\caption{Held-out-task retention on the twenty-task suite: merge/refine on $14$ specialized tasks, evaluate the $6$ strongest natural-image tasks zero-shot (base mean $0.802$); single seed, $n=64$, refinements at $S{=}30$ cosine. $^\ast$ marks the accuracy/retention Pareto frontier; non-frontier rows abridged (full table: Appendix~\ref{app:clip20}).}
-\label{tab:clip20heldout}
-\footnotesize
-\begin{tabular}{lccc}
-\toprule
-Model (built from the 14 train tasks) & Dist.\ $\theta_0$ & Train-14 & Held-out 6 (drop) \\
-\midrule
-Base model $\theta_0$$^\ast$          & $0.00$ & $0.443$ & $0.802\ (\phantom{-}0.000)$ \\
-GD from base, $\eta{=}5\mathrm{e}{-5}$$^\ast$ & $0.08$ & $0.529$ & $0.797\ (-0.005)$ \\
-APR from base, $\eta{=}4$$^\ast$      & $0.44$ & $0.618$ & $0.790\ (-0.012)$ \\
-APR from base, $\eta{=}8$$^\ast$      & $0.60$ & $0.637$ & $0.780\ (-0.022)$ \\
-Task arithmetic ($\lambda{=}0.08$)    & $0.87$ & $0.536$ & $0.781\ (-0.021)$ \\
-APR from task arith., $\eta{=}4$      & $1.06$ & $0.654$ & $0.772\ (-0.030)$ \\
-Breadcrumbs$^\ast$                    & $1.28$ & $0.536$ & $0.792\ (-0.010)$ \\
-APR from AdaMerging, $\eta{=}4$$^\ast$ & $1.44$ & $\mathbf{0.682}$ & $0.780\ (-0.022)$ \\
-Task arithmetic ($\lambda{=}0.2$)     & $2.18$ & $0.510$ & $0.594\ (-0.208)$ \\
-RegMean                               & $386$  & $0.675$ & $0.743\ (-0.059)$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.37\linewidth]{figs/heldout_frontier.pdf}
-\caption{The accuracy--retention trade-off of Table~\ref{tab:clip20heldout}: models built from the $14$ training tasks, evaluated on them ($x$) and zero-shot on the $6$ held-out tasks ($y$; dotted line: the base model). The frontier's high-accuracy half is populated entirely by the anchored refinement; every merge (gray squares) is dominated, and the ungated learning-rate arc (triangles) bends away from it.}
-\label{fig:clip20heldout}
-\end{figure}
-
-\paragraph{Replay budget, and replication.}
-Shrinking the buffer degrades the mean gracefully but the worst task ${\approx}3\times$ faster (Table~\ref{tab:clip20nbudget}, Appendix~\ref{app:clip20}). With just \emph{eight} labels per task, refining the base model reaches $0.632$ ($0.626\pm0.005$ over five draws, above the tuned merge on every draw), and the from-base margin over GD (${\approx}{+}0.05$--$0.06$ mean) is budget-independent---set by the geometry above, not data volume. Five-seed replication of the headline cells (Table~\ref{tab:clip20seeds}) confirms the single-seed conclusions and sharpens two: the gate's worst-task effect is initialization-dependent (helpful on all five seeds from AdaMerging, $+0.031\pm0.015$; mildly negative from TIES), and the paired margins over plain descent are seed-consistent (e.g.\ $+0.018\pm0.007$ from AdaMerging; $+0.053\pm0.006$ from base at $n=8$).
 
 \begin{table}[t]
 \centering
@@ -412,8 +366,61 @@ Base, $n{=}8$        & APR      & $0.626\pm0.005$ & $0.170\pm0.017$ \\
 \end{table}
 
 
+\paragraph{The anchored step, not the gate, is load-bearing.}
+Across an initialization$\times$method matrix (six initializations; Table~\ref{tab:clip20matrix}), APR and the ungated anchored update agree within $\pm0.01$ everywhere (five-seed paired differences $-0.002\pm0.006$ from TIES, $+0.001\pm0.005$ from AdaMerging), while the inverted gate collapses to $0.100$: the attribution \emph{sign} carries signal, but thresholding at zero adds nothing over no gate. Refinement improves every initialization and preserves their ordering. A held-out audit explains why: first-order attributions transfer to a disjoint buffer only weakly and uniformly across magnitude buckets---the gradient's transferable contribution is step magnitude, not coordinate choice (Appendix~\ref{app:clip20}).
+
+\paragraph{Longer horizons, and safety.}
+Unlike at eight tasks, $S=30$ (cosine, re-randomized order) still pays---${\approx}{+}0.01$ mean, worst-task $0.262\to0.386$ from TIES---with returns exhausted by thirty sweeps (Table~\ref{tab:clip20budget}, Appendix~\ref{app:clip20}). Safety is the clearest practical advantage: of the $23$ APR cells run on this suite, none fell below its initialization or the zero-shot floor (worst cell $0.614$, at double the optimal rate), and the optimum $\eta\approx4$--$8$ transfers across all checkpoint-space initializations. The unconstrained-descent probe, by contrast, can diverge under nothing more than a replay-buffer redraw (three of twenty pinned runs, e.g.\ $0.694\to0.132$), while the anchored update had zero failures with seed spreads of $0.002$--$0.006$. Relatedly, GD overfits small buffers at long horizons ($9$ of $36$ small-$n$ cells deteriorate while replay loss still improves), whereas the anchored update never shows the signature (largest decline $0.003$ across ${\approx}48$ cells): once every coordinate is capped, additional sweeps have nowhere damaging to go (Appendix~\ref{app:clip20}).
+
+\paragraph{Composition, and the RegMean anchor.}
+RegMean is the best label-free initialization ($0.723$), and APR lifts it to $0.764$/$0.502$---the best configuration in the study---at an interior $\eta=0.5$, an order of magnitude below the checkpoint-space rates, exactly as the far-initialization step-size law predicts. RegMean is also the one initialization where plain descent finishes ahead, by a small but seed-consistent $0.003\pm0.002$: its merge point lies $>450$ from the base model, mostly in inference-invisible directions, so the anchor $v_i$ inherits a large non-functional component. This predicts that anchoring on the functional part of $v_i$ would remove the handicap (not yet run), and implies RegMean's drift must be measured in output space (Appendix~\ref{app:clip20}).
+
+\paragraph{Geometry, and refining from the base model.}
+At the tuned merge every expert sits at distance ${\approx}2.4$, yet the best refined solutions lie only $0.14$--$0.23$ from a strong initialization: the two length scales that coincided at three and eight tasks decouple at twenty, which explains both the shrinking gate advantage and the shrinking matched-budget margin over GD---and predicts that from the \emph{base model}, where the destination genuinely is far, the distance-scaled step should dominate again. It does ($+0.058$ over GD at matched budget; $0.683$ vs.\ $0.625$ at $S=30$). APR from base reaches $0.644$ at $S=5$---already above the tuned task-arithmetic merge ($0.604$)---while ending only $0.29$ from $\theta_0$ (the merge: $1.04$), and $0.683$ at displacement $0.59$: an accuracy--proximity frontier that dominates every checkpoint-space merge on both axes (Table~\ref{tab:clip20dist}, Appendix~\ref{app:clip20}).
+
+\paragraph{Held-out-task retention: the minimal-drift point, measured.}
+Splitting the suite into $14$ specialized training tasks and the $6$ strongest natural-image tasks---evaluated purely zero-shot through frozen heads, so the held-out axis measures how much of the \emph{pretrained} model's capability survives merging and refinement (base mean $0.802$)---turns that proximity into a measured claim (Table~\ref{tab:clip20heldout}; Figure~\ref{fig:clip20heldout}): \textbf{the accuracy--retention Pareto frontier is populated almost entirely by the refinement}, and every merge is dominated. Its high-accuracy end is APR from AdaMerging ($0.682$ train at a $-0.022$ retention drop: $+0.146$ training accuracy over the best merge at \emph{equal} retention); GD from base matches APR's retention only by barely moving, and the ungated update's entire learning-rate arc stays below APR's frontier---the first setting in which the gate is clearly beneficial rather than neutral, plausibly because it avoids collateral damage to the shared features that zero-shot transfer depends on. Parameter distance fails as a drift proxy across families (RegMean at distance $386$ loses only $0.059$ held-out; task arithmetic at distance $2.2$ loses $0.208$), so retention must be measured, not proxied; tuning $\lambda$ on the merged tasks alone is actively harmful ($-0.187$ held-out). The frontier arms replicate over four buffer seeds with spreads of $0.001$--$0.006$.
+
+\begin{table}[t]
+\begin{minipage}[t]{0.60\textwidth}
+\centering\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccc}
+\toprule
+Model (built from the 14 train tasks) & Dist.\ $\theta_0$ & Train-14 & Held-out 6 (drop) \\
+\midrule
+Base model $\theta_0$$^\ast$          & $0.00$ & $0.443$ & $0.802\ (\phantom{-}0.000)$ \\
+GD from base, $\eta{=}5\mathrm{e}{-5}$$^\ast$ & $0.08$ & $0.529$ & $0.797\ (-0.005)$ \\
+APR from base, $\eta{=}4$$^\ast$      & $0.44$ & $0.618$ & $0.790\ (-0.012)$ \\
+APR from base, $\eta{=}8$$^\ast$      & $0.60$ & $0.637$ & $0.780\ (-0.022)$ \\
+Task arithmetic ($\lambda{=}0.08$)    & $0.87$ & $0.536$ & $0.781\ (-0.021)$ \\
+APR from task arith., $\eta{=}4$      & $1.06$ & $0.654$ & $0.772\ (-0.030)$ \\
+Breadcrumbs$^\ast$                    & $1.28$ & $0.536$ & $0.792\ (-0.010)$ \\
+APR from AdaMerging, $\eta{=}4$$^\ast$ & $1.44$ & $\mathbf{0.682}$ & $0.780\ (-0.022)$ \\
+Task arithmetic ($\lambda{=}0.2$)     & $2.18$ & $0.510$ & $0.594\ (-0.208)$ \\
+RegMean                               & $386$  & $0.675$ & $0.743\ (-0.059)$ \\
+\bottomrule
+\end{tabular}
+\captionof{table}{Held-out-task retention on the twenty-task suite: merge/refine on $14$ specialized tasks, evaluate the $6$ strongest natural-image tasks zero-shot (base mean $0.802$); single seed, $n=64$, refinements at $S{=}30$ cosine. $^\ast$ marks the accuracy/retention Pareto frontier; non-frontier rows abridged (full table: Appendix~\ref{app:clip20}).}
+\label{tab:clip20heldout}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.37\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figs/heldout_frontier.pdf}
+\captionof{figure}{The accuracy--retention trade-off of Table~\ref{tab:clip20heldout}: models built from the $14$ training tasks, evaluated on them ($x$) and zero-shot on the $6$ held-out tasks ($y$; dotted line: the base model). The frontier's high-accuracy half is populated entirely by the anchored refinement; every merge (gray squares) is dominated, and the ungated learning-rate arc (triangles) bends away from it.}
+\label{fig:clip20heldout}
+\end{minipage}
+\end{table}
+
+
+
+
+\paragraph{Replay budget, and replication.}
+Shrinking the buffer degrades the mean gracefully but the worst task ${\approx}3\times$ faster (Table~\ref{tab:clip20nbudget}, Appendix~\ref{app:clip20}). With just \emph{eight} labels per task, refining the base model reaches $0.632$ ($0.626\pm0.005$ over five draws, above the tuned merge on every draw), and the from-base margin over GD (${\approx}{+}0.05$--$0.06$ mean) is budget-independent---set by the geometry above, not data volume. Five-seed replication of the headline cells (Table~\ref{tab:clip20seeds}) confirms the single-seed conclusions and sharpens two: the gate's worst-task effect is initialization-dependent (helpful on all five seeds from AdaMerging, $+0.031\pm0.015$; mildly negative from TIES), and the paired margins over plain descent are seed-consistent (e.g.\ $+0.018\pm0.007$ from AdaMerging; $+0.053\pm0.006$ from base at $n=8$).
+
+
+
 \paragraph{Summary.}
-Five claims survive the twenty-task campaign: (i)~the refinement improves every initialization given---six merges and the base model---with the gain shrinking but never vanishing as the initialization improves; (ii)~the anchored, distance-scaled, clipped step is load-bearing, the gate adding initialization-dependent worst-task repair and held-out retention; (iii)~no anchored run ever fell below its initialization or the floor, while unconstrained descent has catastrophic cells at adjacent rates, overfits small buffers, and can diverge under a buffer redraw; (iv)~eight labels per task beat the tuned merge from the base model alone; (v)~refinement traces an accuracy--retention frontier that merging does not reach (remaining gaps: Appendix~\ref{app:clip20}).
+Five claims survive the campaign: (i)~the refinement improves every initialization given---six merges and the base model---with gains shrinking but never vanishing as the initialization improves; (ii)~the anchored, distance-scaled, clipped step is load-bearing, the gate adding worst-task repair and held-out retention; (iii)~no anchored run ever fell below its initialization or the floor, while unconstrained descent has catastrophic cells at adjacent rates, overfits small buffers, and diverges under buffer redraws; (iv)~eight labels per task beat the tuned merge from the base model; (v)~refinement traces an accuracy--retention frontier merging does not reach (gaps: Appendix~\ref{app:clip20}).
 
 \section{Discussion}
 \label{sec:contribution}
