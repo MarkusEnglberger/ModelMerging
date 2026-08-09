@@ -1,0 +1,235 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{wortsman2022modelsoups}
+\citation{matena2022fisher}
+\citation{ilharco2022taskarithmetic}
+\citation{yadav2023ties}
+\citation{yu2023dare}
+\citation{deep2024della}
+\citation{davari2023breadcrumbs}
+\citation{he2024localize}
+\citation{kong2024apl}
+\citation{jin2023regmean}
+\citation{yang2024adamerging}
+\citation{lu2024twin,zeng2025taskvectorbases}
+\citation{tang2024fusionbench}
+\citation{syed2024attributionpatching,kramar2024atpstar}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Related Work and Background}{1}{section.1}\protected@file@percent }
+\newlabel{sec:related}{{1}{1}{Related Work and Background}{section.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Model merging and task vectors.}{1}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Interference-aware and data-dependent merging.}{1}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Attribution patching.}{1}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Methodology}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Problem Setup}{2}{subsection.2.1}\protected@file@percent }
+\newlabel{eq:initial-merge}{{1}{2}{Problem Setup}{equation.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Trust-Region Replay Refinement}{2}{subsection.2.2}\protected@file@percent }
+\newlabel{sec:replay-refinement}{{2.2}{2}{Trust-Region Replay Refinement}{subsection.2.2}{}}
+\newlabel{eq:sequential-gradient}{{2}{2}{Trust-Region Replay Refinement}{equation.2.2}{}}
+\newlabel{eq:sequential-direction}{{3}{2}{Trust-Region Replay Refinement}{equation.2.3}{}}
+\newlabel{eq:sequential-mask}{{4}{2}{Trust-Region Replay Refinement}{equation.2.4}{}}
+\newlabel{eq:sequential-raw-update}{{5}{2}{Trust-Region Replay Refinement}{equation.2.5}{}}
+\newlabel{eq:clipped-update}{{6}{2}{Trust-Region Replay Refinement}{equation.2.6}{}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Sequential expert-direction-gated replay refinement}}{3}{algorithm.1}\protected@file@percent }
+\newlabel{alg:expert-gated-refinement}{{1}{3}{Trust-Region Replay Refinement}{algorithm.1}{}}
+\newlabel{prop:box-nonexpansive}{{1}{3}{Non-expansiveness toward the expert box}{proposition.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}A Second Perspective: Attribution Patching in Parameter Space}{3}{subsection.2.3}\protected@file@percent }
+\newlabel{sec:ap-view}{{2.3}{3}{A Second Perspective: Attribution Patching in Parameter Space}{subsection.2.3}{}}
+\newlabel{eq:ap-gate}{{7}{3}{A Second Perspective: Attribution Patching in Parameter Space}{equation.2.7}{}}
+\citation{wang2018glue}
+\citation{liu2019roberta}
+\citation{raffel2020t5,tang2024fusionbench}
+\citation{radford2021clip,ilharco2022taskarithmetic}
+\citation{wang2024tall}
+\citation{he2025mergebench}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Experimental Protocol}{4}{section.3}\protected@file@percent }
+\newlabel{sec:protocol}{{3}{4}{Experimental Protocol}{section.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{Settings.}{4}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Replay data.}{4}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Baselines.}{4}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Metrics.}{4}{section*.7}\protected@file@percent }
+\newlabel{eq:normalized-retention}{{8}{4}{Metrics}{equation.3.8}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Results}{4}{section.4}\protected@file@percent }
+\newlabel{sec:results}{{4}{4}{Results}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Three-task proof of concept.}{5}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{GLUE-8 scale-up.}{5}{section*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What the attribution gate is and is not doing.}{5}{section*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{CLIP/ViT vision track.}{5}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Merge baselines, and composition with them}{5}{subsection.4.1}\protected@file@percent }
+\newlabel{sec:mergebaselines}{{4.1}{5}{Merge baselines, and composition with them}{subsection.4.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Composition.}{5}{section*.12}\protected@file@percent }
+\citation{xiao2024lmcocktail}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Multi-seed replication of the headline configurations (five replay-buffer seeds; mean $\pm $ std of mean normalized retention, worst-task in parentheses). Each cell re-runs the best configuration from the corresponding sweep with a freshly sampled replay buffer per seed; TIES is deterministic given the checkpoints and is shown for reference. The random-gate control uses a random mask of the same density as the attribution gate.}}{6}{table.1}\protected@file@percent }
+\newlabel{tab:multiseed}{{1}{6}{Multi-seed replication of the headline configurations (five replay-buffer seeds; mean $\pm $ std of mean normalized retention, worst-task in parentheses). Each cell re-runs the best configuration from the corresponding sweep with a freshly sampled replay buffer per seed; TIES is deterministic given the checkpoints and is shown for reference. The random-gate control uses a random mask of the same density as the attribution gate}{table.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Why a label-free method can tie a labeled one.}{6}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Properties of the label-free baselines.}{6}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Step size, and when composition fails.}{6}{section*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Matched labeled budget.}{6}{section*.16}\protected@file@percent }
+\citation{wang2024tall}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Shared-output T5 track: merging through a single generation head}{7}{subsection.4.2}\protected@file@percent }
+\newlabel{sec:t5}{{4.2}{7}{Shared-output T5 track: merging through a single generation head}{subsection.4.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{Small replay budgets: a draw-fragility boundary.}{7}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Scaling to twenty tasks: the high-interference regime}{7}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:clip20}{{4.3}{7}{Scaling to twenty tasks: the high-interference regime}{subsection.4.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{The anchored step, not the gate, is load-bearing.}{7}{section*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Longer horizons, and safety.}{8}{section*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Composition, and the RegMean anchor.}{8}{section*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Geometry, and refining from the base model.}{8}{section*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Held-out-task retention: the minimal-drift point, measured.}{8}{section*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Replay budget, and replication.}{8}{section*.23}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces The accuracy--retention trade-off of Table\nobreakspace  {}\ref  {tab:clip20heldout}: each point is a model built from the $14$ training tasks, evaluated on them ($x$) and zero-shot on the $6$ held-out tasks ($y$; dotted line = the base model's own zero-shot accuracy). The step line is the Pareto frontier: its high-accuracy half is populated entirely by the anchored refinement, while every merge (gray squares) is dominated. The ungated update's learning-rate arc (triangles, $\eta =0.5\!\to \!8$) bends away from the frontier---larger steps lose retention without gaining accuracy. RegMean sits at parameter distance $386$ from $\theta _0$ yet retains mid-pack---parameter distance is not a drift metric (see text).}}{9}{figure.1}\protected@file@percent }
+\newlabel{fig:clip20heldout}{{1}{9}{The accuracy--retention trade-off of Table~\ref {tab:clip20heldout}: each point is a model built from the $14$ training tasks, evaluated on them ($x$) and zero-shot on the $6$ held-out tasks ($y$; dotted line = the base model's own zero-shot accuracy). The step line is the Pareto frontier: its high-accuracy half is populated entirely by the anchored refinement, while every merge (gray squares) is dominated. The ungated update's learning-rate arc (triangles, $\eta =0.5\!\to \!8$) bends away from the frontier---larger steps lose retention without gaining accuracy. RegMean sits at parameter distance $386$ from $\theta _0$ yet retains mid-pack---parameter distance is not a drift metric (see text)}{figure.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Summary.}{9}{section*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{9}{section.5}\protected@file@percent }
+\newlabel{sec:contribution}{{5}{9}{Discussion}{section.5}{}}
+\bibcite{davari2023breadcrumbs}{{1}{2023}{{Davari and Belilovsky}}{{}}}
+\bibcite{deep2024della}{{2}{2024}{{Deep et~al.}}{{}}}
+\bibcite{he2024localize}{{3}{2024}{{He et~al.}}{{}}}
+\bibcite{he2025mergebench}{{4}{2025}{{He et~al.}}{{}}}
+\bibcite{ilharco2022taskarithmetic}{{5}{2022}{{Ilharco et~al.}}{{}}}
+\bibcite{jin2023regmean}{{6}{2023}{{Jin et~al.}}{{}}}
+\bibcite{kong2024apl}{{7}{2024}{{Kong et~al.}}{{}}}
+\bibcite{kramar2024atpstar}{{8}{2024}{{Kramar et~al.}}{{}}}
+\bibcite{liu2019roberta}{{9}{2019}{{Liu et~al.}}{{}}}
+\bibcite{lu2024twin}{{10}{2024}{{Lu et~al.}}{{}}}
+\bibcite{matena2022fisher}{{11}{2022}{{Matena and Raffel}}{{}}}
+\bibcite{radford2021clip}{{12}{2021}{{Radford et~al.}}{{}}}
+\bibcite{raffel2020t5}{{13}{2020}{{Raffel et~al.}}{{}}}
+\bibcite{sanh2019distilbert}{{14}{2019}{{Sanh et~al.}}{{}}}
+\bibcite{sundararajan2017ig}{{15}{2017}{{Sundararajan et~al.}}{{}}}
+\bibcite{syed2024attributionpatching}{{16}{2024}{{Syed et~al.}}{{}}}
+\bibcite{tang2024fusionbench}{{17}{2024}{{Tang et~al.}}{{}}}
+\bibcite{wang2018glue}{{18}{2018}{{Wang et~al.}}{{}}}
+\bibcite{wang2019superglue}{{19}{2019}{{Wang et~al.}}{{}}}
+\bibcite{wang2024tall}{{20}{2024}{{Wang et~al.}}{{}}}
+\bibcite{wortsman2022modelsoups}{{21}{2022}{{Wortsman et~al.}}{{}}}
+\bibcite{xiao2024lmcocktail}{{22}{2024}{{Xiao et~al.}}{{}}}
+\bibcite{yadav2023ties}{{23}{2023}{{Yadav et~al.}}{{}}}
+\bibcite{yang2024adamerging}{{24}{2024}{{Yang et~al.}}{{}}}
+\bibcite{yu2023dare}{{25}{2023}{{Yu et~al.}}{{}}}
+\bibcite{zeng2025taskvectorbases}{{26}{2025}{{Zeng et~al.}}{{}}}
+\@writefile{toc}{\contentsline {section}{\numberline {A}Box-Distance Monotonicity and the Expert Box}{11}{appendix.A}\protected@file@percent }
+\newlabel{app:box-theory}{{A}{11}{Box-Distance Monotonicity and the Expert Box}{appendix.A}{}}
+\newlabel{thm:box-distance-monotonicity}{{1}{11}{Box-distance monotonicity under coordinatewise movement toward a hull point}{theorem.1}{}}
+\newlabel{prop:l1-geodesic-box-hull}{{2}{12}{}{proposition.2}{}}
+\newlabel{cor:algorithm-box-distance}{{1}{13}{Box-distance monotonicity of the sequential refinement}{corollary.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {B}Method Details: Sequential Scheduling}{14}{appendix.B}\protected@file@percent }
+\newlabel{app:method}{{B}{14}{Method Details: Sequential Scheduling}{appendix.B}{}}
+\citation{wang2018glue}
+\citation{liu2019roberta}
+\citation{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench,wang2019superglue,raffel2020t5,yu2023dare,he2025mergebench}
+\citation{sanh2019distilbert}
+\citation{wang2019superglue,raffel2020t5}
+\citation{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}
+\citation{wang2024tall}
+\citation{he2025mergebench}
+\@writefile{toc}{\contentsline {section}{\numberline {C}Extended Experimental Protocol}{15}{appendix.C}\protected@file@percent }
+\newlabel{app:protocol}{{C}{15}{Extended Experimental Protocol}{appendix.C}{}}
+\@writefile{toc}{\contentsline {paragraph}{Benchmark settings.}{15}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Proof-of-concept order.}{15}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Secondary benchmark settings.}{15}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Replay data.}{16}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Baselines.}{16}{section*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Task-similarity and interference analysis.}{16}{section*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.1}Ablations and Diagnostics}{16}{subsection.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {C.2}Hypotheses}{16}{subsection.C.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Three-task RoBERTa-base proof of concept (MRPC, STS-B, SST-2; $n=64$, $S=5$). Mean normalized retention; best learning rate per family. Left: best configuration, mean $\pm $ std over five seeds. Right: a single-seed contrast at a large fixed learning rate, isolating the gate's effect.}}{17}{table.2}\protected@file@percent }
+\newlabel{tab:poc3}{{2}{17}{Three-task RoBERTa-base proof of concept (MRPC, STS-B, SST-2; $n=64$, $S=5$). Mean normalized retention; best learning rate per family. Left: best configuration, mean $\pm $ std over five seeds. Right: a single-seed contrast at a large fixed learning rate, isolating the gate's effect}{table.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {D}Multi-Head GLUE: Extended Results}{17}{appendix.D}\protected@file@percent }
+\newlabel{app:glue}{{D}{17}{Multi-Head GLUE: Extended Results}{appendix.D}{}}
+\@writefile{toc}{\contentsline {paragraph}{Three-task proof of concept.}{17}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{GLUE-8 scale-up.}{17}{section*.34}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces GLUE-8 (all eight tasks, RoBERTa-base, single seed). Best mean normalized retention per family (worst-task retention in parentheses); the task-arithmetic merge baseline is $0.320$ (worst $-0.175$). APR is reported at its largest stable learning rate, $\eta =16$; the $\eta =32$ configuration reached $0.614$ once but is not reproducible (see text).}}{18}{table.3}\protected@file@percent }
+\newlabel{tab:glue8}{{3}{18}{GLUE-8 (all eight tasks, RoBERTa-base, single seed). Best mean normalized retention per family (worst-task retention in parentheses); the task-arithmetic merge baseline is $0.320$ (worst $-0.175$). APR is reported at its largest stable learning rate, $\eta =16$; the $\eta =32$ configuration reached $0.614$ once but is not reproducible (see text)}{table.3}{}}
+\@writefile{toc}{\contentsline {paragraph}{What the attribution gate is and is not doing.}{18}{section*.35}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {E}CLIP-8: Extended Results}{18}{appendix.E}\protected@file@percent }
+\newlabel{app:clip8}{{E}{18}{CLIP-8: Extended Results}{appendix.E}{}}
+\@writefile{toc}{\contentsline {paragraph}{CLIP/ViT vision track.}{18}{section*.36}\protected@file@percent }
+\citation{yadav2023ties}
+\citation{yu2023dare}
+\citation{davari2023breadcrumbs}
+\citation{yang2024adamerging}
+\citation{jin2023regmean}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Eight-task CLIP ViT-B/32 suite (single seed, $n=64$, $S=5$, $\gamma =1$, uniform $\lambda _i=0.3$). Best learning rate per family by mean normalized retention (Eq.\nobreakspace  {}\textup  {\hbox {\mathsurround \z@ \normalfont  (\ignorespaces \ref  {eq:normalized-retention}\unskip \@@italiccorr )}}); worst-task retention in parentheses. The gated update is best on both, and is the only method keeping worst-task retention positive.}}{19}{table.4}\protected@file@percent }
+\newlabel{tab:clip8}{{4}{19}{Eight-task CLIP ViT-B/32 suite (single seed, $n=64$, $S=5$, $\gamma =1$, uniform $\lambda _i=0.3$). Best learning rate per family by mean normalized retention (Eq.~\eqref {eq:normalized-retention}); worst-task retention in parentheses. The gated update is best on both, and is the only method keeping worst-task retention positive}{table.4}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Per-task top-1 accuracy on the eight-task CLIP suite: zero-shot backbone, task expert, task-arithmetic merge, and the proposed gated refinement (APR, $\eta =8$). Refinement recovers most of the merge's interference loss, including on Cars and SUN397, which the merge had degraded below the zero-shot backbone.}}{19}{table.5}\protected@file@percent }
+\newlabel{tab:clip8pt}{{5}{19}{Per-task top-1 accuracy on the eight-task CLIP suite: zero-shot backbone, task expert, task-arithmetic merge, and the proposed gated refinement (APR, $\eta =8$). Refinement recovers most of the merge's interference loss, including on Cars and SUN397, which the merge had degraded below the zero-shot backbone}{table.5}{}}
+\@writefile{toc}{\contentsline {paragraph}{Replay budget and refinement horizon (CLIP/ViT).}{19}{section*.37}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {F}Merge Baselines and Matched-Budget Comparisons: Extended Results}{19}{appendix.F}\protected@file@percent }
+\newlabel{app:mergebaselines}{{F}{19}{Merge Baselines and Matched-Budget Comparisons: Extended Results}{appendix.F}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Replay-budget study on the eight-task CLIP suite (mean normalized retention; worst-task in parentheses). Best configuration per family; the gated update (APR) near-converges by $S=5\text  {--}10$ sweeps, while ordinary replay GD is given a longer horizon ($S=25\text  {--}35$) as a generous baseline. APR holds an ${\approx }\,+0.10$ mean advantage at every budget and is the only method with non-negative worst-task retention down to $n=16$.}}{20}{table.6}\protected@file@percent }
+\newlabel{tab:clipbudget}{{6}{20}{Replay-budget study on the eight-task CLIP suite (mean normalized retention; worst-task in parentheses). Best configuration per family; the gated update (APR) near-converges by $S=5\text {--}10$ sweeps, while ordinary replay GD is given a longer horizon ($S=25\text {--}35$) as a generous baseline. APR holds an ${\approx }\,+0.10$ mean advantage at every budget and is the only method with non-negative worst-task retention down to $n=16$}{table.6}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces Merge baselines and composition (single seed, $n=64$, $S=5$). Mean normalized retention, worst-task in parentheses. Every family shares the same experts, replay buffers, and heads; hyperparameters ($\lambda $, density, sparsity, $\eta $) are tuned per family on the evaluation split (see Section\nobreakspace  {}\ref  {sec:results}). $^\ddagger $: standard \emph  {transductive} AdaMerging draws unlabeled inputs from the evaluation split; the CLIP rows instead use the matched budget (the same $64$ unlabeled inputs per task that APR sees labeled), which \emph  {improves} on transductive ($0.333$ / $0.604$ for task/layer wise), and the matched layer-wise merge is the initialization for the last row (making that composition fully inductive). On GLUE both budgets fail alike (transductive $0.023$ / $0.173$; matched $0.029$ / $0.198$ for task/layer wise). RegMean uses the matched $64$ unlabeled inputs per task (a $256$-input variant scores $0.747$ / $0.483$). $^\P  $: APR harms the RegMean initialization on GLUE-8 at every learning rate (see text); the value shown is its least-bad cell. $^{**}$: favorable seed---across five replay seeds this cell is $0.480\pm 0.153$ at its fixed refinement rate (Table\nobreakspace  {}\ref  {tab:longapr} and accompanying text); the GLUE column's bold entry is the most robust composition instead. Multi-seed replications of the headline cells appear in Table\nobreakspace  {}\ref  {tab:multiseed}.}}{20}{table.7}\protected@file@percent }
+\newlabel{tab:mergebaselines}{{7}{20}{Merge baselines and composition (single seed, $n=64$, $S=5$). Mean normalized retention, worst-task in parentheses. Every family shares the same experts, replay buffers, and heads; hyperparameters ($\lambda $, density, sparsity, $\eta $) are tuned per family on the evaluation split (see Section~\ref {sec:results}). $^\ddagger $: standard \emph {transductive} AdaMerging draws unlabeled inputs from the evaluation split; the CLIP rows instead use the matched budget (the same $64$ unlabeled inputs per task that APR sees labeled), which \emph {improves} on transductive ($0.333$ / $0.604$ for task/layer wise), and the matched layer-wise merge is the initialization for the last row (making that composition fully inductive). On GLUE both budgets fail alike (transductive $0.023$ / $0.173$; matched $0.029$ / $0.198$ for task/layer wise). RegMean uses the matched $64$ unlabeled inputs per task (a $256$-input variant scores $0.747$ / $0.483$). $^\P $: APR harms the RegMean initialization on GLUE-8 at every learning rate (see text); the value shown is its least-bad cell. $^{**}$: favorable seed---across five replay seeds this cell is $0.480\pm 0.153$ at its fixed refinement rate (Table~\ref {tab:longapr} and accompanying text); the GLUE column's bold entry is the most robust composition instead. Multi-seed replications of the headline cells appear in Table~\ref {tab:multiseed}}{table.7}{}}
+\@writefile{toc}{\contentsline {paragraph}{The refinement composes with better merges rather than replacing them.}{20}{section*.38}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Error bars across replay-buffer seeds.}{21}{section*.39}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why is a label-free method competitive with a labeled one at all?}{21}{section*.40}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Coefficient tuning.}{21}{section*.41}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Entropy is a good surrogate for accuracy only when the heads are frozen.}{21}{section*.42}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Does a longer, annealed schedule improve the refinement?}{21}{section*.43}\protected@file@percent }
+\citation{xiao2024lmcocktail}
+\citation{matena2022fisher}
+\citation{he2024localize}
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces Long-horizon control: do more sweeps, random task order, and cosine learning-rate annealing improve the refinement? Mean normalized retention (worst-task in parentheses); ``anneal'' = $S{=}30$, random order per sweep, cosine decay to $5\%$ of the peak learning rate. CLIP-8 columns are single-seed; GLUE-8 columns are mean $\pm $ std over five replay seeds (the steps-only row was run single-seed and is shown for CLIP only). At eight tasks the refinement is near-converged by $S{=}5$ on CLIP, whereas on GLUE the annealed long horizon is clearly the best and most stable configuration.}}{22}{table.8}\protected@file@percent }
+\newlabel{tab:longapr}{{8}{22}{Long-horizon control: do more sweeps, random task order, and cosine learning-rate annealing improve the refinement? Mean normalized retention (worst-task in parentheses); ``anneal'' = $S{=}30$, random order per sweep, cosine decay to $5\%$ of the peak learning rate. CLIP-8 columns are single-seed; GLUE-8 columns are mean $\pm $ std over five replay seeds (the steps-only row was run single-seed and is shown for CLIP only). At eight tasks the refinement is near-converged by $S{=}5$ on CLIP, whereas on GLUE the annealed long horizon is clearly the best and most stable configuration}{table.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Which ingredient of the sparsification baselines matters.}{22}{section*.44}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The optimal step size depends on the initialization---and boundedness is not usefulness.}{22}{section*.45}\protected@file@percent }
+\citation{raffel2020t5,tang2024fusionbench}
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces Matched labeled-data budget: every method uses the same $64$ labeled examples per task (from train), with hyperparameters selected on the replay buffer, not the evaluation split. Mean normalized retention, worst-task in parentheses. $^\S  $: the evaluation-selected configuration differs from the replay-selected one shown (evaluation-selected values: ungated CLIP $0.536$; APR GLUE $0.595$; learned Localize-and-Stitch $0.371$ / $0.421$).}}{23}{table.9}\protected@file@percent }
+\newlabel{tab:matched}{{9}{23}{Matched labeled-data budget: every method uses the same $64$ labeled examples per task (from train), with hyperparameters selected on the replay buffer, not the evaluation split. Mean normalized retention, worst-task in parentheses. $^\S $: the evaluation-selected configuration differs from the replay-selected one shown (evaluation-selected values: ungated CLIP $0.536$; APR GLUE $0.595$; learned Localize-and-Stitch $0.371$ / $0.421$)}{table.9}{}}
+\@writefile{toc}{\contentsline {paragraph}{Matched labeled budget: the same $64$ examples, every method.}{23}{section*.46}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {G}Shared-Output T5 Track: Extended Results}{23}{appendix.G}\protected@file@percent }
+\newlabel{app:t5}{{G}{23}{Shared-Output T5 Track: Extended Results}{appendix.G}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces Shared-output T5 track: flan-T5-base text-to-text GLUE-8 (single seed, $n=64$, $S=5$, $\gamma =1$, $\lambda _i=0.3$). The whole sequence-to-sequence model including the LM head is merged; every task decodes through the same head, so no oracle task identity is assumed. Mean normalized retention (worst-task in parentheses); best configuration per family. STS-B retention is measured against a zero base (see text). Nearly every refinement family's optimum sits at the \emph  {top} of its learning-rate grid (the grids were inherited from the RoBERTa study and shifted down one notch, which turned out too conservative for T5), so the refinement values are lower bounds; see text.}}{24}{table.10}\protected@file@percent }
+\newlabel{tab:t5}{{10}{24}{Shared-output T5 track: flan-T5-base text-to-text GLUE-8 (single seed, $n=64$, $S=5$, $\gamma =1$, $\lambda _i=0.3$). The whole sequence-to-sequence model including the LM head is merged; every task decodes through the same head, so no oracle task identity is assumed. Mean normalized retention (worst-task in parentheses); best configuration per family. STS-B retention is measured against a zero base (see text). Nearly every refinement family's optimum sits at the \emph {top} of its learning-rate grid (the grids were inherited from the RoBERTa study and shifted down one notch, which turned out too conservative for T5), so the refinement values are lower bounds; see text}{table.10}{}}
+\@writefile{toc}{\contentsline {paragraph}{The multi-head findings carry over without the oracle assumption.}{24}{section*.47}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Caveats.}{24}{section*.48}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Small replay budgets: a draw-fragility boundary for unconstrained descent.}{24}{section*.49}\protected@file@percent }
+\citation{wang2024tall}
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces Replay-budget study on the shared-output track: $n\in \{16,8\}$ examples per task, $S\in \{5,20\}$ sweeps, constant learning rate, evaluation-selected grids re-centered until every selected cell is interior. Mean normalized retention over the seven classification tasks (STS-B excluded; by the convention check in the text this changes no ordering), mean $\pm $ std over three replay-buffer draws with the configuration pinned at the seed-0 selection. ``$k/3$ collapse'' marks pinned cells that diverge to the degenerate state ($\approx -6.2$ mean retention, the same attractor as the inverted-gate control of Table\nobreakspace  {}\ref  {tab:t5}) on $k$ of the three draws; surviving-draw values are shown. Bold: best arm that is stable across all three draws.}}{25}{table.11}\protected@file@percent }
+\newlabel{tab:t5budget}{{11}{25}{Replay-budget study on the shared-output track: $n\in \{16,8\}$ examples per task, $S\in \{5,20\}$ sweeps, constant learning rate, evaluation-selected grids re-centered until every selected cell is interior. Mean normalized retention over the seven classification tasks (STS-B excluded; by the convention check in the text this changes no ordering), mean $\pm $ std over three replay-buffer draws with the configuration pinned at the seed-0 selection. ``$k/3$ collapse'' marks pinned cells that diverge to the degenerate state ($\approx -6.2$ mean retention, the same attractor as the inverted-gate control of Table~\ref {tab:t5}) on $k$ of the three draws; surviving-draw values are shown. Bold: best arm that is stable across all three draws}{table.11}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {H}Twenty-Task CLIP: Extended Results}{25}{appendix.H}\protected@file@percent }
+\newlabel{app:clip20}{{H}{25}{Twenty-Task CLIP: Extended Results}{appendix.H}{}}
+\@writefile{toc}{\contentsline {paragraph}{Two protocol corrections forced by the scale.}{25}{section*.50}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {12}{\ignorespaces Twenty-task CLIP suite: initialization $\times $ method at matched budget ($n=64$, $S=5$, single seed). Mean top-1 accuracy over the twenty tasks (worst-task in parentheses); zero-shot floor $0.550$, expert ceiling $0.896$. Best per family by mean accuracy; each family's learning rate is tuned per initialization. The refinement improves every initialization, and APR $\approx $ the ungated anchored update everywhere ($\pm 0.01$), so at this scale the anchored, distance-scaled, clipped step---not the gate---is the load-bearing ingredient. The ungated update from RegMean peaked at the low edge of its grid, so that cell is a lower bound. RegMean row from the matched $n=64$ Gram budget.}}{26}{table.12}\protected@file@percent }
+\newlabel{tab:clip20matrix}{{12}{26}{Twenty-task CLIP suite: initialization $\times $ method at matched budget ($n=64$, $S=5$, single seed). Mean top-1 accuracy over the twenty tasks (worst-task in parentheses); zero-shot floor $0.550$, expert ceiling $0.896$. Best per family by mean accuracy; each family's learning rate is tuned per initialization. The refinement improves every initialization, and APR $\approx $ the ungated anchored update everywhere ($\pm 0.01$), so at this scale the anchored, distance-scaled, clipped step---not the gate---is the load-bearing ingredient. The ungated update from RegMean peaked at the low edge of its grid, so that cell is a lower bound. RegMean row from the matched $n=64$ Gram budget}{table.12}{}}
+\@writefile{toc}{\contentsline {paragraph}{An initialization-by-method matrix.}{26}{section*.51}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{A held-out attribution audit: why thresholding the gate cannot help.}{26}{section*.52}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {13}{\ignorespaces Twenty-task CLIP suite: best APR result over \emph  {any} refinement budget (learning rate, sweeps $S\in \{5,30\}$, and constant/cosine schedule tuned per initialization), mean top-1 accuracy with worst-task in parentheses; zero-shot floor $0.550$, expert ceiling $0.896$; single seed. Initializations ordered by their own accuracy. The refinement improves every starting point, and the gain shrinks monotonically as the initialization improves ($+0.13$ from the base model, $+0.04$ from RegMean) while worst-task accuracy at least doubles at every initialization. Refining directly from the base model ($\lambda =0$, top row) already exceeds the tuned task-arithmetic merge.}}{27}{table.13}\protected@file@percent }
+\newlabel{tab:clip20budget}{{13}{27}{Twenty-task CLIP suite: best APR result over \emph {any} refinement budget (learning rate, sweeps $S\in \{5,30\}$, and constant/cosine schedule tuned per initialization), mean top-1 accuracy with worst-task in parentheses; zero-shot floor $0.550$, expert ceiling $0.896$; single seed. Initializations ordered by their own accuracy. The refinement improves every starting point, and the gain shrinks monotonically as the initialization improves ($+0.13$ from the base model, $+0.04$ from RegMean) while worst-task accuracy at least doubles at every initialization. Refining directly from the base model ($\lambda =0$, top row) already exceeds the tuned task-arithmetic merge}{table.13}{}}
+\@writefile{toc}{\contentsline {paragraph}{The refinement is not converged at five sweeps at this scale.}{27}{section*.53}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Hyperparameter robustness.}{27}{section*.54}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Composition, again.}{27}{section*.55}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{When sixty-four examples do not overfit---and when eight do.}{28}{section*.56}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Geometry of the twenty-task regime.}{28}{section*.57}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {14}{\ignorespaces Parameter-space distance $\lVert \theta -\theta _0\rVert $ from the base encoder (norm $336$; every expert lies ${\approx }2.4$ from base), measured exactly for the task-vector-based merges and for refinement started from $\theta _0$. Refining from the base model reaches merge-level accuracy while staying several times closer to the pretrained weights than any merge. RegMean is omitted: its distance ($>450$) is dominated by inference-invisible directions and does not reflect functional drift (see ``Composition, again'').}}{29}{table.14}\protected@file@percent }
+\newlabel{tab:clip20dist}{{14}{29}{Parameter-space distance $\lVert \theta -\theta _0\rVert $ from the base encoder (norm $336$; every expert lies ${\approx }2.4$ from base), measured exactly for the task-vector-based merges and for refinement started from $\theta _0$. Refining from the base model reaches merge-level accuracy while staying several times closer to the pretrained weights than any merge. RegMean is omitted: its distance ($>450$) is dominated by inference-invisible directions and does not reflect functional drift (see ``Composition, again'')}{table.14}{}}
+\@writefile{toc}{\contentsline {paragraph}{Refining directly from the base model.}{29}{section*.58}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Held-out-task retention: the minimal-drift point, measured.}{29}{section*.59}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {15}{\ignorespaces Held-out-task retention on the twenty-task suite: merge/refine on $14$ specialized tasks, evaluate the $6$ strongest natural-image tasks zero-shot (base mean $0.802$); single seed, $n=64$, refinements at $S{=}30$ cosine. $^\ast $ marks the training-accuracy/retention Pareto frontier. Every merge is dominated by a refinement point; RegMean's parameter distance is functionally inert (see text).}}{30}{table.15}\protected@file@percent }
+\newlabel{tab:clip20heldout}{{15}{30}{Held-out-task retention on the twenty-task suite: merge/refine on $14$ specialized tasks, evaluate the $6$ strongest natural-image tasks zero-shot (base mean $0.802$); single seed, $n=64$, refinements at $S{=}30$ cosine. $^\ast $ marks the training-accuracy/retention Pareto frontier. Every merge is dominated by a refinement point; RegMean's parameter distance is functionally inert (see text)}{table.15}{}}
+\@writefile{toc}{\contentsline {paragraph}{Replay budget at twenty tasks.}{30}{section*.60}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Selecting hyperparameters without the evaluation set.}{30}{section*.61}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {16}{\ignorespaces Replay-budget study on the twenty-task suite: best configuration over learning rate and horizon $S\in \{5,30,60\}$ per cell, mean top-1 accuracy (worst-task in parentheses); single seed, identical buffer draws across cells at each $n$. ``Init.\ alone'' is budget-independent. Ordinary GD is reported from the base model (the from-base ablation's comparison); at small budgets its gap to APR is unchanged from $n=64$. Worst-task accuracy degrades ${\approx }3\times $ faster than the mean as the buffer shrinks.}}{31}{table.16}\protected@file@percent }
+\newlabel{tab:clip20nbudget}{{16}{31}{Replay-budget study on the twenty-task suite: best configuration over learning rate and horizon $S\in \{5,30,60\}$ per cell, mean top-1 accuracy (worst-task in parentheses); single seed, identical buffer draws across cells at each $n$. ``Init.\ alone'' is budget-independent. Ordinary GD is reported from the base model (the from-base ablation's comparison); at small budgets its gap to APR is unchanged from $n=64$. Worst-task accuracy degrades ${\approx }3\times $ faster than the mean as the buffer shrinks}{table.16}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {17}{\ignorespaces Multi-seed replication on the twenty-task suite: five replay-buffer seeds, configurations pinned at the seed-$0$ selections (mean $\pm $ std of mean / worst-task top-1 accuracy). Initializations are seed-invariant except RegMean, whose Gram inputs redraw with the buffer. The ungated anchored update is shown where the gate comparison is the point; the base-model rows retain the plain-descent reference. GD's $n{=}64$ from-base row is dominated by one diverged seed (see text).}}{31}{table.17}\protected@file@percent }
+\newlabel{tab:clip20seeds}{{17}{31}{Multi-seed replication on the twenty-task suite: five replay-buffer seeds, configurations pinned at the seed-$0$ selections (mean $\pm $ std of mean / worst-task top-1 accuracy). Initializations are seed-invariant except RegMean, whose Gram inputs redraw with the buffer. The ungated anchored update is shown where the gate comparison is the point; the base-model rows retain the plain-descent reference. GD's $n{=}64$ from-base row is dominated by one diverged seed (see text)}{table.17}{}}
+\@writefile{toc}{\contentsline {paragraph}{Multi-seed replication of the headline cells.}{31}{section*.62}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Summary of the twenty-task study.}{31}{section*.63}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{What is still missing.}{32}{section*.64}\protected@file@percent }
+\gdef \@abspage@last{32}
