@@ -103,7 +103,7 @@ def test_inverted_gate_blocks_progress():
     print("ok: inverted gate blocks all updates here")
 
 
-def test_vdist_pre_is_safe_at_huge_lr():
+def test_vdist_is_safe_at_huge_lr():
     """Saturating trust region (clip after lr): for gamma<=1 the move never
     overshoots the expert, so even an enormous lr stays bounded (no divergence)."""
     torch.manual_seed(3)
@@ -113,30 +113,15 @@ def test_vdist_pre_is_safe_at_huge_lr():
     start = torch.randn(d)
     base = OrderedDict({"enc.w": start.clone()})
     cfg = RefineConfig(steps=5, lr=1e6, clip_frac=1.0, gate_mode="coordinate",
-                       clip_mode="vdist_pre")
+                       clip_mode="vdist")
     refined, hist = refine(base, [h], cfg, device="cpu", move_model=False)
     w = refined["enc.w"]
-    assert torch.isfinite(w).all(), "vdist_pre diverged at huge lr"
+    assert torch.isfinite(w).all(), "vdist diverged at huge lr"
     # bounded by the expert: never lands farther from expert than it started
     assert (w - expert).norm() <= (start - expert).norm() + 1e-4
     # and with gamma=1 + huge lr it essentially reaches the expert
     assert (w - expert).norm() < 1e-3 * (start - expert).norm()
-    print(f"ok: vdist_pre safe at lr=1e6, dist {(start-expert).norm():.2f} -> {(w-expert).norm():.2e}")
-
-
-def test_vdist_pre_contrast_paper_clip_diverges():
-    """The paper clip (clip then *lr) DOES diverge at huge lr -> motivates vdist_pre."""
-    torch.manual_seed(3)
-    d = 16
-    expert = torch.randn(d) * 5
-    h, _ = make_handle("t", d, expert_vec=expert, target_vec=expert)
-    start = torch.randn(d)
-    base = OrderedDict({"enc.w": start.clone()})
-    cfg = RefineConfig(steps=5, lr=1e6, clip_frac=1.0, gate_mode="coordinate",
-                       clip_mode="vdist")
-    refined, _ = refine(base, [h], cfg, device="cpu", move_model=False)
-    assert (refined["enc.w"] - expert).norm() > (start - expert).norm()
-    print("ok: paper clip (vdist) overshoots/diverges at huge lr (as expected)")
+    print(f"ok: vdist safe at lr=1e6, dist {(start-expert).norm():.2f} -> {(w-expert).norm():.2e}")
 
 
 def test_aggregated_vs_sequential_differ():
@@ -197,8 +182,7 @@ if __name__ == "__main__":
     test_clip_respects_trust_region()
     test_refine_descends_when_expert_is_optimum()
     test_inverted_gate_blocks_progress()
-    test_vdist_pre_is_safe_at_huge_lr()
-    test_vdist_pre_contrast_paper_clip_diverges()
+    test_vdist_is_safe_at_huge_lr()
     test_aggregated_vs_sequential_differ()
     test_constant_trajectory_checkpoints_match_independent_runs()
     print("\nAll synthetic refinement tests passed.")

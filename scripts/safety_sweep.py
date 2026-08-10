@@ -51,10 +51,10 @@ def main():
     for lr in [1, 2, 4, 8, 16, 64, 256, 1024]:
         methods[f"apr_sat@{lr:g}"] = RefineConfig(
             steps=S, lr=lr, clip_frac=g, gate_mode="coordinate",
-            update_mode="gated_grad", clip_mode="vdist_pre")
+            update_mode="gated_grad", clip_mode="vdist")
         methods[f"nogate_sat@{lr:g}"] = RefineConfig(
             steps=S, lr=lr, clip_frac=g, gate_mode="none",
-            update_mode="gated_grad", clip_mode="vdist_pre")
+            update_mode="gated_grad", clip_mode="vdist")
 
     report = {"config": cfg.to_dict(), "gamma": g, "steps": S,
               "tasks": cfg.task_names, "methods": {}}

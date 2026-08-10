@@ -28,11 +28,11 @@ from apr.metrics import aggregate_retention
 from apr.models import pd_sub, pd_global_norm
 
 
-def build_methods(steps, gd_lrs, apr_lrs, nogate_lrs, gammas, clip_mode="vdist_pre",
+def build_methods(steps, gd_lrs, apr_lrs, nogate_lrs, gammas, clip_mode="vdist",
                   skip_inverted=False):
     """APR and no-gate get their OWN lr grids (their optima differ a lot: APR likes
     high lr, no-gate diverges at high lr). inverted_gate is a fixed sanity control
-    (skip with skip_inverted). clip_mode default vdist_pre = clip AFTER lr."""
+    (skip with skip_inverted). clip_mode default vdist = clip AFTER lr."""
     methods = {}
     for g in gammas:
         for lr in apr_lrs:
@@ -62,7 +62,7 @@ def main():
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[16, 32, 64, 128, 256])
     ap.add_argument("--nogate_lrs", type=float, nargs="*", default=[2, 4, 8, 16, 32])
     ap.add_argument("--gammas", type=float, nargs="*", default=[1.0])
-    ap.add_argument("--clip_mode", default="vdist_pre")
+    ap.add_argument("--clip_mode", default="vdist")
     ap.add_argument("--skip_inverted", action="store_true",
                     help="omit the inverted-gate sanity control")
     ap.add_argument("--n_probe", type=int, default=None, help="override replay buffer size")

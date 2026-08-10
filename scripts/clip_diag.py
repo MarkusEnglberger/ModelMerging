@@ -67,7 +67,7 @@ def main():
                                              clip_mode="vdist"),
         "apr_sat@lr16":         RefineConfig(steps=args.steps, lr=16, clip_frac=0.5,
                                              gate_mode="coordinate", update_mode="gated_grad",
-                                             clip_mode="vdist_pre"),
+                                             clip_mode="vdist"),
         "nogate@lr4 (paperclip)": RefineConfig(steps=args.steps, lr=4, clip_frac=0.5,
                                                gate_mode="none", update_mode="gated_grad",
                                                clip_mode="vdist"),

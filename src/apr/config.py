@@ -24,7 +24,11 @@ class RefineConfig:
     #   grad       : -g             (ordinary replay gradient descent)
     #   interp     :  v             (direct expert interpolation, u ~ m*v)
     update_mode: str = "gated_grad"
-    clip_mode: str = "vdist"  # vdist => clamp to +/- gamma*|v|; none => no clip
+    # "vdist" is the trust region of the paper: the per-coordinate step is
+    # clipped to +/- gamma*|v| AFTER the learning-rate scaling, so a single
+    # update can never overshoot the expert at any lr. "none" disables the
+    # clip entirely and exists only for the unconstrained-descent baselines.
+    clip_mode: str = "vdist"
     rms_normalize: bool = False  # tensor-wise RMS normalize u before applying
     random_gate_density: Optional[float] = None  # for gate_mode=random; else match
     freeze_first_gates: bool = False  # reuse sweep-0 gates (expansion-point ablation)

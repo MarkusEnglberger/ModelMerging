@@ -46,7 +46,7 @@ refine:
   order: fixed
   gate_mode: coordinate
   update_mode: gated_grad
-  clip_mode: vdist_pre
+  clip_mode: vdist
   aggregated: false
 
 data:

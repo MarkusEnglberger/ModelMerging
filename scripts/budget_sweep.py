@@ -32,15 +32,15 @@ def family_configs(steps, gamma):
         fams["ordinary_gd"].append((lr, RefineConfig(
             steps=steps, lr=lr, gate_mode="none", update_mode="grad", clip_mode="none")))
     for lr in [1, 2, 4, 8, 16, 32, 64]:
-        # clip AFTER lr (vdist_pre): step bounded by gamma*|v|; clip fires when
+        # clip AFTER lr (vdist): step bounded by gamma*|v|; clip fires when
         # lr*|g| > gamma, i.e. when the step would overshoot the gamma-trust region.
-        # Grid brackets the vdist_pre optimum (~lr16 from highlr_diag) on both sides.
+        # Grid brackets the vdist optimum (~lr16 from highlr_diag) on both sides.
         fams["apr"].append((lr, RefineConfig(
             steps=steps, lr=lr, clip_frac=gamma, gate_mode="coordinate",
-            update_mode="gated_grad", clip_mode="vdist_pre")))
+            update_mode="gated_grad", clip_mode="vdist")))
         fams["nogate"].append((lr, RefineConfig(
             steps=steps, lr=lr, clip_frac=gamma, gate_mode="none",
-            update_mode="gated_grad", clip_mode="vdist_pre")))
+            update_mode="gated_grad", clip_mode="vdist")))
     return fams
 
 

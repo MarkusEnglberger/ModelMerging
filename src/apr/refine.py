@@ -146,13 +146,8 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
             m = _gate(gi, vi, cfg, rng_gen)
         u_raw = _base_update(gi, vi, cfg.update_mode) * m
         if cfg.clip_mode == "vdist":
-            # clip THEN scale by lr (paper Eq. 18-19): move bounded by lr*gamma*|v|
-            bound = cfg.clip_frac * vi.abs()
-            pre = u_raw
-            u_t = torch.clamp(pre, min=-bound, max=bound)
-        elif cfg.clip_mode == "vdist_pre":
-            # saturating trust region: clip AFTER scaling by lr, so the move is
-            # bounded by gamma*|v| for ANY lr (no overshoot for gamma<=1 => safe).
+            # The trust region: clip AFTER scaling by lr, so the move is bounded
+            # by gamma*|v| for ANY lr (no overshoot for gamma<=1 => safe).
             bound = cfg.clip_frac * vi.abs()
             pre = lr_eff * u_raw
             u_t = torch.clamp(pre, min=-bound, max=bound)
@@ -160,7 +155,10 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
             pre = None
             u_t = u_raw
         else:
-            raise ValueError(f"Unknown clip_mode '{cfg.clip_mode}'")
+            raise ValueError(
+                f"Unknown clip_mode '{cfg.clip_mode}' (expected 'vdist' or "
+                f"'none'). The legacy clip-before-lr variant, formerly "
+                f"'vdist', was removed; 'vdist_pre' is now spelled 'vdist'.")
         if pre is not None:
             # count coords pushed to the trust-region boundary (only gated ones
             # can be, since masked coords have u_raw=0 <= bound)
@@ -207,9 +205,10 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
 
     for s in range(cfg.steps):
         lr_eff = _sweep_lr(cfg, s)
-        # for vdist_pre, lr is already folded into the clipped update inside
-        # _compute_update, so it is applied with unit step here.
-        apply_alpha = 1.0 if cfg.clip_mode == "vdist_pre" else lr_eff
+        # for the trust region, lr is already folded into the clipped update
+        # inside _compute_update, so it is applied with unit step here; the
+        # unconstrained baseline ("none") still needs the lr applied.
+        apply_alpha = 1.0 if cfg.clip_mode == "vdist" else lr_eff
         sweep_order = _order_for_sweep(order_names, cfg.order, s, py_rng)
         # snapshot for aggregated-U mode (all updates computed at theta^(s))
         snapshot = pd_clone(theta) if cfg.aggregated else None

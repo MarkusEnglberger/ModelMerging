@@ -49,7 +49,6 @@ from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ta_merge,
 from apr.taskvec import task_arithmetic_merge
 from apr.adamerging import adamerging
 from apr.replay_baselines import make_replay_objective
-from apr.data import sample_replay_buffer
 from apr.models import pd_sub, pd_global_norm
 
 
@@ -73,19 +72,11 @@ def eval_merge(ctx, state):
 # behaviour, "mean_acc" is the right choice when some task has a degenerate
 # expert-minus-base gap (see metrics.DEGENERATE_GAP).
 SELECT_BY = "mean_normret"
-# Set when --n_select is given: maps a candidate state to its loss on a
-# DISJOINT selection buffer (lower is better). When set, every family and
-# refinement cell is chosen by this instead of the evaluation split, so no
-# test information enters hyperparameter selection.
-SELECT_OBJ = None
 
 
-def record(report, name, scores, nr, ag, disp, state=None, **extra):
-    entry = {"scores": scores, "normret": nr, "aggregate": ag,
-             "displacement": disp, **extra}
-    if SELECT_OBJ is not None and state is not None and "selection_obj" not in entry:
-        entry["selection_obj"] = SELECT_OBJ(state)
-    report["methods"][name] = entry
+def record(report, name, scores, nr, ag, disp, **extra):
+    report["methods"][name] = {"scores": scores, "normret": nr, "aggregate": ag,
+                               "displacement": disp, **extra}
     nd = (f" nr*={ag['mean_normret_nondeg']:.3f}"
           if "mean_normret_nondeg" in ag else "")
     _log(f"  -> {name}: acc={ag['mean_acc']:.4f}/{ag['worst_acc']:.4f} "
@@ -101,11 +92,8 @@ class Best:
         self.label, self.mean, self.name, self.state = label, None, None, None
 
     def offer(self, mean, name, state):
-        # Under the n+n split, rank by held-out replay loss (negated: higher is
-        # better) rather than by the evaluation aggregate that `mean` carries.
-        score = mean if SELECT_OBJ is None else -SELECT_OBJ(state)
-        if self.mean is None or score > self.mean:
-            self.mean, self.name, self.state = score, name, state
+        if self.mean is None or mean > self.mean:
+            self.mean, self.name, self.state = mean, name, state
 
     def __bool__(self):
         return self.state is not None
@@ -196,15 +184,6 @@ def main():
     ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
     ap.add_argument("--skip_families", nargs="*", default=[],
                     choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
-    ap.add_argument("--n_select", type=int, default=None,
-                    help="n+n protocol: draw this many EXTRA labeled examples "
-                         "per task, disjoint from the replay buffer, and select "
-                         "every hyperparameter on them instead of on the "
-                         "evaluation split. Total labeled cost per task is "
-                         "n_probe + n_select.")
-    ap.add_argument("--selection_seed", type=int, default=None,
-                    help="sampling seed for the selection buffer; must differ "
-                         "from the probe seed (default: probe_seed + 1)")
     ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
                     default="mean_normret",
                     help="aggregate used to pick best-per-family / best APR lr. "
@@ -242,42 +221,9 @@ def main():
         for n in names:
             ctx.per_task[n]["expert_encoder"] = None
 
-    # ---- n+n split: a disjoint, equally sized selection buffer per task ----
-    global SELECT_OBJ
-    selection_protocol = None
-    if args.n_select is not None:
-        sel_seed = (args.selection_seed if args.selection_seed is not None
-                    else cfg.data.probe_seed + 1)
-        if sel_seed == cfg.data.probe_seed:
-            raise SystemExit(f"selection seed {sel_seed} equals the probe seed; "
-                             "the two buffers must be drawn independently")
-        for name in names:
-            info = ctx.per_task[name]
-            buf, idx = sample_replay_buffer(
-                info["train_ds"], info["spec"], args.n_select, sel_seed,
-                cfg.data.class_balanced, exclude_indices=info["probe_indices"],
-                return_indices=True)
-            if set(idx) & set(info["probe_indices"]):
-                raise RuntimeError(f"train/selection overlap for {name}")
-            info["selection_buffer"] = buf
-        SELECT_OBJ, sel_ref = make_replay_objective(
-            ctx, buffer_key="selection_buffer")
-        selection_protocol = {
-            "rule": "held-out replay loss on a disjoint selection buffer",
-            "n_probe_per_task": cfg.data.n_probe,
-            "n_select_per_task": args.n_select,
-            "total_labels_per_task": cfg.data.n_probe + args.n_select,
-            "probe_seed": cfg.data.probe_seed, "selection_seed": sel_seed,
-            "train_selection_overlap": 0, "selection_ref_losses": sel_ref}
-        _log(f"[select] n+n split: {cfg.data.n_probe} train + "
-             f"{args.n_select} select per task (seeds "
-             f"{cfg.data.probe_seed}/{sel_seed}); evaluation split unused "
-             f"for selection")
-
     report = {"config": cfg.to_dict(), "tasks": names, "steps": steps,
               "base": ctx.base_scores, "expert": ctx.expert_scores,
-              "grids": vars(args), "selection_protocol": selection_protocol,
-              "methods": {}}
+              "grids": vars(args), "methods": {}}
     global SELECT_BY
     SELECT_BY = args.select_by
     _log(f"[select] best-per-family by {SELECT_BY}")
@@ -454,12 +400,9 @@ def main():
                      else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
             m = record(report, nm, s, nr, ag,
                        pd_global_norm(pd_sub(refined, fam.state)),
-                       state=refined,
                        init=init_label, lr=lr, schedule=sched, gate_mode=gmode,
                        topk_frac=frac,
                        gate_density=gd, replay_obj=objective(refined))
-            if SELECT_OBJ is not None:
-                m = -report["methods"][nm]["selection_obj"]
             if best_mean is None or m > best_mean:
                 best_mean = m
                 report[f"best_apr_from_{key}"] = nm
@@ -472,7 +415,7 @@ def main():
             refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
             record(report, f"nogate:from={key}@lr{lr:g}", s, nr, ag,
-                   pd_global_norm(pd_sub(refined, fam.state)), state=refined, init=init_label, lr=lr,
+                   pd_global_norm(pd_sub(refined, fam.state)), init=init_label, lr=lr,
                    replay_obj=objective(refined))
         for sched in args.gd_schedules:
             for S in (args.gd_steps or [steps]):
@@ -488,7 +431,7 @@ def main():
                     refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
                     s, nr, ag = eval_merge(ctx, refined)
                     record(report, tag, s, nr, ag,
-                           pd_global_norm(pd_sub(refined, fam.state)), state=refined,
+                           pd_global_norm(pd_sub(refined, fam.state)),
                            init=init_label, lr=lr, gd_steps=S, schedule=sched,
                            replay_obj=objective(refined))
 
@@ -503,7 +446,7 @@ def main():
             refined, _hist = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
             record(report, f"gd:from={key}@lr{lr:g}", s, nr, ag,
-                   pd_global_norm(pd_sub(refined, fam.state)), state=refined,
+                   pd_global_norm(pd_sub(refined, fam.state)),
                    init=init_label, lr=lr, replay_obj=objective(refined))
         # a peak at the grid edge means the optimum was not bracketed
         if best_mean is not None and args.apr_lrs:

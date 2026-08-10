@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Push APR-saturating to very high lr and check the lr->infinity limit.
 
-Theory: with clip-after-lr (vdist_pre), as lr->inf every gated coordinate
+Theory: with clip-after-lr (vdist), as lr->inf every gated coordinate
 saturates to clip(lr*(-g|v|), +/-gamma|v|) -> gamma*v (on gated coords
 sign(-g)=sign(v)). So APR-saturating should CONVERGE to a fixed, lr-independent
 result: "move each gated coordinate a fraction gamma toward its expert" (gated
@@ -38,13 +38,13 @@ def main():
     for lr in [16, 64, 256, 1024, 4096, 65536, 1_000_000]:
         methods[f"apr_sat@{lr:g}"] = RefineConfig(
             steps=S, lr=lr, clip_frac=g, gate_mode="coordinate",
-            update_mode="gated_grad", clip_mode="vdist_pre")
+            update_mode="gated_grad", clip_mode="vdist")
     # predicted lr->inf limit: gated interpolation by fraction gamma toward expert.
     # update_mode=interp gives u_raw = v (on gated coords); clip to +/-gamma|v|
-    # yields exactly gamma*v, applied with unit step (vdist_pre, lr=1).
+    # yields exactly gamma*v, applied with unit step (vdist, lr=1).
     methods["interp_limit (gamma*v)"] = RefineConfig(
         steps=S, lr=1.0, clip_frac=g, gate_mode="coordinate",
-        update_mode="interp", clip_mode="vdist_pre")
+        update_mode="interp", clip_mode="vdist")
 
     report = {"config": cfg.to_dict(), "gamma": g, "steps": S, "methods": {}}
     mref = ctx.normret(ctx.merge_scores)
