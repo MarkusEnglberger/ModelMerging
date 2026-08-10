@@ -211,7 +211,7 @@ Every benchmark receives the same experiment set---the three-family comparison f
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{The canonical experiment set, instantiated identically on every benchmark: mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1 accuracy, zero-shot floor $0.550$). $\pm$ marks cells replicated over five replay-buffer seeds; unmarked cells are single-seed. ``APR $\leftarrow$ best merge'' composes with the strongest initialization available per benchmark (DARE-TIES, AdaMerging, DARE-TIES, and RegMean at $S{=}30$, respectively). Dashes are experiments not yet run; the design will be populated for every benchmark.}
+\caption{The canonical experiment set, instantiated identically on every benchmark: mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1 accuracy, zero-shot floor $0.550$). $\pm$ marks cells replicated over five replay-buffer seeds; unmarked cells are single-seed. ``APR $\leftarrow$ $X$'' rows compose the refinement with checkpoint-only and label-free merges; the initializations' own scores appear in Tables~\ref{tab:mergebaselines} and~\ref{tab:clip20matrix} (Appendix). Dashes are experiments not yet run; the design will be populated for every benchmark.}
 \label{tab:main}
 \begin{tabular}{lcccc}
 \toprule
@@ -227,7 +227,11 @@ APR (gated)                  & $0.542{\pm}.062\ ({-}.17)$ & $0.605{\pm}.008\ ({+
 Random-gate control          & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ ({-}.56)$ & --- & --- \\
 Inverted-gate control        & --- & $-1.682$ & $-6.185$ & $0.100$ \\
 \midrule
-APR $\leftarrow$ best merge  & $0.620{\pm}.021\ ({+}.18)$ & $0.699{\pm}.044\ ({+}.31)$ & $0.687\ ({+}.11)$ & $0.764{\pm}.002\ (.50)$ \\
+APR $\leftarrow$ Breadcrumbs & $0.523\ (.10)$ & $0.606\ (.21)$ & $0.468\ ({+}.06)$ & $0.678\ (.18)$ \\
+APR $\leftarrow$ DARE-TIES   & $0.620{\pm}.021\ ({+}.18)$ & $0.626\ (.19)$ & $0.687\ ({+}.11)$ & $0.695\ (.25)$ \\
+APR $\leftarrow$ TIES        & $0.571\ (.17)$ & $0.635{\pm}.061\ ({+}.15)$ & $0.619\ ({+}.17)$ & $0.697\ (.26)$ \\
+APR $\leftarrow$ AdaMerging  & $0.583\ (.05)$ & $0.699{\pm}.044\ ({+}.31)$ & --- & $0.707\ (.19)$ \\
+APR $\leftarrow$ RegMean     & $0.103\ ({-}.06)$ & $0.762\ (.44)$ & --- & $0.749\ (.49)$ \\
 APR $\leftarrow$ pretrained  & --- & --- & --- & $0.686{\pm}.004\ (.34)$ \\
 \bottomrule
 \end{tabular}
@@ -278,27 +282,6 @@ We next scale the vision track to the twenty-task suite of \citet{wang2024tall},
 \begin{table}[t]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\caption{Twenty-task CLIP suite: initialization $\times$ method at matched budget ($n=64$, $S=5$, single seed); mean top-1 accuracy (worst-task in parentheses), floor $0.550$, ceiling $0.896$. Learning rates tuned per cell; the ungated-from-RegMean cell peaked at its grid edge and is a lower bound.}
-\label{tab:clip20matrix}
-\footnotesize
-\begin{tabular}{lccc}
-\toprule
-Initialization & Merge alone & $+$\,ungated & $+$\,APR \\
-\midrule
-Task arithmetic ($\lambda=0.08$) & $0.604\ (0.115)$ & $0.670\ (0.203)$ & $\mathbf{0.680}\ (0.221)$ \\
-TIES                             & $0.626\ (0.150)$ & $\mathbf{0.701}\ (0.277)$ & $0.697\ (0.262)$ \\
-DARE-TIES                        & $0.617\ (0.149)$ & $\mathbf{0.697}\ (0.277)$ & $0.695\ (0.254)$ \\
-Breadcrumbs                      & $0.611\ (0.111)$ & $0.669\ (0.168)$ & $\mathbf{0.678}\ (0.177)$ \\
-AdaMerging-layer                 & $0.665\ (0.101)$ & $0.701\ (0.140)$ & $\mathbf{0.707}\ (0.188)$ \\
-RegMean                          & $0.723\ (0.234)$ & $0.756\ (0.520)$ & $0.749\ (0.486)$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering
-\small
 \setlength{\tabcolsep}{5pt}
 \caption{Multi-seed replication on the twenty-task suite: five replay-buffer seeds, configurations pinned at the seed-$0$ selections (mean $\pm$ std of mean / worst-task accuracy). Initializations are seed-invariant except RegMean (Gram inputs redraw). GD's $n{=}64$ from-base row is dominated by one diverged seed (see text).}
 \label{tab:clip20seeds}
@@ -326,7 +309,7 @@ Base, $n{=}8$        & APR      & $0.626\pm0.005$ & $0.170\pm0.017$ \\
 
 
 \paragraph{The anchored step, not the gate, is load-bearing.}
-Across an initialization$\times$method matrix (six initializations; Table~\ref{tab:clip20matrix}), APR and the ungated anchored update agree within $\pm0.01$ everywhere (five-seed paired differences $-0.002\pm0.006$ from TIES, $+0.001\pm0.005$ from AdaMerging), while the inverted gate collapses to $0.100$: the attribution \emph{sign} carries signal, but thresholding at zero adds nothing over no gate. Refinement improves every initialization and preserves their ordering. A held-out audit explains why: first-order attributions transfer to a disjoint buffer only weakly and uniformly across magnitude buckets---the gradient's transferable contribution is step magnitude, not coordinate choice (Appendix~\ref{app:clip20}).
+Across an initialization$\times$method matrix (six initializations; APR column in Table~\ref{tab:main}, full matrix including the ungated column in Table~\ref{tab:clip20matrix}, Appendix~\ref{app:clip20}), APR and the ungated anchored update agree within $\pm0.01$ everywhere (five-seed paired differences $-0.002\pm0.006$ from TIES, $+0.001\pm0.005$ from AdaMerging), while the inverted gate collapses to $0.100$: the attribution \emph{sign} carries signal, but thresholding at zero adds nothing over no gate. Refinement improves every initialization and preserves their ordering. A held-out audit explains why: first-order attributions transfer to a disjoint buffer only weakly and uniformly across magnitude buckets---the gradient's transferable contribution is step magnitude, not coordinate choice (Appendix~\ref{app:clip20}).
 
 \paragraph{Longer horizons, and safety.}
 Unlike at eight tasks, $S=30$ (cosine, re-randomized order) still pays---${\approx}{+}0.01$ mean, worst-task $0.262\to0.386$ from TIES---with returns exhausted by thirty sweeps (Table~\ref{tab:clip20budget}, Appendix~\ref{app:clip20}). Safety is the clearest practical advantage: of the $23$ APR cells run on this suite, none fell below its initialization or the zero-shot floor (worst cell $0.614$, at double the optimal rate), and the optimum $\eta\approx4$--$8$ transfers across all checkpoint-space initializations. The unconstrained-descent probe, by contrast, can diverge under nothing more than a replay-buffer redraw (three of twenty pinned runs, e.g.\ $0.694\to0.132$), while the anchored update had zero failures with seed spreads of $0.002$--$0.006$. Relatedly, GD overfits small buffers at long horizons ($9$ of $36$ small-$n$ cells deteriorate while replay loss still improves), whereas the anchored update never shows the signature (largest decline $0.003$ across ${\approx}48$ cells): once every coordinate is capped, additional sweeps have nowhere damaging to go (Appendix~\ref{app:clip20}).
@@ -1170,6 +1153,28 @@ Three findings. First, the gated update is the best stable arm in all four cells
 
 \section{Twenty-Task CLIP: Extended Results}
 \label{app:clip20}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Twenty-task CLIP suite: initialization $\times$ method at matched budget ($n=64$, $S=5$, single seed); mean top-1 accuracy (worst-task in parentheses), floor $0.550$, ceiling $0.896$. Learning rates tuned per cell; the ungated-from-RegMean cell peaked at its grid edge and is a lower bound.}
+\label{tab:clip20matrix}
+\footnotesize
+\begin{tabular}{lccc}
+\toprule
+Initialization & Merge alone & $+$\,ungated & $+$\,APR \\
+\midrule
+Task arithmetic ($\lambda=0.08$) & $0.604\ (0.115)$ & $0.670\ (0.203)$ & $\mathbf{0.680}\ (0.221)$ \\
+TIES                             & $0.626\ (0.150)$ & $\mathbf{0.701}\ (0.277)$ & $0.697\ (0.262)$ \\
+DARE-TIES                        & $0.617\ (0.149)$ & $\mathbf{0.697}\ (0.277)$ & $0.695\ (0.254)$ \\
+Breadcrumbs                      & $0.611\ (0.111)$ & $0.669\ (0.168)$ & $\mathbf{0.678}\ (0.177)$ \\
+AdaMerging-layer                 & $0.665\ (0.101)$ & $0.701\ (0.140)$ & $\mathbf{0.707}\ (0.188)$ \\
+RegMean                          & $0.723\ (0.234)$ & $0.756\ (0.520)$ & $0.749\ (0.486)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 This appendix reproduces the full twenty-task campaign behind Section~\ref{sec:clip20}.
 
 We next scale the vision track to the twenty-task suite of \citet{wang2024tall}, using the published fine-tuned ViT-B/32 encoders for all twenty tasks (every expert was validated to beat its zero-shot floor by a wide margin, including the three tasks whose class-name orderings we had to reconstruct: PCAM $0.556\!\to\!0.887$, FER2013 $0.376\!\to\!0.711$, RenderedSST2 $0.586\!\to\!0.713$). Unless noted, all results in this subsection are single-seed with $n=64$ replay examples per task and hyperparameters selected on the evaluation split, symmetrically for every method; a stricter disjoint-holdout selection protocol, piloted at the end of this section, changes the numbers negligibly, and the headline cells are replicated over five replay-buffer seeds (Table~\ref{tab:clip20seeds}).
