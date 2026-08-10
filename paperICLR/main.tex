@@ -49,7 +49,7 @@ Paper under double-blind review}
 
 \begin{abstract}
 We study the task of merging fine-tuned variants of a shared pretrained model when a small labeled replay buffer for each task is available.
-After an initial task-arithmetic merge, we refine the merged model with task gradients while using the known task experts as coordinate-wise trust anchors.
+Starting from any initial model---a merge produced by any existing method, or the pretrained model itself---we refine it with task gradients while using the known task experts as coordinate-wise trust anchors.
 The resulting update admits two equivalent motivations that we develop in parallel. As a parameter-space analogue of attribution patching, the effect of moving the current model toward a task expert is approximated by a first-order loss attribution, and only coordinates for which the expert direction is locally loss-decreasing are used. As an expert-anchored trust-region replay refinement, the departure from ordinary replay gradient descent is that each coordinate's step is weighted by its distance to the expert, gated to keep only steps that move toward the expert, and clipped so it cannot overshoot---the same coordinates that the attribution view selects. Both perspectives lead to a single refinement algorithm.
 \end{abstract}
 \section{Introduction}
