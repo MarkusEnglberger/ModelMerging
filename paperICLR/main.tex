@@ -205,13 +205,13 @@ Unless noted, refinement runs $S$ sweeps from the task-arithmetic merge with the
 
 \section{Results}
 \label{sec:results}
-Every benchmark receives the same experiment grid---each merge initialization (and the pretrained model) alone and under each refinement treatment, plus the gate controls---collected in one format in Table~\ref{tab:main}; dashes mark experiments not yet run, and the grid will be populated for every benchmark. The subsections take one benchmark each and add its benchmark-specific studies (replay budget, refinement horizon, held-out retention). Cross-benchmark analyses are consolidated in Appendix~\ref{app:mergebaselines}.
+Every benchmark receives the same experiment grid---each initialization alone and refined, the unconstrained baselines from the pretrained model and from task arithmetic, and the gate controls---collected in one format in Table~\ref{tab:main}; dashes mark experiments not yet run, and the grid will be populated for every benchmark. The subsections take one benchmark each and add its benchmark-specific studies (replay budget, refinement horizon, held-out retention). Cross-benchmark analyses are consolidated in Appendix~\ref{app:mergebaselines}.
 
 \begin{table}[t]
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{The canonical experiment grid, instantiated identically on every benchmark: each initialization \emph{alone} and under the three refinement treatments, plus the gate controls. Cells are mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1 accuracy). The pretrained row \emph{alone} is the retention zero point (CLIP-20: the $0.550$ zero-shot floor); no initialization is privileged---task arithmetic is simply the one whose treatment set is complete so far. $\pm$ marks five-seed cells; unmarked cells are single-seed. Dashes are experiments not yet run; the grid will be populated for every benchmark.}
+\caption{The canonical experiment grid, instantiated identically on every benchmark. All cells use $n=64$ labeled replay examples per task and $S=5$ refinement sweeps, except $^{\dagger}$ ($S=30$; the from-pretrained cells are replicated only at the longer horizon). Entries are the mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1 accuracy). The pretrained \emph{alone} row is the retention zero point (CLIP-20: the $0.550$ zero-shot floor). No initialization is privileged; the two unconstrained baselines ($+$GD, $+$ungated) are run from the pretrained model and from task arithmetic, which suffices to separate the anchor and the gate from the initialization, while $+$APR is run from every initialization to test composition. The ungated update from the remaining five initializations is reported for CLIP-20 in Table~\ref{tab:clip20matrix}. $\pm$ marks five-seed cells; the rest are single-seed. Dashes are experiments not yet run.}
 \label{tab:main}
 \setlength{\arraystretch}{0.95}
 \begin{tabular}{llcccc}
@@ -220,9 +220,9 @@ Initialization & Treatment & GLUE-8 & CLIP-8 & GLUE-8 t2t & CLIP-20 \\
  & & \multicolumn{3}{c}{normalized retention} & top-1 acc. \\
 \midrule
 Pretrained      & alone      & $0$ & $0$ & $0$ & $0.550$ \\
-                & $+$GD      & --- & --- & --- & $0.523{\pm}.187\ (.14)$ \\
+                & $+$GD      & --- & --- & --- & $0.523^{\dagger}{\pm}.187\ (.14)$ \\
                 & $+$ungated & --- & --- & --- & --- \\
-                & $+$APR     & --- & --- & --- & $0.686{\pm}.004\ (.34)$ \\
+                & $+$APR     & --- & --- & --- & $\mathbf{0.686^{\dagger}{\pm}.004}\ (.34)$ \\
 \midrule
 Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.383\ ({-}.25)$ & $0.604\ (.12)$ \\
                 & $+$GD      & $0.483{\pm}.017\ ({-}.05)$ & $0.460{\pm}.002\ ({-}.20)$ & $0.414\ (.00)$ & --- \\
@@ -230,29 +230,19 @@ Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.383\ (
                 & $+$APR     & $0.542{\pm}.062\ ({-}.17)$ & $0.605{\pm}.008\ ({+}.15)$ & $0.537\ ({+}.02)$ & $0.680\ (.22)$ \\
 \midrule
 Breadcrumbs     & alone      & $0.143\ ({-}.27)$ & $0.431\ ({+}.08)$ & $0.409\ (.00)$ & $0.611\ (.11)$ \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & $0.669\ (.17)$ \\
                 & $+$APR     & $0.523\ (.10)$ & $0.606\ (.21)$ & $0.468\ ({+}.06)$ & $0.678\ (.18)$ \\
 \midrule
 DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.391\ ({-}.42)$ & $0.617\ (.15)$ \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & $0.697\ (.28)$ \\
-                & $+$APR     & $0.620{\pm}.021\ ({+}.18)$ & $0.626\ (.19)$ & $0.687\ ({+}.11)$ & $0.695\ (.25)$ \\
+                & $+$APR     & $\mathbf{0.620}{\pm}.021\ ({+}.18)$ & $0.626\ (.19)$ & $\mathbf{0.687}\ ({+}.11)$ & $0.695\ (.25)$ \\
 \midrule
 TIES            & alone      & $0.302\ (.00)$ & $0.528\ ({+}.26)$ & $0.457\ ({+}.01)$ & $0.626\ (.15)$ \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & $0.701\ (.28)$ \\
                 & $+$APR     & $0.571\ (.17)$ & $0.635{\pm}.061\ ({+}.15)$ & $0.619\ ({+}.17)$ & $0.697\ (.26)$ \\
 \midrule
 AdaMerging      & alone      & $0.173\ (.00)$ & $0.610\ ({+}.22)$ & --- & $0.665\ (.10)$ \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & $0.701\ (.14)$ \\
-                & $+$APR     & $0.583\ (.05)$ & $0.699{\pm}.044\ ({+}.31)$ & --- & $0.707\ (.19)$ \\
+                & $+$APR     & $0.583\ (.05)$ & $\mathbf{0.699}{\pm}.044\ ({+}.31)$ & --- & $0.707\ (.19)$ \\
 \midrule
 RegMean         & alone      & $0.478\ ({+}.18)$ & $0.733\ ({+}.44)$ & --- & $0.723\ (.23)$ \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & $0.756\ (.52)$ \\
-                & $+$APR     & $0.103\ ({-}.06)$ & $0.762\ (.44)$ & --- & $0.749\ (.49)$ \\
+                & $+$APR     & $0.103\ ({-}.06)$ & $\mathbf{0.762}\ (.44)$ & --- & $\mathbf{0.749}\ (.49)$ \\
 \midrule
 Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ ({-}.56)$ & --- & --- \\
 (from TA)       & inverted gate & --- & $-1.682$ & $-6.185$ & $0.100$ \\
