@@ -193,7 +193,16 @@ def main():
     ap.add_argument("--control_gd_lrs", type=float, nargs="*", default=[],
                     help="also run ordinary replay GD from each refine_from init "
                          "at these lrs (the composition control)")
-    ap.add_argument("--steps", type=int, default=None, help="APR sweeps (default: config)")
+    ap.add_argument("--steps", type=int, nargs="*", default=None,
+                    help="refinement sweep counts (default: the config's single "
+                         "value). More than one value makes S part of the swept "
+                         "grid for ALL THREE arms -- APR, ungated and ordinary "
+                         "GD -- which matters because the (lr, S) optima trade "
+                         "off along a roughly constant lr*S product, and because "
+                         "the arms converge at different horizons (APR "
+                         "near-converges by S=5-10 while plain GD is still "
+                         "improving at S=35), so pinning one S is not neutral "
+                         "between them.")
     ap.add_argument("--skip_families", nargs="*", default=[],
                     choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
     ap.add_argument("--n_select", type=int, default=None,
@@ -226,7 +235,8 @@ def main():
     if args.probe_seed is not None:
         cfg.data.probe_seed = args.probe_seed
     ctx = MergeContext.build(cfg)
-    steps = args.steps if args.steps is not None else cfg.refine.steps
+    steps_grid = args.steps if args.steps else [cfg.refine.steps]
+    steps = steps_grid[0]   # reported as the nominal horizon
     names = cfg.task_names
     if args.refine_from:
         # Recorded per refine cell so hyperparameters can be selected without
@@ -274,7 +284,7 @@ def main():
              f"{cfg.data.probe_seed}/{sel_seed}); evaluation split unused "
              f"for selection")
 
-    report = {"config": cfg.to_dict(), "tasks": names, "steps": steps,
+    report = {"config": cfg.to_dict(), "tasks": names, "steps": steps_grid,
               "base": ctx.base_scores, "expert": ctx.expert_scores,
               "grids": vars(args), "selection_protocol": selection_protocol,
               "methods": {}}
@@ -292,7 +302,7 @@ def main():
             nm = f"merge:TA@l{lam:g}"
             s, nr, ag = eval_merge(ctx, state)
             ta.offer(record(report, nm, s, nr, ag,
-                            pd_global_norm(pd_sub(state, ctx.merged0)), lam=lam), nm, state)
+                            pd_global_norm(pd_sub(state, ctx.merged0)), state=state, lam=lam), nm, state)
 
     # ---- TIES (combined tau reused across the lambda grid) ----
     ties = Best("TIES")
@@ -307,7 +317,7 @@ def main():
                 s, nr, ag = eval_merge(ctx, state)
                 ties.offer(record(report, nm, s, nr, ag,
                                   pd_global_norm(pd_sub(state, ctx.merged0)),
-                                  density=d, lam=lam), nm, state)
+                                  state=state, density=d, lam=lam), nm, state)
 
     # ---- DARE alone (control: expectation-preserving => ~= TA) ----
     dare = Best("DARE")
@@ -320,7 +330,7 @@ def main():
                 s, nr, ag = eval_merge(ctx, state)
                 dare.offer(record(report, nm, s, nr, ag,
                                   pd_global_norm(pd_sub(state, ctx.merged0)),
-                                  density=d, seed=sd, note="control"), nm, state)
+                                  state=state, density=d, seed=sd, note="control"), nm, state)
 
     # ---- DARE-TIES ----
     dt = Best("DARETIES")
@@ -335,7 +345,7 @@ def main():
                     s, nr, ag = eval_merge(ctx, state)
                     dt.offer(record(report, nm, s, nr, ag,
                                     pd_global_norm(pd_sub(state, ctx.merged0)),
-                                    drop=dd, trim=tr, lam=lam), nm, state)
+                                    state=state, drop=dd, trim=tr, lam=lam), nm, state)
 
     # ---- DELLA (row-wise magnitude-ranked sampling, then sign election) ----
     della = Best("DELLA")
@@ -352,7 +362,7 @@ def main():
                         della.offer(record(
                             report, nm, s, nr, ag,
                             pd_global_norm(pd_sub(state, ctx.merged0)),
-                            density=d, window_size=w, lam=lam, seed=sd),
+                            state=state, density=d, window_size=w, lam=lam, seed=sd),
                             nm, state)
 
     # ---- Model Breadcrumbs ----
@@ -368,7 +378,7 @@ def main():
                     s, nr, ag = eval_merge(ctx, state)
                     bc.offer(record(report, nm, s, nr, ag,
                                     pd_global_norm(pd_sub(state, ctx.merged0)),
-                                    density=d, outlier=o, lam=lam), nm, state)
+                                    state=state, density=d, outlier=o, lam=lam), nm, state)
 
     # ---- Localize-and-Stitch, data-free magnitude variant ----
     # (the learned-mask variant needs per-task full-d float masks -- ~12 GB each at
@@ -385,7 +395,7 @@ def main():
                 s, nr, ag = eval_merge(ctx, state)
                 ls.offer(record(report, nm, s, nr, ag,
                                 pd_global_norm(pd_sub(state, ctx.merged0)),
-                                sparsity=frac, lam=lam, stitch=info), nm, state)
+                                state=state, sparsity=frac, lam=lam, stitch=info), nm, state)
             del masks
 
     # ---- AdaMerging (label-free, uses unlabeled eval inputs: transductive) ----
@@ -408,7 +418,7 @@ def main():
                 s, nr, ag = eval_merge(ctx, state)
                 ada.offer(record(report, nm, s, nr, ag,
                                  pd_global_norm(pd_sub(state, ctx.merged0)),
-                                 adamerging=info), nm, state)
+                                 state=state, adamerging=info), nm, state)
 
     fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt,
             "della": della, "bc": bc, "ls": ls, "ada": ada}
@@ -435,44 +445,49 @@ def main():
          fracs = args.topk_fracs if gmode.startswith("topk") else [None]
          for frac in fracs:
           for sched in args.apr_schedules:
-           for lr in args.apr_lrs:
-            rc = dataclasses.replace(
+           for steps in steps_grid:
+            for lr in args.apr_lrs:
+             rc = dataclasses.replace(
                 cfg.refine, steps=steps, lr=lr, gate_mode=gmode,
-                topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
-                lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
-                order=args.apr_order if sched != "constant" else cfg.refine.order)
-            _log(f"\n===== APR from {init_label} @ lr{lr:g} S={steps} {sched} "
-                 f"({rc.gate_mode}"
-                 f"{'' if frac is None else f'@{frac:g}'}"
-                 f"/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
-            refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
-            s, nr, ag = eval_merge(ctx, refined)
-            gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
-            nm = (f"apr:from={key}@lr{lr:g}"
-                  + ("" if sched == "constant" else f",{sched}")
-                  + ("" if gmode == cfg.refine.gate_mode and frac is None
-                     else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
-            m = record(report, nm, s, nr, ag,
-                       pd_global_norm(pd_sub(refined, fam.state)),
-                       state=refined,
-                       init=init_label, lr=lr, schedule=sched, gate_mode=gmode,
-                       topk_frac=frac,
-                       gate_density=gd, replay_obj=objective(refined))
-            if SELECT_OBJ is not None:
-                m = -report["methods"][nm]["selection_obj"]
-            if best_mean is None or m > best_mean:
-                best_mean = m
-                report[f"best_apr_from_{key}"] = nm
+                 topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
+                 lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
+                 order=args.apr_order if sched != "constant" else cfg.refine.order)
+             _log(f"\n===== APR from {init_label} @ lr{lr:g} S={steps} {sched} "
+                  f"({rc.gate_mode}"
+                  f"{'' if frac is None else f'@{frac:g}'}"
+                  f"/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
+             refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
+             s, nr, ag = eval_merge(ctx, refined)
+             gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
+             nm = (f"apr:from={key}@lr{lr:g}"
+                   + ("" if len(steps_grid) == 1 else f",S{steps}")
+                   + ("" if sched == "constant" else f",{sched}")
+                   + ("" if gmode == cfg.refine.gate_mode and frac is None
+                      else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
+             m = record(report, nm, s, nr, ag,
+                        pd_global_norm(pd_sub(refined, fam.state)),
+                        state=refined,
+                        init=init_label, lr=lr, steps=steps, schedule=sched,
+                        gate_mode=gmode, topk_frac=frac,
+                        gate_density=gd, replay_obj=objective(refined))
+             if SELECT_OBJ is not None:
+                 m = -report["methods"][nm]["selection_obj"]
+             if best_mean is None or m > best_mean:
+                 best_mean = m
+                 report[f"best_apr_from_{key}"] = nm
         # ---- controls from the SAME init: ungated anchor, and ordinary GD ----
         # Both isolate a different part of the update: nogate removes the gate but
         # keeps the anchored/distance-scaled/clipped step; GD removes all of it.
-        for lr in args.nogate_lrs:
+        for steps in steps_grid:
+          for lr in args.nogate_lrs:
             rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr, gate_mode="none")
-            _log(f"\n===== nogate from {init_label} @ lr{lr:g} =====")
+            _log(f"\n===== nogate from {init_label} @ lr{lr:g} S={steps} =====")
             refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
-            record(report, f"nogate:from={key}@lr{lr:g}", s, nr, ag,
-                   pd_global_norm(pd_sub(refined, fam.state)), state=refined, init=init_label, lr=lr,
+            tag = f"nogate:from={key}@lr{lr:g}" + ("" if len(steps_grid) == 1 else f",S{steps}")
+            record(report, tag, s, nr, ag,
+                   pd_global_norm(pd_sub(refined, fam.state)), state=refined,
+                   init=init_label, lr=lr, steps=steps,
                    replay_obj=objective(refined))
         for sched in args.gd_schedules:
             for S in (args.gd_steps or [steps]):
@@ -495,16 +510,18 @@ def main():
         # ordinary replay GD from the SAME init: the control that separates
         # "APR composes with better merges" from "any labeled replay step does".
         # Same replay buffers, same sweep count; free -g steps, no gate, no clip.
-        for lr in args.control_gd_lrs:
+        for steps in steps_grid:
+          for lr in args.control_gd_lrs:
             rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr,
                                      gate_mode="none", update_mode="grad",
                                      clip_mode="none")
-            _log(f"\n===== ordinary GD from {init_label} @ lr{lr:g} =====")
+            _log(f"\n===== ordinary GD from {init_label} @ lr{lr:g} S={steps} =====")
             refined, _hist = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
             s, nr, ag = eval_merge(ctx, refined)
-            record(report, f"gd:from={key}@lr{lr:g}", s, nr, ag,
+            tag = f"gd:from={key}@lr{lr:g}" + ("" if len(steps_grid) == 1 else f",S{steps}")
+            record(report, tag, s, nr, ag,
                    pd_global_norm(pd_sub(refined, fam.state)), state=refined,
-                   init=init_label, lr=lr, replay_obj=objective(refined))
+                   init=init_label, lr=lr, steps=steps, replay_obj=objective(refined))
         # a peak at the grid edge means the optimum was not bracketed
         if best_mean is not None and args.apr_lrs:
             best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1].split(",")[0])

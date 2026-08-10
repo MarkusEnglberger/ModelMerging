@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=180G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/grid_n16-%j.out
 #SBATCH --error=logs/grid_n16-%j.out
@@ -40,11 +40,17 @@ source slurm/common.sh
 : "${BENCH:?set BENCH (glue8|clip8|clip20|t5_glue8)}"
 : "${MODE:?set MODE (merges|base)}"
 
+# INITS: which merge families to build and refine from. AdaMerging is excluded
+# on the shared-output track: its entropy objective assumes a classification
+# head, and on a seq2seq LM head the graph detaches, so the backward raises
+# "element 0 of tensors does not require grad" (job 25414283). The blank
+# AdaMerging cell for that track in Table 1 is therefore a capability gap of
+# the baseline, not an experiment left unrun.
 case "$BENCH" in
-  glue8)     CFG=configs/glue8.yaml;       APR="1 2 4 8 16 32";        NG="0.5 1 2 4 8";      GD="1e-5 5e-5 1e-4 5e-4 1e-3" ;;
-  clip8)     CFG=configs/clip8.yaml;       APR="2 4 8 16 32";          NG="2 4 8 16";         GD="1e-4 5e-4 1e-3 5e-3" ;;
-  clip20)    CFG=configs/clip20_l008.yaml; APR="1 2 4 8 16";           NG="1 2 4 8";          GD="1e-4 5e-4 1e-3 5e-3" ;;
-  t5_glue8)  CFG=configs/t5_glue8.yaml;    APR="64 128 256 512 1024";  NG="4 8 16 32";        GD="1e-3 3e-3 1e-2 3e-2" ;;
+  glue8)     CFG=configs/glue8.yaml;       APR="1 2 4 8 16 32";        NG="0.5 1 2 4 8";      GD="1e-5 5e-5 1e-4 5e-4 1e-3"; INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  clip8)     CFG=configs/clip8.yaml;       APR="2 4 8 16 32";          NG="2 4 8 16";         GD="1e-4 5e-4 1e-3 5e-3";      INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  clip20)    CFG=configs/clip20_l008.yaml; APR="1 2 4 8 16";           NG="1 2 4 8";          GD="1e-4 5e-4 1e-3 5e-3";      INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  t5_glue8)  CFG=configs/t5_glue8.yaml;    APR="64 128 256 512 1024";  NG="4 8 16 32";        GD="1e-3 3e-3 1e-2 3e-2";      INITS="ta ties dareties bc";     SKIP="dare della ls ada" ;;
   *) echo "unknown BENCH=$BENCH" >&2; exit 2 ;;
 esac
 
@@ -63,8 +69,9 @@ if [ "$MODE" = base ]; then
   python scripts/merge_baselines.py "${COMMON[@]}" \
     --ta_lams 0 \
     --skip_families ties dare dareties della bc ls ada \
-    --refine_from ta
+    --refine_from ta   # merge:TA@l0 == theta_0
 else
   python scripts/merge_baselines.py "${COMMON[@]}" \
-    --refine_from ta ties dareties bc ada
+    --skip_families $SKIP \
+    --refine_from $INITS
 fi
