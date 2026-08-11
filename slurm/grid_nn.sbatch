@@ -52,15 +52,26 @@ case "$BENCH" in
   *) echo "unknown BENCH=$BENCH" >&2; exit 2 ;;
 esac
 
+# Overrides for extension waves. The (lr, S) optima trade off along a roughly
+# constant lr*S product, so a longer horizon needs a PROPORTIONALLY LOWER
+# learning-rate grid: going from S=20 to S=50 (2.5x) shifts the grid down by
+# about the same factor. Extending S while holding lr fixed would test the
+# wrong cells.
+: "${STEPS_GRID:=5 20}"
+[ -n "${APR_OVR:-}" ] && APR="$APR_OVR"
+[ -n "${NG_OVR:-}"  ] && NG="$NG_OVR"
+[ -n "${GD_OVR:-}"  ] && GD="$GD_OVR"
+[ -n "${TAG:-}" ] && SUFFIX="_$TAG" || SUFFIX=""
+
 SELECT=mean_normret
 [ "$BENCH" = clip20 ] && SELECT=mean_acc
 
-OUT="results/compare/grid_nn_${BENCH}_${MODE}_n${N}.json"
-COMMON=(--config "$CFG" --n_probe "$N" --n_select "$N" --steps 5 20
+OUT="results/compare/grid_nn_${BENCH}_${MODE}_n${N}${SUFFIX}.json"
+COMMON=(--config "$CFG" --n_probe "$N" --n_select "$N" --steps $STEPS_GRID
         --select_by "$SELECT" --apr_lrs $APR --nogate_lrs $NG
         --control_gd_lrs $GD --out "$OUT")
 
-echo "[job] BENCH=$BENCH MODE=$MODE n=${N}+${N} S in {5,20} -> $OUT"
+echo "[job] BENCH=$BENCH MODE=$MODE n=${N}+${N} S in {$STEPS_GRID} -> $OUT"
 
 if [ "$MODE" = base ]; then
   python scripts/merge_baselines.py "${COMMON[@]}" \
