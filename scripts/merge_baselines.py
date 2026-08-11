@@ -35,9 +35,11 @@ isolates *sign election* as the active ingredient of TIES.
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import os
 import sys
+import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -109,6 +111,126 @@ class Best:
 
     def __bool__(self):
         return self.state is not None
+
+
+
+
+# ---------------------------------------------------------------- merge cache
+# Expensive initializations are deterministic given their inputs, but were
+# rebuilt by every job: AdaMerging trains 300 steps, RegMean accumulates Gram
+# matrices, Localize-and-Stitch fits masks. The cheap arithmetic merges (TIES,
+# DARE, Breadcrumbs, task arithmetic) are NOT cached -- rebuilding them costs
+# less than reading them back.
+MERGE_CACHE_DIR = "results/merge_cache"
+CACHEABLE = ("ada", "regmean", "ls")
+
+
+def _merge_cache_path(cfg, family, params, extra=None):
+    """Everything that determines the merged weights.
+
+    ``extra`` carries method-specific inputs that are easy to forget and unsafe
+    to omit. AdaMerging is the cautionary case: it is a TEST-TIME method whose
+    unlabeled inputs may come from the evaluation split (transductive) or from
+    the matched replay budget, and those give different states -- so the data
+    source, the probe budget and the probe seed all belong in the key. A state
+    cached under one and reused under the other would silently leak the
+    evaluation split into a merge the paper reports as inductive.
+    """
+    key = {"base_model": cfg.base_model, "modality": cfg.modality,
+           "model_dtype": cfg.model_dtype,
+           "experts": [{"name": e.name, "checkpoint": e.checkpoint}
+                       for e in cfg.experts],
+           "family": family, "params": params,
+           "n_probe": cfg.data.n_probe, "probe_seed": cfg.data.probe_seed,
+           "class_balanced": cfg.data.class_balanced,
+           "extra": extra or {}}
+    h = hashlib.sha1(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
+    return os.path.join(MERGE_CACHE_DIR, f"{family}_{h}.pt"), key
+
+
+def merge_cache_load(cfg, family, params, extra=None):
+    path, _ = _merge_cache_path(cfg, family, params, extra)
+    if family in CACHEABLE and os.path.exists(path):
+        try:
+            state = torch.load(path, map_location="cpu")
+            _log(f"[merge-cache] hit {os.path.basename(path)} ({family})")
+            return state
+        except Exception as exc:                      # corrupt/partial file
+            _log(f"[merge-cache] unreadable {path} ({exc}); rebuilding")
+    return None
+
+
+def merge_cache_save(cfg, family, params, state, extra=None):
+    if family not in CACHEABLE:
+        return
+    path, key = _merge_cache_path(cfg, family, params, extra)
+    os.makedirs(MERGE_CACHE_DIR, exist_ok=True)
+    tmp = path + f".tmp{os.getpid()}"                 # atomic: concurrent jobs
+    torch.save(state, tmp)                            # share this directory
+    os.replace(tmp, path)
+    with open(path.replace(".pt", ".json"), "w") as fh:
+        json.dump(key, fh, indent=2, default=str)
+    _log(f"[merge-cache] saved {os.path.basename(path)} ({family})")
+
+
+def sweep_arm(ctx, cfg, report, start_state, steps_grid, lrs, make_cfg, name_of,
+              extra_of, fast, log_label):
+    """Run one refinement arm over the (lr, S) grid.
+
+    Two efficiencies, both only sound under the stated conditions:
+
+    * TRAJECTORY REUSE. With a constant learning rate the state after S sweeps
+      of a longer run is exactly the state a separate S-sweep run produces, so
+      one trajectory at max(steps_grid) with snapshots yields every horizon.
+      Horizon-dependent schedules (cosine) cannot nest and fall back to
+      separate runs.
+    * SELECTION-ONLY SCORING (``fast``). Under the n+n protocol the evaluation
+      split may not inform selection, so scoring every cell on it is pure waste
+      -- on the twenty-task suite it was ~99% of the runtime. In fast mode each
+      cell is scored only on the disjoint selection buffer (a few hundred
+      forward passes) and just the winner is evaluated. Weights are 351 MB
+      apiece for ViT-B/32, so only the running best is kept resident.
+
+    Returns (best_name, best_state, best_sel) or (None, None, None).
+    """
+    max_S = max(steps_grid)
+    b_name = b_state = None
+    b_sel = float("inf")
+    for lr in lrs:
+        rc_max = make_cfg(lr, max_S)
+        nest = getattr(rc_max, "lr_schedule", "constant") == "constant"
+        if nest and len(steps_grid) > 1:
+            _log(f"\n===== {log_label} @ lr{lr:g} S<={max_S} "
+                 f"(one trajectory, snapshots at {sorted(steps_grid)}) =====")
+            states, history = ctx.run_refine_checkpoints_from(
+                start_state, rc_max, sorted(steps_grid), seed=cfg.seed)
+            produced = [(S, states[S]) for S in sorted(steps_grid)]
+        else:
+            produced = []
+            for S in sorted(steps_grid):
+                _log(f"\n===== {log_label} @ lr{lr:g} S={S} =====")
+                st, history = ctx.run_refine_from(start_state, make_cfg(lr, S),
+                                                  seed=cfg.seed)
+                produced.append((S, st))
+        for S, st in produced:
+            nm = name_of(lr, S)
+            sel = SELECT_OBJ(st) if SELECT_OBJ is not None else None
+            if fast:
+                entry = {"selection_obj": sel,
+                         "displacement": pd_global_norm(pd_sub(st, start_state))}
+                entry.update(extra_of(lr, S, history))
+                entry["evaluated"] = False
+                report["methods"][nm] = entry
+                _log(f"  -> {nm}: sel={sel:.4f} (not evaluated)")
+            else:
+                s, nr, ag = eval_merge(ctx, st)
+                record(report, nm, s, nr, ag,
+                       pd_global_norm(pd_sub(st, start_state)), state=st,
+                       **extra_of(lr, S, history))
+            rank = sel if sel is not None else -report["methods"][nm]["aggregate"][SELECT_BY]
+            if rank < b_sel:
+                b_sel, b_name, b_state = rank, nm, st
+    return b_name, b_state, b_sel
 
 
 def main():
@@ -214,6 +336,13 @@ def main():
     ap.add_argument("--selection_seed", type=int, default=None,
                     help="sampling seed for the selection buffer; must differ "
                          "from the probe seed (default: probe_seed + 1)")
+    ap.add_argument("--eval_all_cells", action="store_true",
+                    help="score EVERY grid cell on the evaluation split. Off by "
+                         "default under --n_select, where selection may not see "
+                         "that split and full scoring is ~99%% of the runtime; "
+                         "turn it on to measure the selection gap (the "
+                         "difference between the split-selected and the "
+                         "oracle-selected cell), which needs both numbers.")
     ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
                     default="mean_normret",
                     help="aggregate used to pick best-per-family / best APR lr. "
@@ -405,14 +534,26 @@ def main():
             for variant in args.ada_variants:
                 _log(f"\n[AdaMerging-{variant}/{dkey}] entropy minimisation "
                      f"({args.ada_steps} steps, lr={args.ada_lr})")
-                state, info = adamerging(
-                    ctx.base_encoder, ctx.task_vectors, ctx.per_task, names, ctx.device,
-                    layerwise=(variant == "layer"), steps=args.ada_steps, lr=args.ada_lr,
-                    batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
-                    num_workers=args.ada_workers, data_key=dkey,
-                    # 3B/fp32: resident task vectors (12 GB/task) + vocab-sized
-                    # entropy logits OOM the 93 GB card; stream from CPU instead
-                    tv_on_gpu=(cfg.modality != "causal_lm"), logger=_log)
+                ada_params = {"variant": variant, "steps": args.ada_steps,
+                              "lr": args.ada_lr, "bs": args.ada_bs,
+                              "init_lam": args.ada_init_lam, "seed": cfg.seed}
+                # data_key decides transductive (eval split) vs matched budget,
+                # which yields DIFFERENT states -- it must be part of the key.
+                ada_extra = {"data_key": dkey}
+                cached = merge_cache_load(cfg, "ada", ada_params, ada_extra)
+                if cached is not None:
+                    state, info = cached, {"cached": True, **ada_params,
+                                           "data_key": dkey}
+                else:
+                    state, info = adamerging(
+                        ctx.base_encoder, ctx.task_vectors, ctx.per_task, names, ctx.device,
+                        layerwise=(variant == "layer"), steps=args.ada_steps, lr=args.ada_lr,
+                        batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
+                        num_workers=args.ada_workers, data_key=dkey,
+                        # 3B/fp32: resident task vectors (12 GB/task) + vocab-sized
+                        # entropy logits OOM the 93 GB card; stream from CPU instead
+                        tv_on_gpu=(cfg.modality != "causal_lm"), logger=_log)
+                    merge_cache_save(cfg, "ada", ada_params, state, ada_extra)
                 tag = variant if dkey == "eval_ds" else f"{variant}-matched"
                 nm = f"merge:ADA-{tag}"
                 s, nr, ag = eval_merge(ctx, state)
@@ -439,91 +580,75 @@ def main():
             _log(f"[apr] skip from={key} (family not run)")
             continue
         init_label = fam.name.split(":", 1)[1]
-        best_mean = None
+        fast = (SELECT_OBJ is not None) and not args.eval_all_cells
         gate_modes = args.apr_gate_modes or [cfg.refine.gate_mode]
         for gmode in gate_modes:
          fracs = args.topk_fracs if gmode.startswith("topk") else [None]
          for frac in fracs:
           for sched in args.apr_schedules:
-           for steps in steps_grid:
-            for lr in args.apr_lrs:
-             rc = dataclasses.replace(
-                cfg.refine, steps=steps, lr=lr, gate_mode=gmode,
-                 topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
-                 lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
-                 order=args.apr_order if sched != "constant" else cfg.refine.order)
-             _log(f"\n===== APR from {init_label} @ lr{lr:g} S={steps} {sched} "
-                  f"({rc.gate_mode}"
-                  f"{'' if frac is None else f'@{frac:g}'}"
-                  f"/clip={rc.clip_mode}/g{rc.clip_frac:g}/{rc.order}) =====")
-             refined, history = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
-             s, nr, ag = eval_merge(ctx, refined)
-             gd = (sum(h["gate_density"] for h in history) / len(history)) if history else None
-             nm = (f"apr:from={key}@lr{lr:g}"
-                   + ("" if len(steps_grid) == 1 else f",S{steps}")
-                   + ("" if sched == "constant" else f",{sched}")
-                   + ("" if gmode == cfg.refine.gate_mode and frac is None
-                      else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
-             m = record(report, nm, s, nr, ag,
-                        pd_global_norm(pd_sub(refined, fam.state)),
-                        state=refined,
-                        init=init_label, lr=lr, steps=steps, schedule=sched,
-                        gate_mode=gmode, topk_frac=frac,
-                        gate_density=gd, replay_obj=objective(refined))
-             if SELECT_OBJ is not None:
-                 m = -report["methods"][nm]["selection_obj"]
-             if best_mean is None or m > best_mean:
-                 best_mean = m
-                 report[f"best_apr_from_{key}"] = nm
+            def mk(lr, S, gmode=gmode, frac=frac, sched=sched):
+                return dataclasses.replace(
+                    cfg.refine, steps=S, lr=lr, gate_mode=gmode,
+                    topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
+                    lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
+                    order=args.apr_order if sched != "constant" else cfg.refine.order)
+            def nm_of(lr, S, gmode=gmode, frac=frac, sched=sched):
+                return (f"apr:from={key}@lr{lr:g}"
+                        + ("" if len(steps_grid) == 1 else f",S{S}")
+                        + ("" if sched == "constant" else f",{sched}")
+                        + ("" if gmode == cfg.refine.gate_mode and frac is None
+                           else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
+            def ex_of(lr, S, history, gmode=gmode, frac=frac, sched=sched):
+                gdens = (sum(h["gate_density"] for h in history) / len(history)
+                         if history else None)
+                return dict(init=init_label, lr=lr, steps=S, schedule=sched,
+                            gate_mode=gmode, topk_frac=frac, gate_density=gdens)
+            bn, bstate, _ = sweep_arm(
+                ctx, cfg, report, fam.state, steps_grid, args.apr_lrs, mk,
+                nm_of, ex_of, fast, f"APR from {init_label}")
+            if bn is not None:
+                report[f"best_apr_from_{key}"] = bn
+                if fast:
+                    s, nr, ag = eval_merge(ctx, bstate)
+                    e = report["methods"][bn]
+                    e.update({"scores": s, "normret": nr, "aggregate": ag,
+                              "evaluated": True})
+                    _log(f"  [winner] {bn}: evaluated -> "
+                         f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
+                del bstate
+
         # ---- controls from the SAME init: ungated anchor, and ordinary GD ----
         # Both isolate a different part of the update: nogate removes the gate but
         # keeps the anchored/distance-scaled/clipped step; GD removes all of it.
-        for steps in steps_grid:
-          for lr in args.nogate_lrs:
-            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr, gate_mode="none")
-            _log(f"\n===== nogate from {init_label} @ lr{lr:g} S={steps} =====")
-            refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
-            s, nr, ag = eval_merge(ctx, refined)
-            tag = f"nogate:from={key}@lr{lr:g}" + ("" if len(steps_grid) == 1 else f",S{steps}")
-            record(report, tag, s, nr, ag,
-                   pd_global_norm(pd_sub(refined, fam.state)), state=refined,
-                   init=init_label, lr=lr, steps=steps,
-                   replay_obj=objective(refined))
-        for sched in args.gd_schedules:
-            for S in (args.gd_steps or [steps]):
-                for lr in args.gd_lrs:
-                    rc = dataclasses.replace(
-                        cfg.refine, steps=S, lr=lr, gate_mode="none",
-                        update_mode="grad", clip_mode="none",
-                        lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
-                        order=args.gd_order if sched != "constant" else cfg.refine.order)
-                    tag = f"gd:from={key}@lr{lr:g},S{S},{sched}"
-                    _log(f"\n===== ordinary GD from {init_label} "
-                         f"@ lr{lr:g} S={S} {sched} =====")
-                    refined, _ = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
-                    s, nr, ag = eval_merge(ctx, refined)
-                    record(report, tag, s, nr, ag,
-                           pd_global_norm(pd_sub(refined, fam.state)), state=refined,
-                           init=init_label, lr=lr, gd_steps=S, schedule=sched,
-                           replay_obj=objective(refined))
-
-        # ordinary replay GD from the SAME init: the control that separates
-        # "APR composes with better merges" from "any labeled replay step does".
-        # Same replay buffers, same sweep count; free -g steps, no gate, no clip.
-        for steps in steps_grid:
-          for lr in args.control_gd_lrs:
-            rc = dataclasses.replace(cfg.refine, steps=steps, lr=lr,
-                                     gate_mode="none", update_mode="grad",
-                                     clip_mode="none")
-            _log(f"\n===== ordinary GD from {init_label} @ lr{lr:g} S={steps} =====")
-            refined, _hist = ctx.run_refine_from(fam.state, rc, seed=cfg.seed)
-            s, nr, ag = eval_merge(ctx, refined)
-            tag = f"gd:from={key}@lr{lr:g}" + ("" if len(steps_grid) == 1 else f",S{steps}")
-            record(report, tag, s, nr, ag,
-                   pd_global_norm(pd_sub(refined, fam.state)), state=refined,
-                   init=init_label, lr=lr, steps=steps, replay_obj=objective(refined))
+        for arm, lrs, kw in (
+                ("nogate", args.nogate_lrs, dict(gate_mode="none")),
+                ("gd", args.control_gd_lrs, dict(gate_mode="none",
+                                                 update_mode="grad",
+                                                 clip_mode="none"))):
+            if not lrs:
+                continue
+            def mk(lr, S, kw=kw):
+                return dataclasses.replace(cfg.refine, steps=S, lr=lr, **kw)
+            def nm_of(lr, S, arm=arm):
+                return (f"{arm}:from={key}@lr{lr:g}"
+                        + ("" if len(steps_grid) == 1 else f",S{S}"))
+            def ex_of(lr, S, history):
+                return dict(init=init_label, lr=lr, steps=S)
+            bn, bstate, _ = sweep_arm(
+                ctx, cfg, report, fam.state, steps_grid, lrs, mk, nm_of, ex_of,
+                fast, f"{arm} from {init_label}")
+            if bn is not None:
+                report[f"best_{arm}_from_{key}"] = bn
+                if fast:
+                    s, nr, ag = eval_merge(ctx, bstate)
+                    e = report["methods"][bn]
+                    e.update({"scores": s, "normret": nr, "aggregate": ag,
+                              "evaluated": True})
+                    _log(f"  [winner] {bn}: evaluated -> "
+                         f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
+                del bstate
         # a peak at the grid edge means the optimum was not bracketed
-        if best_mean is not None and args.apr_lrs:
+        if report.get(f"best_apr_from_{key}") and args.apr_lrs:
             best_lr = float(report[f"best_apr_from_{key}"].split("@lr")[1].split(",")[0])
             if best_lr == min(args.apr_lrs):
                 _log(f"[warn] APR from {key} peaked at the LOW EDGE (lr={best_lr:g}) "
@@ -539,7 +664,12 @@ def main():
     print(f"{'method':<30} " + " ".join(f"{t[:7]:>7}" for t in names) +
           f" | {'mAcc':>6} {'wAcc':>6} {'mNR':>7} {'wNR':>7} {'||disp||':>8}")
     print("-" * 108)
-    for n, d in sorted(report["methods"].items(),
+    scored = {n: d for n, d in report["methods"].items() if "aggregate" in d}
+    unscored = len(report["methods"]) - len(scored)
+    if unscored:
+        print(f"({unscored} cells scored on the selection buffer only; the "
+              f"selected cell of each arm is evaluated and listed below)")
+    for n, d in sorted(scored.items(),
                        key=lambda kv: -kv[1]["aggregate"][SELECT_BY]):
         a = d["aggregate"]
         print(f"{n:<30} " + " ".join(f"{d['normret'][t]:>7.3f}" for t in names) +

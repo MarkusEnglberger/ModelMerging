@@ -18,7 +18,7 @@ source slurm/common.sh
 
 python scripts/merge_baselines.py \
   --config configs/glue8.yaml \
-  --n_probe 8 --n_select 8 --steps 1 \
+  --n_probe 8 --n_select 8 --steps 2 4 \
   --ta_lams 0.2 0.3 \
   --skip_families ties dare dareties della bc ls ada \
   --refine_from ta \

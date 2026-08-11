@@ -67,9 +67,16 @@ SELECT=mean_normret
 [ "$BENCH" = clip20 ] && SELECT=mean_acc
 
 OUT="results/compare/grid_nn_${BENCH}_${MODE}_n${N}${SUFFIX}.json"
+# AdaMerging's unlabeled inputs come from the MATCHED BUDGET, not the eval
+# split. Its objective minimises prediction entropy on unlabeled data, and the
+# standard formulation draws that data from the evaluation set -- transductive:
+# it adapts to the very test points it is scored on (87,433 images on CLIP-8,
+# against the 512 labeled examples APR gets). The paper reports the matched-
+# budget variant, which sees the same n unlabeled inputs per task that APR sees
+# labeled, so this flag is required for the rows to be comparable.
 COMMON=(--config "$CFG" --n_probe "$N" --n_select "$N" --steps $STEPS_GRID
         --select_by "$SELECT" --apr_lrs $APR --nogate_lrs $NG
-        --control_gd_lrs $GD --out "$OUT")
+        --control_gd_lrs $GD --ada_data probe_buffer --out "$OUT")
 
 echo "[job] BENCH=$BENCH MODE=$MODE n=${N}+${N} S in {$STEPS_GRID} -> $OUT"
 
