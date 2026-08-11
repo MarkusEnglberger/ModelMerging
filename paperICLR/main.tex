@@ -67,7 +67,7 @@ Our contributions are: (i)~a replay-refinement method with two equivalent deriva
 Model merging combines fine-tuned variants of a shared pretrained model into a single model in weight space, avoiding ensembling overhead: model soups average compatible checkpoints \citep{wortsman2022modelsoups}, Fisher merging weights parameters by Fisher information \citep{matena2022fisher}, and task arithmetic represents fine-tuning as a \emph{task vector} $\taskvec_t=\theta_t-\thetab$ and merges as $\thetab+\sum_t\lambda_t\taskvec_t$ \citep{ilharco2022taskarithmetic}---checkpoint-only, but prone to over-counted directions and sign or magnitude conflicts across tasks.
 
 \paragraph{Interference-aware and data-dependent merging.}
-A major line of work addresses interference between task vectors: TIES-Merging trims small-magnitude updates and merges only sign-consistent components \citep{yadav2023ties}; DARE randomly drops most delta parameters and rescales the rest \citep{yu2023dare}, generalized by DELLA \citep{deep2024della}; Model Breadcrumbs removes negligible and outlier perturbations \citep{davari2023breadcrumbs}; Localize-and-Stitch stitches sparse task-relevant regions back into the pretrained model \citep{he2024localize}. A complementary line uses small amounts of data or model outputs: APL scores task vectors by a data-dependent contrast \citep{kong2024apl}, RegMean solves each linear layer by regression on its inputs \citep{jin2023regmean}, and AdaMerging learns coefficients by entropy minimization \citep{yang2024adamerging}. Twin-Merging, Task Vector Bases, and FusionBench extend and standardize this space \citep{lu2024twin,zeng2025taskvectorbases,tang2024fusionbench}. The present work does not introduce another pruning rule: it asks whether a small \emph{labeled} replay buffer can repair an initial merge while staying close to the known experts, using the sign of a merge-to-expert attribution only as a local gate for refinement.
+A major line of work addresses interference between task vectors: TIES-Merging trims small-magnitude updates and merges only sign-consistent components \citep{yadav2023ties}; DARE randomly drops most delta parameters and rescales the rest \citep{yu2023dare}, generalized by DELLA \citep{deep2024della}; Model Breadcrumbs removes negligible and outlier perturbations \citep{davari2023breadcrumbs}; Localize-and-Stitch stitches sparse task-relevant regions back into the pretrained model \citep{he2024localize}. Most closely related to our trust-region view, Task Arithmetic in Trust Region (TATR) uses task-loss gradients at the pretrained model to identify gradient-orthogonal parameter dimensions in which task vectors can be merged with limited interference \citep{sun2025tatr}. TATR is training-free and restricts the merge itself; our method instead uses labeled replay gradients at the evolving merged model to take sequential, expert-directed refinement steps. A complementary line uses small amounts of data or model outputs: APL scores task vectors by a data-dependent contrast \citep{kong2024apl}, RegMean solves each linear layer by regression on its inputs \citep{jin2023regmean}, and AdaMerging learns coefficients by entropy minimization \citep{yang2024adamerging}. Twin-Merging, Task Vector Bases, and FusionBench extend and standardize this space \citep{lu2024twin,zeng2025taskvectorbases,tang2024fusionbench}. The present work does not introduce another pruning rule: it asks whether a small \emph{labeled} replay buffer can repair an initial merge while staying close to the known experts, using the sign of a merge-to-expert attribution only as a local gate for refinement.
 
 \paragraph{Attribution patching.}
 Attribution patching approximates the effect of an intervention by a first-order Taylor expansion, replacing many explicit interventions with gradient-based scores \citep{syed2024attributionpatching,kramar2024atpstar}; in parameter space the analogue is a directional derivative of the task loss along a chosen displacement---here, the movement from the current merged model toward a task expert. Extended positioning against the benchmark families of the merging literature is given in Appendix~\ref{app:protocol}.
@@ -205,7 +205,7 @@ Unless noted, refinement runs $S$ sweeps from the task-arithmetic merge with the
 
 \section{Results}
 \label{sec:results}
-Every benchmark receives the same experiment grid---each initialization alone and refined, the unconstrained baselines from the pretrained model and from task arithmetic, and the gate controls---collected in one format in Table~\ref{tab:main}; dashes mark experiments not yet run, and the grid will be populated for every benchmark. The subsections take one benchmark each and add its benchmark-specific studies (replay budget, refinement horizon, held-out retention). Cross-benchmark analyses are consolidated in Appendix~\ref{app:mergebaselines}.
+Every benchmark receives the same experiment grid---each initialization alone and refined, the unconstrained baselines, and the gate controls---and we report it at two tiers that differ in how hyperparameters are chosen. Table~\ref{tab:main} is the \emph{tuned} tier: $n=64$ replay examples per task, configurations selected on the evaluation split, which measures how good each method can be. Table~\ref{tab:main16} is the \emph{deployment} tier: $16$ replay examples plus a disjoint $16$-example selection buffer per task, every hyperparameter---including the sweep count---chosen on that buffer, and the evaluation split read only at the selected cell, which measures what a practitioner actually gets. The tiers are not cell-by-cell comparable, and we draw no conclusion from differences between them; each is internally consistent. Dashes mark experiments not yet run. The subsections take one benchmark each and add its benchmark-specific studies (replay budget, refinement horizon, held-out retention). Cross-benchmark analyses are consolidated in Appendix~\ref{app:mergebaselines}.
 
 \begin{table}[t]
 \centering
@@ -250,7 +250,65 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \end{tabular}
 \end{table}
 
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{\textbf{The same grid under split selection at a $16{+}16$ budget.} Each task contributes $16$ labeled replay examples and a \emph{disjoint} $16$-example selection buffer ($32$ labels per task in total). Every hyperparameter---merge coefficient, density, refinement learning rate, and the sweep count $S$---is chosen by minimizing held-out loss on the selection buffer, and the evaluation split is read \emph{only} at the selected cell. Table~\ref{tab:main} instead tunes on the evaluation split, so the two tables answer different questions and their numbers should not be compared cell by cell: this one reports what a practitioner obtains without ever touching test data. Entries are mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1); the pretrained \emph{alone} row is the retention zero point. To keep the search budget identical across benchmarks, $S$ is swept over $\{5,20,50\}$ for the from-pretrained rows and $\{5,20\}$ for the composition rows. $^{\dagger}$: the selected $S$ is the longest offered, so the cell is a lower bound rather than a verified interior optimum; the extended search reported in the text resolves these for GLUE-8 and CLIP-8. Dashes are experiments not yet run, except AdaMerging on the shared-output track, where the entropy objective requires a classification head and the baseline does not apply.}
+\label{tab:main16}
+\setlength{\arraystretch}{0.95}
+\begin{tabular}{llcccc}
+\toprule
+Initialization & Treatment & GLUE-8 & CLIP-8 & GLUE-8 t2t & CLIP-20 \\
+ & & \multicolumn{3}{c}{normalized retention} & top-1 acc. \\
+\midrule
+Pretrained      & alone      & $0$ & $0$ & $0$ & $0.550\ ({+}.10)$ \\
+                & $+$GD      & $0.209^{\dagger}\ ({-}.18)$ & $0.096^{\dagger}\ ({-}.19)$ & $0.094^{\dagger}\ ({-}.52)$ & $0.583^{\dagger}\ ({+}.12)$ \\
+                & $+$ungated & $-0.431^{\dagger}\ ({-}3.52)$ & $-0.036\ ({-}.59)$ & $0.131\ ({-}.36)$ & $0.586\ ({+}.11)$ \\
+                & $+$APR     & $\mathbf{0.315}^{\dagger}\ ({-}.12)$ & $\mathbf{0.432}^{\dagger}\ ({-}.16)$ & $\mathbf{0.508}^{\dagger}\ ({+}.03)$ & $\mathbf{0.647}\ ({+}.22)$ \\
+\midrule
+Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.352\ ({-}.50)$ & --- \\
+                & $+$GD      & $0.574^{\dagger}\ ({+}.06)$ & $0.424^{\dagger}\ ({-}.26)$ & $0.660^{\dagger}\ ({+}.33)$ & --- \\
+                & $+$ungated & $0.586\ ({-}.01)$ & $0.450^{\dagger}\ ({-}.25)$ & $0.538\ ({-}.33)$ & --- \\
+                & $+$APR     & $0.608\ ({+}.10)$ & $0.516^{\dagger}\ ({-}.08)$ & $0.581\ ({+}.05)$ & --- \\
+\midrule
+Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.409\ ({+}.00)$ & --- \\
+                & $+$GD      & $0.534^{\dagger}\ ({+}.04)$ & $0.511^{\dagger}\ ({+}.09)$ & $0.658^{\dagger}\ ({+}.05)$ & --- \\
+                & $+$ungated & $0.563\ ({+}.04)$ & $0.491^{\dagger}\ ({-}.03)$ & $0.563\ ({-}.27)$ & --- \\
+                & $+$APR     & $0.567^{\dagger}\ ({+}.04)$ & $0.505^{\dagger}\ ({+}.07)$ & $0.552^{\dagger}\ ({+}.08)$ & --- \\
+\midrule
+DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.371\ ({-}.42)$ & --- \\
+                & $+$GD      & $0.521\ ({-}.08)$ & $0.506^{\dagger}\ ({-}.07)$ & $0.690^{\dagger}\ ({+}.38)$ & --- \\
+                & $+$ungated & $0.574\ ({+}.09)$ & $0.269^{\dagger}\ ({-}2.10)$ & $0.622\ ({+}.08)$ & --- \\
+                & $+$APR     & $0.586\ ({+}.11)$ & $0.488^{\dagger}\ ({-}.71)$ & $0.653^{\dagger}\ ({+}.15)$ & --- \\
+\midrule
+TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.418\ ({-}.17)$ & --- \\
+                & $+$GD      & $0.516^{\dagger}\ ({-}.13)$ & $\mathbf{0.599}^{\dagger}\ ({+}.21)$ & $\mathbf{0.716}^{\dagger}\ ({+}.39)$ & --- \\
+                & $+$ungated & $0.525^{\dagger}\ ({-}.08)$ & $0.562^{\dagger}\ ({-}.28)$ & $0.606\ ({+}.00)$ & --- \\
+                & $+$APR     & $0.543^{\dagger}\ ({-}.03)$ & $0.539^{\dagger}\ ({-}.38)$ & $0.657^{\dagger}\ ({+}.09)$ & --- \\
+\midrule
+AdaMerging      & alone      & --- & --- & --- & --- \\
+                & $+$GD      & --- & --- & --- & --- \\
+                & $+$ungated & --- & --- & --- & --- \\
+                & $+$APR     & --- & --- & --- & --- \\
+\midrule
+RegMean         & alone      & --- & --- & --- & --- \\
+                & $+$GD      & --- & --- & --- & --- \\
+                & $+$ungated & --- & --- & --- & --- \\
+                & $+$APR     & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
 
+\paragraph{What split selection changes.}
+Table~\ref{tab:main16} repeats the grid under a protocol in which no test data is used for tuning, at a quarter of the labeled budget. The result splits cleanly in two, along the axis of whether a usable merge already exists.
+
+Refining \emph{from the pretrained model}---the setting with no merge to inherit, and the one where the refinement must supply all of the multi-task ability itself---is an unambiguous win for the gated, expert-anchored update. APR is the best treatment on all four benchmarks, ahead of the better of the two unconstrained baselines by $0.06$ (CLIP-20), $0.11$ (GLUE-8), $0.34$ (CLIP-8), and $0.38$ (shared-output). Neither unconstrained baseline is a viable cold-start method at this budget: ordinary descent recovers only a tenth to a fifth of the expert--base gap on the three retention benchmarks, and split selection puts the ungated update into an actively harmful configuration on GLUE-8 ($-0.431$, worst task $-3.5$). Only the gated, distance-scaled update turns a small replay buffer into multi-task ability with no merge to build on.
+
+\paragraph{The anchored update is insensitive to how wide the search is.}
+Split selection is only as good as the grid it searches, and enlarging that grid can move the selected cell in either direction---a hazard for any method whose selection surface is sharp, and one a practitioner cannot diagnose without the test labels they are trying not to use. We therefore re-ran the from-pretrained rows on a strictly larger search space: learning rates extended by an octave at each end and $S\in\{5,20,50,100,200\}$. APR's selection is \emph{exactly} unchanged on both benchmarks tested---$\eta=8$, $S=50$ on GLUE-8 ($0.315$) and $\eta=32$, $S=50$ on CLIP-8 ($0.432$)---and both are now interior in learning rate and horizon, so APR's $^{\dagger}$ cells there are optima rather than lower bounds. The unconstrained arms move in both directions: the ungated update on GLUE-8 finds a much better cell ($-0.431\to-0.018$), while ordinary descent on CLIP-8 finds a worse one ($0.096\to0.046$) by selecting the longest horizon offered. The anchored method returns the same answer however carefully the grid was designed; the descent-family answers are contingent on it, and the direction of that contingency is not predictable in advance.
+
+Once a good merge \emph{is} available, the gate no longer wins on mean retention, and the outcome is benchmark-dependent. APR is the better treatment in all four composition rows on GLUE-8 (best $0.608$), in one of four on CLIP-8, and in none on the shared-output track, where ordinary replay GD from TIES is the strongest cell in the table ($0.716$ vs.\ APR's $0.657$). We read this as a statement about where the anchor is binding rather than as a refutation: a strong merge already lies inside the region where unconstrained descent is well behaved, so constraining the step costs more than it saves, whereas the pretrained model does not. Two caveats keep this from being a clean loss for the gate. Mean retention does not price tail risk, and Table~\ref{tab:t5budget} shows descent on this very track collapsing on two of three replay draws at these budgets---a hazard invisible to any single-draw number. And APR's outcome is far less sensitive to which merge it is given on CLIP-8 (a $0.051$ spread across initializations, against $0.175$ for GD), though not on the other two, where the spreads are comparable. The defensible claim is therefore narrower than ``APR is best'': the gated anchor is what makes replay refinement work \emph{without} a good merge, and what bounds its downside \emph{with} one.
 
 \subsection{Multi-head GLUE-8 (RoBERTa-base)}
 \label{sec:glue}
@@ -466,6 +524,11 @@ Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael 
 Victor Sanh, Lysandre Debut, Julien Chaumond, and Thomas Wolf.
 \newblock DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter.
 \newblock \emph{arXiv preprint arXiv:1910.01108}, 2019.
+
+\bibitem[Sun et~al.(2025)]{sun2025tatr}
+Wenju Sun, Qingyong Li, Wen Wang, Yangli-ao Geng, and Boyang Li.
+\newblock Task Arithmetic in Trust Region: A training-free model merging approach to navigate knowledge conflicts.
+\newblock \emph{arXiv preprint arXiv:2501.15065}, 2025.
 
 \bibitem[Sundararajan et~al.(2017)]{sundararajan2017ig}
 Mukund Sundararajan, Ankur Taly, and Qiqi Yan.
