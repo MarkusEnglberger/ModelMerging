@@ -254,7 +254,7 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{\textbf{The same grid under split selection at a $16{+}16$ budget.} Each task contributes $16$ labeled replay examples and a \emph{disjoint} $16$-example selection buffer ($32$ labels per task in total). Every hyperparameter---merge coefficient, density, refinement learning rate, and the sweep count $S$---is chosen by minimizing held-out loss on the selection buffer, and the evaluation split is read \emph{only} at the selected cell. Table~\ref{tab:main} instead tunes on the evaluation split, so the two tables answer different questions and their numbers should not be compared cell by cell: this one reports what a practitioner obtains without ever touching test data. Entries are mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1); the pretrained \emph{alone} row is the retention zero point. To keep the search budget identical across benchmarks, $S$ is swept over $\{5,20,50\}$ for the from-pretrained rows and $\{5,20\}$ for the composition rows. $^{\dagger}$: the selected $S$ is the longest offered, so the cell is a lower bound rather than a verified interior optimum; the extended search reported in the text resolves these for GLUE-8 and CLIP-8. Dashes are experiments not yet run, except AdaMerging on the shared-output track, where the entropy objective requires a classification head and the baseline does not apply.}
+\caption{\textbf{The same grid under split selection at a $16{+}16$ budget.} Each task contributes $16$ labeled replay examples and a \emph{disjoint} $16$-example selection buffer ($32$ labels per task in total). Every hyperparameter---merge coefficient, density, refinement learning rate, and the sweep count $S$---is chosen by minimizing held-out loss on the selection buffer, and the evaluation split is read \emph{only} at the selected cell. Table~\ref{tab:main} instead tunes on the evaluation split, so the two tables answer different questions and their numbers should not be compared cell by cell: this one reports what a practitioner obtains without ever touching test data. Entries are mean aggregate with worst-task in parentheses---normalized retention, except twenty-task CLIP (absolute top-1); the pretrained \emph{alone} row is the retention zero point. The search budget is identical across benchmarks and rows: $S\in\{5,20,50\}$ throughout. AdaMerging is given the matched budget---the same $16$ unlabeled inputs per task that APR sees labeled---rather than the standard transductive formulation that adapts on the evaluation split. $^{\dagger}$: the selected $S$ is the longest offered, so the cell is a lower bound rather than a verified interior optimum; the extended search reported in the text resolves these for the from-pretrained rows of GLUE-8 and CLIP-8. Dashes are experiments not yet run, except AdaMerging on the shared-output track, where the entropy objective requires a classification head and the baseline does not apply.}
 \label{tab:main16}
 \setlength{\arraystretch}{0.95}
 \begin{tabular}{llcccc}
@@ -265,32 +265,32 @@ Initialization & Treatment & GLUE-8 & CLIP-8 & GLUE-8 t2t & CLIP-20 \\
 Pretrained      & alone      & $0$ & $0$ & $0$ & $0.550\ ({+}.10)$ \\
                 & $+$GD      & $0.209^{\dagger}\ ({-}.18)$ & $0.096^{\dagger}\ ({-}.19)$ & $0.094^{\dagger}\ ({-}.52)$ & $0.583^{\dagger}\ ({+}.12)$ \\
                 & $+$ungated & $-0.431^{\dagger}\ ({-}3.52)$ & $-0.036\ ({-}.59)$ & $0.131\ ({-}.36)$ & $0.586\ ({+}.11)$ \\
-                & $+$APR     & $\mathbf{0.315}^{\dagger}\ ({-}.12)$ & $\mathbf{0.432}^{\dagger}\ ({-}.16)$ & $\mathbf{0.508}^{\dagger}\ ({+}.03)$ & $\mathbf{0.647}\ ({+}.22)$ \\
+                & $+$APR     & $0.315^{\dagger}\ ({-}.12)$ & $0.432^{\dagger}\ ({-}.16)$ & $0.508^{\dagger}\ ({+}.03)$ & $\mathbf{0.647}\ ({+}.22)$ \\
 \midrule
 Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.352\ ({-}.50)$ & --- \\
-                & $+$GD      & $0.574^{\dagger}\ ({+}.06)$ & $0.424^{\dagger}\ ({-}.26)$ & $0.660^{\dagger}\ ({+}.33)$ & --- \\
-                & $+$ungated & $0.586\ ({-}.01)$ & $0.450^{\dagger}\ ({-}.25)$ & $0.538\ ({-}.33)$ & --- \\
-                & $+$APR     & $0.608\ ({+}.10)$ & $0.516^{\dagger}\ ({-}.08)$ & $0.581\ ({+}.05)$ & --- \\
+                & $+$GD      & $0.574\ ({+}.06)$ & $0.425^{\dagger}\ ({-}.31)$ & $0.660\ ({+}.33)$ & --- \\
+                & $+$ungated & $0.586\ ({-}.01)$ & $0.450\ ({-}.25)$ & $0.538\ ({-}.33)$ & --- \\
+                & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({-}.01)$ & $0.534\ ({+}.08)$ & --- \\
 \midrule
 Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.409\ ({+}.00)$ & --- \\
-                & $+$GD      & $0.534^{\dagger}\ ({+}.04)$ & $0.511^{\dagger}\ ({+}.09)$ & $0.658^{\dagger}\ ({+}.05)$ & --- \\
-                & $+$ungated & $0.563\ ({+}.04)$ & $0.491^{\dagger}\ ({-}.03)$ & $0.563\ ({-}.27)$ & --- \\
-                & $+$APR     & $0.567^{\dagger}\ ({+}.04)$ & $0.505^{\dagger}\ ({+}.07)$ & $0.552^{\dagger}\ ({+}.08)$ & --- \\
+                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.07)$ & $0.658\ ({+}.05)$ & --- \\
+                & $+$ungated & $0.563\ ({+}.04)$ & $0.487^{\dagger}\ ({-}.04)$ & $0.563\ ({-}.27)$ & --- \\
+                & $+$APR     & $0.567\ ({+}.04)$ & $0.504^{\dagger}\ ({+}.06)$ & $0.564^{\dagger}\ ({+}.10)$ & --- \\
 \midrule
 DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.371\ ({-}.42)$ & --- \\
-                & $+$GD      & $0.521\ ({-}.08)$ & $0.506^{\dagger}\ ({-}.07)$ & $0.690^{\dagger}\ ({+}.38)$ & --- \\
-                & $+$ungated & $0.574\ ({+}.09)$ & $0.269^{\dagger}\ ({-}2.10)$ & $0.622\ ({+}.08)$ & --- \\
-                & $+$APR     & $0.586\ ({+}.11)$ & $0.488^{\dagger}\ ({-}.71)$ & $0.653^{\dagger}\ ({+}.15)$ & --- \\
+                & $+$GD      & $0.521\ ({-}.08)$ & $0.515^{\dagger}\ ({-}.07)$ & $0.651^{\dagger}\ ({+}.33)$ & --- \\
+                & $+$ungated & $0.574\ ({+}.09)$ & $0.284^{\dagger}\ ({-}1.99)$ & $0.489\ ({-}.17)$ & --- \\
+                & $+$APR     & $0.586\ ({+}.11)$ & $0.506^{\dagger}\ ({-}.58)$ & $0.662\ ({+}.20)$ & --- \\
 \midrule
 TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.418\ ({-}.17)$ & --- \\
-                & $+$GD      & $0.516^{\dagger}\ ({-}.13)$ & $\mathbf{0.599}^{\dagger}\ ({+}.21)$ & $\mathbf{0.716}^{\dagger}\ ({+}.39)$ & --- \\
-                & $+$ungated & $0.525^{\dagger}\ ({-}.08)$ & $0.562^{\dagger}\ ({-}.28)$ & $0.606\ ({+}.00)$ & --- \\
-                & $+$APR     & $0.543^{\dagger}\ ({-}.03)$ & $0.539^{\dagger}\ ({-}.38)$ & $0.657^{\dagger}\ ({+}.09)$ & --- \\
+                & $+$GD      & $0.516\ ({-}.13)$ & $0.599^{\dagger}\ ({+}.21)$ & $\mathbf{0.716}\ ({+}.39)$ & --- \\
+                & $+$ungated & $0.525\ ({-}.08)$ & $0.564^{\dagger}\ ({-}.23)$ & $0.606\ ({+}.00)$ & --- \\
+                & $+$APR     & $0.543\ ({-}.03)$ & $0.548^{\dagger}\ ({-}.27)$ & $0.575\ ({+}.17)$ & --- \\
 \midrule
-AdaMerging      & alone      & --- & --- & --- & --- \\
-                & $+$GD      & --- & --- & --- & --- \\
-                & $+$ungated & --- & --- & --- & --- \\
-                & $+$APR     & --- & --- & --- & --- \\
+AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & --- & --- \\
+                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.16)$ & --- & --- \\
+                & $+$ungated & $0.538\ ({-}.36)$ & $0.569^{\dagger}\ ({-}.06)$ & --- & --- \\
+                & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.639}^{\dagger}\ ({+}.30)$ & --- & --- \\
 \midrule
 RegMean         & alone      & --- & --- & --- & --- \\
                 & $+$GD      & --- & --- & --- & --- \\
@@ -308,7 +308,9 @@ Refining \emph{from the pretrained model}---the setting with no merge to inherit
 \paragraph{The anchored update is insensitive to how wide the search is.}
 Split selection is only as good as the grid it searches, and enlarging that grid can move the selected cell in either direction---a hazard for any method whose selection surface is sharp, and one a practitioner cannot diagnose without the test labels they are trying not to use. We therefore re-ran the from-pretrained rows on a strictly larger search space: learning rates extended by an octave at each end and $S\in\{5,20,50,100,200\}$. APR's selection is \emph{exactly} unchanged on both benchmarks tested---$\eta=8$, $S=50$ on GLUE-8 ($0.315$) and $\eta=32$, $S=50$ on CLIP-8 ($0.432$)---and both are now interior in learning rate and horizon, so APR's $^{\dagger}$ cells there are optima rather than lower bounds. The unconstrained arms move in both directions: the ungated update on GLUE-8 finds a much better cell ($-0.431\to-0.018$), while ordinary descent on CLIP-8 finds a worse one ($0.096\to0.046$) by selecting the longest horizon offered. The anchored method returns the same answer however carefully the grid was designed; the descent-family answers are contingent on it, and the direction of that contingency is not predictable in advance.
 
-Once a good merge \emph{is} available, the gate no longer wins on mean retention, and the outcome is benchmark-dependent. APR is the better treatment in all four composition rows on GLUE-8 (best $0.608$), in one of four on CLIP-8, and in none on the shared-output track, where ordinary replay GD from TIES is the strongest cell in the table ($0.716$ vs.\ APR's $0.657$). We read this as a statement about where the anchor is binding rather than as a refutation: a strong merge already lies inside the region where unconstrained descent is well behaved, so constraining the step costs more than it saves, whereas the pretrained model does not. Two caveats keep this from being a clean loss for the gate. Mean retention does not price tail risk, and Table~\ref{tab:t5budget} shows descent on this very track collapsing on two of three replay draws at these budgets---a hazard invisible to any single-draw number. And APR's outcome is far less sensitive to which merge it is given on CLIP-8 (a $0.051$ spread across initializations, against $0.175$ for GD), though not on the other two, where the spreads are comparable. The defensible claim is therefore narrower than ``APR is best'': the gated anchor is what makes replay refinement work \emph{without} a good merge, and what bounds its downside \emph{with} one.
+Once a good merge \emph{is} available the margins narrow sharply and the ordering becomes benchmark-dependent. On GLUE-8 the gate still wins cleanly: APR is the better treatment in all five composition rows, and its best cell ($0.608$, from task arithmetic) leads the best GD cell by $0.034$. On CLIP-8 the row-by-row comparison favors GD (APR better in two of five), yet the best composition cell is still APR's ($0.639$ from AdaMerging, against $0.601$)---the gate loses the typical row and wins the top one, because it composes best with the strongest initialization. On the shared-output track the gate loses outright: GD from TIES is the strongest cell in the table ($0.716$), ahead of APR's best ($0.662$) and better than APR in three of four rows.
+
+We read this as a statement about where the anchor binds rather than as a refutation. A strong merge already lies inside the region where unconstrained descent is well behaved, so constraining the step costs more than it saves; the pretrained model does not, which is why the same constraint is decisive there. Two things keep the composition tier from being a clean loss for the gate. Mean retention does not price tail risk, and Table~\ref{tab:t5budget} shows descent on this very track collapsing to the degenerate attractor on two of three replay draws at these budgets---a hazard no single-draw number can show. And APR's result is less sensitive to which merge it is handed on two of the three benchmarks (spreads across initializations of $0.065$ vs.\ $0.115$ on GLUE-8 and $0.135$ vs.\ $0.176$ on CLIP-8, though $0.128$ vs.\ $0.065$ against it on the shared-output track). The defensible claim is therefore narrower than ``APR is best'': the gated anchor is what makes replay refinement work \emph{without} a good merge, and what bounds its downside \emph{with} one.
 
 \subsection{Multi-head GLUE-8 (RoBERTa-base)}
 \label{sec:glue}
