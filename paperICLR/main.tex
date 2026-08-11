@@ -265,32 +265,32 @@ Initialization & Treatment & GLUE-8 & CLIP-8 & GLUE-8 t2t & CLIP-20 \\
 Pretrained      & alone      & $0$ & $0$ & $0$ & $0.550\ ({+}.10)$ \\
                 & $+$GD      & $0.209^{\dagger}\ ({-}.18)$ & $0.096^{\dagger}\ ({-}.19)$ & $0.094^{\dagger}\ ({-}.52)$ & $0.583^{\dagger}\ ({+}.12)$ \\
                 & $+$ungated & $-0.431^{\dagger}\ ({-}3.52)$ & $-0.036\ ({-}.59)$ & $0.131\ ({-}.36)$ & $0.586\ ({+}.11)$ \\
-                & $+$APR     & $0.315^{\dagger}\ ({-}.12)$ & $0.432^{\dagger}\ ({-}.16)$ & $0.508^{\dagger}\ ({+}.03)$ & $\mathbf{0.647}\ ({+}.22)$ \\
+                & $+$APR     & $0.315^{\dagger}\ ({-}.12)$ & $0.432^{\dagger}\ ({-}.16)$ & $0.508^{\dagger}\ ({+}.03)$ & $0.647\ ({+}.22)$ \\
 \midrule
-Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.352\ ({-}.50)$ & --- \\
-                & $+$GD      & $0.574\ ({+}.06)$ & $0.425^{\dagger}\ ({-}.31)$ & $0.660\ ({+}.33)$ & --- \\
-                & $+$ungated & $0.586\ ({-}.01)$ & $0.450\ ({-}.25)$ & $0.538\ ({-}.33)$ & --- \\
-                & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({-}.01)$ & $0.534\ ({+}.08)$ & --- \\
+Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.352\ ({-}.50)$ & $0.495\ ({+}.15)$ \\
+                & $+$GD      & $0.574\ ({+}.06)$ & $0.425^{\dagger}\ ({-}.31)$ & $0.660\ ({+}.33)$ & $0.555\ ({+}.18)$ \\
+                & $+$ungated & $0.586\ ({-}.01)$ & $0.450\ ({-}.25)$ & $0.538\ ({-}.33)$ & $0.602\ ({+}.17)$ \\
+                & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({-}.01)$ & $0.534\ ({+}.08)$ & $0.667\ ({+}.25)$ \\
 \midrule
-Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.409\ ({+}.00)$ & --- \\
-                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.07)$ & $0.658\ ({+}.05)$ & --- \\
-                & $+$ungated & $0.563\ ({+}.04)$ & $0.487^{\dagger}\ ({-}.04)$ & $0.563\ ({-}.27)$ & --- \\
-                & $+$APR     & $0.567\ ({+}.04)$ & $0.504^{\dagger}\ ({+}.06)$ & $0.564^{\dagger}\ ({+}.10)$ & --- \\
+Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.409\ ({+}.00)$ & $0.603\ ({+}.12)$ \\
+                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.07)$ & $0.658\ ({+}.05)$ & $0.638^{\dagger}\ ({+}.17)$ \\
+                & $+$ungated & $0.563\ ({+}.04)$ & $0.487^{\dagger}\ ({-}.04)$ & $0.563\ ({-}.27)$ & $0.650\ ({+}.19)$ \\
+                & $+$APR     & $0.567\ ({+}.04)$ & $0.504^{\dagger}\ ({+}.06)$ & $0.564^{\dagger}\ ({+}.10)$ & $0.661\ ({+}.20)$ \\
 \midrule
-DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.371\ ({-}.42)$ & --- \\
-                & $+$GD      & $0.521\ ({-}.08)$ & $0.515^{\dagger}\ ({-}.07)$ & $0.651^{\dagger}\ ({+}.33)$ & --- \\
-                & $+$ungated & $0.574\ ({+}.09)$ & $0.284^{\dagger}\ ({-}1.99)$ & $0.489\ ({-}.17)$ & --- \\
-                & $+$APR     & $0.586\ ({+}.11)$ & $0.506^{\dagger}\ ({-}.58)$ & $0.662\ ({+}.20)$ & --- \\
+DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.371\ ({-}.42)$ & $0.520\ ({+}.20)$ \\
+                & $+$GD      & $0.521\ ({-}.08)$ & $0.515^{\dagger}\ ({-}.07)$ & $0.651^{\dagger}\ ({+}.33)$ & $0.594^{\dagger}\ ({+}.28)$ \\
+                & $+$ungated & $0.574\ ({+}.09)$ & $0.284^{\dagger}\ ({-}1.99)$ & $0.489\ ({-}.17)$ & $0.579\ ({+}.09)$ \\
+                & $+$APR     & $0.586\ ({+}.11)$ & $0.506^{\dagger}\ ({-}.58)$ & $0.662\ ({+}.20)$ & $0.664\ ({+}.30)$ \\
 \midrule
-TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.418\ ({-}.17)$ & --- \\
-                & $+$GD      & $0.516\ ({-}.13)$ & $0.599^{\dagger}\ ({+}.21)$ & $\mathbf{0.716}\ ({+}.39)$ & --- \\
-                & $+$ungated & $0.525\ ({-}.08)$ & $0.564^{\dagger}\ ({-}.23)$ & $0.606\ ({+}.00)$ & --- \\
-                & $+$APR     & $0.543\ ({-}.03)$ & $0.548^{\dagger}\ ({-}.27)$ & $0.575\ ({+}.17)$ & --- \\
+TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.418\ ({-}.17)$ & $0.619\ ({+}.19)$ \\
+                & $+$GD      & $0.516\ ({-}.13)$ & $0.599^{\dagger}\ ({+}.21)$ & $\mathbf{0.716}\ ({+}.39)$ & $0.658^{\dagger}\ ({+}.26)$ \\
+                & $+$ungated & $0.525\ ({-}.08)$ & $0.564^{\dagger}\ ({-}.23)$ & $0.606\ ({+}.00)$ & $0.672\ ({+}.28)$ \\
+                & $+$APR     & $0.543\ ({-}.03)$ & $0.548^{\dagger}\ ({-}.27)$ & $0.575\ ({+}.17)$ & $\mathbf{0.676}\ ({+}.27)$ \\
 \midrule
-AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & --- & --- \\
-                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.16)$ & --- & --- \\
-                & $+$ungated & $0.538\ ({-}.36)$ & $0.569^{\dagger}\ ({-}.06)$ & --- & --- \\
-                & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.639}^{\dagger}\ ({+}.30)$ & --- & --- \\
+AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & --- & $0.597\ ({+}.10)$ \\
+                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.16)$ & --- & $0.637^{\dagger}\ ({+}.13)$ \\
+                & $+$ungated & $0.538\ ({-}.36)$ & $0.569^{\dagger}\ ({-}.06)$ & --- & $0.649\ ({+}.16)$ \\
+                & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.639}^{\dagger}\ ({+}.30)$ & --- & $0.665\ ({+}.20)$ \\
 \midrule
 RegMean         & alone      & --- & --- & --- & --- \\
                 & $+$GD      & --- & --- & --- & --- \\
@@ -308,9 +308,13 @@ Refining \emph{from the pretrained model}---the setting with no merge to inherit
 \paragraph{The anchored update is insensitive to how wide the search is.}
 Split selection is only as good as the grid it searches, and enlarging that grid can move the selected cell in either direction---a hazard for any method whose selection surface is sharp, and one a practitioner cannot diagnose without the test labels they are trying not to use. We therefore re-ran the from-pretrained rows on a strictly larger search space: learning rates extended by an octave at each end and $S\in\{5,20,50,100,200\}$. APR's selection is \emph{exactly} unchanged on both benchmarks tested---$\eta=8$, $S=50$ on GLUE-8 ($0.315$) and $\eta=32$, $S=50$ on CLIP-8 ($0.432$)---and both are now interior in learning rate and horizon, so APR's $^{\dagger}$ cells there are optima rather than lower bounds. The unconstrained arms move in both directions: the ungated update on GLUE-8 finds a much better cell ($-0.431\to-0.018$), while ordinary descent on CLIP-8 finds a worse one ($0.096\to0.046$) by selecting the longest horizon offered. The anchored method returns the same answer however carefully the grid was designed; the descent-family answers are contingent on it, and the direction of that contingency is not predictable in advance.
 
-Once a good merge \emph{is} available the margins narrow sharply and the ordering becomes benchmark-dependent. On GLUE-8 the gate still wins cleanly: APR is the better treatment in all five composition rows, and its best cell ($0.608$, from task arithmetic) leads the best GD cell by $0.034$. On CLIP-8 the row-by-row comparison favors GD (APR better in two of five), yet the best composition cell is still APR's ($0.639$ from AdaMerging, against $0.601$)---the gate loses the typical row and wins the top one, because it composes best with the strongest initialization. On the shared-output track the gate loses outright: GD from TIES is the strongest cell in the table ($0.716$), ahead of APR's best ($0.662$) and better than APR in three of four rows.
+One axis of the grid is genuinely missing, however, and we tested it rather than assume it away. Every cell in Table~\ref{tab:main16} runs APR at a constant rate with a fixed task order, whereas the $n=64$ control of Table~\ref{tab:longapr} found the annealed package---cosine decay to $5\%$ of the peak, task order re-randomized each sweep---worth as much as $+0.10$ on GLUE-8. Offering both schedules to split selection on CLIP-8, from task arithmetic and from TIES, splits the difference. From TIES the annealed configuration is better on the selection buffer \emph{and} on the evaluation split, lifting the cell from $0.548$ to $0.615$---past GD's $0.599$, so this row's ordering was an artifact of the missing axis. From task arithmetic it goes the other way: annealing wins on the selection buffer by a clear margin ($0.458$ vs.\ $0.511$) but is \emph{worse} on the evaluation split ($0.495$ vs.\ $0.524$), so honest selection costs $0.029$ here by preferring a configuration the metric does not. The axis therefore matters, is not uniformly favorable, and is one we have so far searched on only two of five initializations; we report the CLIP-8 composition row at the uniform constant-schedule budget of Table~\ref{tab:main16} rather than mixing search budgets across rows, and flag the TIES cell as a lower bound of $0.615$.
 
-We read this as a statement about where the anchor binds rather than as a refutation. A strong merge already lies inside the region where unconstrained descent is well behaved, so constraining the step costs more than it saves; the pretrained model does not, which is why the same constraint is decisive there. Two things keep the composition tier from being a clean loss for the gate. Mean retention does not price tail risk, and Table~\ref{tab:t5budget} shows descent on this very track collapsing to the degenerate attractor on two of three replay draws at these budgets---a hazard no single-draw number can show. And APR's result is less sensitive to which merge it is handed on two of the three benchmarks (spreads across initializations of $0.065$ vs.\ $0.115$ on GLUE-8 and $0.135$ vs.\ $0.176$ on CLIP-8, though $0.128$ vs.\ $0.065$ against it on the shared-output track). The defensible claim is therefore narrower than ``APR is best'': the gated anchor is what makes replay refinement work \emph{without} a good merge, and what bounds its downside \emph{with} one.
+Once a good merge \emph{is} available the margins narrow, and the gate wins on three benchmarks of four. On the two multi-head suites it wins outright: APR is the better treatment in all five composition rows on GLUE-8 (best $0.608$) and in all five on CLIP-20 (best $0.676$). On CLIP-8 the row-by-row comparison favors GD (APR better in two of five), yet the best composition cell is still APR's ($0.639$ from AdaMerging, against $0.601$)---the gate loses the typical row and wins the top one, because it composes best with the strongest initialization. Only on the shared-output track does it lose outright: GD from TIES is the strongest cell in the table ($0.716$), ahead of APR's best ($0.662$) and better in three of four rows.
+
+The sharper distinction in this tier is not the mean but the \emph{spread across initializations}, which is what a practitioner without test labels is exposed to: having picked a merge for reasons unrelated to refinement, how much does that choice cost? APR is the less sensitive arm on three of four benchmarks ($0.065$ vs.\ $0.115$ on GLUE-8, $0.135$ vs.\ $0.176$ on CLIP-8, and---most strikingly---$0.015$ vs.\ $0.103$ on CLIP-20, where APR lands within a fifteen-thousandth-wide band from \emph{every} initialization while GD ranges from $0.555$ to $0.658$). The shared-output track again runs the other way ($0.128$ vs.\ $0.065$). Where the anchor binds, it makes the outcome a property of the method rather than of the merge it was handed.
+
+We read the CLIP-8 and shared-output results as a statement about where the anchor binds rather than as a refutation. A strong merge already lies inside the region where unconstrained descent is well behaved, so constraining the step costs more than it saves; the pretrained model does not, which is why the same constraint is decisive there. And mean retention does not price tail risk: Table~\ref{tab:t5budget} shows descent on the shared-output track collapsing to the degenerate attractor on two of three replay draws at these budgets, a hazard no single-draw number can show. The defensible claim is therefore narrower than ``APR is best'': the gated anchor is what makes replay refinement work \emph{without} a good merge, and what makes its outcome predictable \emph{with} one.
 
 \subsection{Multi-head GLUE-8 (RoBERTa-base)}
 \label{sec:glue}
