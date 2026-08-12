@@ -22,3 +22,23 @@ key.txt.pub
 *.pem
 id_ed25519*
 id_rsa*
+
+# Editor / assistant local config
+.vscode/
+.claude/
+
+# LaTeX build artifacts (main.pdf and main.bbl are versioned deliberately:
+# the PDF is the shared artifact, the .bbl its bibliography provenance)
+*.aux
+*.log
+*.out
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+
+# Editor backups and patch leftovers
+*.bak*
+*.orig
+*~
