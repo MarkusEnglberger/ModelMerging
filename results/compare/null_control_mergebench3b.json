@@ -1,0 +1,191 @@
+{
+  "config": {
+    "base_model": "meta-llama/Llama-3.2-3B",
+    "experts": [
+      {
+        "name": "math",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "coding",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "instruction",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "causal_lm",
+    "model_dtype": "bfloat16",
+    "eval_dtype": "bfloat16",
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 1024,
+      "eval_batch_size": 16,
+      "grad_batch_size": 4,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": false,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": 200
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/mergebench3b",
+    "tag": "mergebench3b"
+  },
+  "tasks": [
+    "math",
+    "coding",
+    "instruction"
+  ],
+  "base": {
+    "math": 0.08,
+    "coding": 0.31,
+    "instruction": 0.215
+  },
+  "expert": {
+    "math": 0.725,
+    "coding": 0.36,
+    "instruction": 0.46
+  },
+  "cross_run": {
+    "base": {
+      "now": {
+        "math": 0.08,
+        "coding": 0.31,
+        "instruction": 0.215
+      },
+      "prev": {
+        "math": 0.08,
+        "coding": 0.31,
+        "instruction": 0.215
+      },
+      "diff": {
+        "math": 0.0,
+        "coding": 0.0,
+        "instruction": 0.0
+      }
+    },
+    "expert": {
+      "now": {
+        "math": 0.725,
+        "coding": 0.36,
+        "instruction": 0.46
+      },
+      "prev": {
+        "math": 0.725,
+        "coding": 0.36,
+        "instruction": 0.46
+      },
+      "diff": {
+        "math": 0.0,
+        "coding": 0.0,
+        "instruction": 0.0
+      }
+    },
+    "merge": {
+      "now": {
+        "math": 0.495,
+        "coding": 0.345,
+        "instruction": 0.36
+      },
+      "prev": {
+        "math": 0.495,
+        "coding": 0.345,
+        "instruction": 0.36
+      },
+      "diff": {
+        "math": 0.0,
+        "coding": 0.0,
+        "instruction": 0.0
+      }
+    }
+  },
+  "repeat_runs": [
+    {
+      "math": 0.495,
+      "coding": 0.345,
+      "instruction": 0.36
+    },
+    {
+      "math": 0.495,
+      "coding": 0.345,
+      "instruction": 0.36
+    },
+    {
+      "math": 0.495,
+      "coding": 0.345,
+      "instruction": 0.36
+    }
+  ],
+  "repeat_spread": {
+    "math": {
+      "min": 0.495,
+      "max": 0.495,
+      "range": 0.0
+    },
+    "coding": {
+      "min": 0.345,
+      "max": 0.345,
+      "range": 0.0
+    },
+    "instruction": {
+      "min": 0.36,
+      "max": 0.36,
+      "range": 0.0
+    }
+  },
+  "repeat_aggregates": [
+    {
+      "mean_normret": 0.645082471091707,
+      "worst_normret": 0.591836710537277,
+      "hmean_normret": 0.6420622907598309
+    },
+    {
+      "mean_normret": 0.645082471091707,
+      "worst_normret": 0.591836710537277,
+      "hmean_normret": 0.6420622907598309
+    },
+    {
+      "mean_normret": 0.645082471091707,
+      "worst_normret": 0.591836710537277,
+      "hmean_normret": 0.6420622907598309
+    }
+  ],
+  "perturbed": {
+    "lr": 1e-08,
+    "displacement": 6.659275156354795e-08,
+    "scores": {
+      "math": 0.49,
+      "coding": 0.345,
+      "instruction": 0.36
+    },
+    "aggregate": {
+      "mean_normret": 0.6424984918036033,
+      "worst_normret": 0.591836710537277,
+      "hmean_normret": 0.6394682745566846
+    }
+  }
+}

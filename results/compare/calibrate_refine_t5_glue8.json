@@ -1,0 +1,509 @@
+{
+  "config": {
+    "base_model": "google/flan-t5-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "t5",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 256,
+      "eval_batch_size": 64,
+      "grad_batch_size": null,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/t5_glue8",
+    "tag": "t5_glue8"
+  },
+  "tasks": [
+    "cola",
+    "sst2",
+    "mrpc",
+    "stsb",
+    "qqp",
+    "mnli",
+    "qnli",
+    "rte"
+  ],
+  "grids": {
+    "config": "configs/t5_glue8.yaml",
+    "n_probe": 64,
+    "variants": [
+      "layer",
+      "task"
+    ],
+    "cal_lrs": [
+      0.01,
+      0.03
+    ],
+    "l2_regs": [
+      0.001,
+      0.01,
+      0.1
+    ],
+    "cal_steps": 300,
+    "cal_bs": 16,
+    "holdout_frac": 0.25,
+    "apr_lrs": [
+      8.0,
+      16.0,
+      32.0,
+      64.0
+    ],
+    "steps": 5,
+    "out": "results/compare/calibrate_refine_t5_glue8.json"
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": 0.38330441486482836,
+      "worst": -0.24999994229168127,
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "calib:layer@lr0.01,l20.001": {
+      "mean": 0.5193349557875752,
+      "worst": 0.06832295818333223,
+      "replay_obj": 0.6164850448113073,
+      "disp": 13.384003285796823,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.2576106786727905,
+          "sst2": 0.27824798226356506,
+          "mrpc": 0.2715877294540405,
+          "stsb": 0.4737716615200043,
+          "qqp": 0.11414097994565964,
+          "mnli": 0.6166730523109436,
+          "qnli": 0.16620422899723053,
+          "rte": 0.30776694416999817
+        },
+        "best_holdout_loss": 0.341660063713789,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.22098106890916824
+      }
+    },
+    "calib:layer@lr0.01,l20.01": {
+      "mean": 0.455463654404964,
+      "worst": -0.33333325638890665,
+      "replay_obj": 0.754489321547841,
+      "disp": 15.487742252075416,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.2722757160663605,
+          "sst2": 0.2917309105396271,
+          "mrpc": 0.28547829389572144,
+          "stsb": 0.4290558695793152,
+          "qqp": 0.23299632966518402,
+          "mnli": 0.5037969350814819,
+          "qnli": 0.24818672239780426,
+          "rte": 0.28342506289482117
+        },
+        "best_holdout_loss": 0.38205370493233204,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.281398082152009
+      }
+    },
+    "calib:layer@lr0.01,l20.1": {
+      "mean": 0.27040757150902467,
+      "worst": -0.7499998268750412,
+      "replay_obj": 0.8794919255293449,
+      "disp": 12.278773038516507,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.28289419412612915,
+          "sst2": 0.29530230164527893,
+          "mrpc": 0.28792741894721985,
+          "stsb": 0.38852304220199585,
+          "qqp": 0.2811429798603058,
+          "mnli": 0.3575688898563385,
+          "qnli": 0.28156206011772156,
+          "rte": 0.2907446026802063
+        },
+        "best_holdout_loss": 0.6109799547120929,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.5821193547453731
+      }
+    },
+    "calib:layer@lr0.03,l20.001": {
+      "mean": 0.5393209571206659,
+      "worst": 0.07453413619999845,
+      "replay_obj": 0.6217946023296329,
+      "disp": 14.326023135433179,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 141,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.24932509660720825,
+          "sst2": 0.2734455466270447,
+          "mrpc": 0.2714654505252838,
+          "stsb": 0.48185139894485474,
+          "qqp": 0.11502207815647125,
+          "mnli": 0.6341443657875061,
+          "qnli": 0.1701272577047348,
+          "rte": 0.305400550365448
+        },
+        "best_holdout_loss": 0.34024341544136405,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.21991125657223165
+      }
+    },
+    "calib:layer@lr0.03,l20.01": {
+      "mean": 0.47819154018971965,
+      "worst": -0.24999994229168127,
+      "replay_obj": 0.7511867872707123,
+      "disp": 18.608719964673615,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 211,
+        "lr": 0.03,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.2755044996738434,
+          "sst2": 0.29293686151504517,
+          "mrpc": 0.28783363103866577,
+          "stsb": 0.4236588180065155,
+          "qqp": 0.2360457330942154,
+          "mnli": 0.5002864599227905,
+          "qnli": 0.2481706291437149,
+          "rte": 0.2824782431125641
+        },
+        "best_holdout_loss": 0.379949543857947,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.3231889377348125
+      }
+    },
+    "calib:layer@lr0.03,l20.1": {
+      "mean": 0.27051635799976714,
+      "worst": -0.7499998268750412,
+      "replay_obj": 0.8787320224649195,
+      "disp": 12.065939284196547,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 101,
+        "lr": 0.03,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.28283464908599854,
+          "sst2": 0.29559463262557983,
+          "mrpc": 0.28847140073776245,
+          "stsb": 0.38811078667640686,
+          "qqp": 0.28196319937705994,
+          "mnli": 0.3592716455459595,
+          "qnli": 0.2814514935016632,
+          "rte": 0.29212379455566406
+        },
+        "best_holdout_loss": 0.6091180432122201,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.6077199354767799
+      }
+    },
+    "calib:task@lr0.01,l20.001": {
+      "mean": 0.09842492843269077,
+      "worst": -2.142856253061589,
+      "replay_obj": 1.2406351795374322,
+      "disp": 14.35639910734959,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.0577671118080616,
+          "sst2": -0.17045468091964722,
+          "mrpc": 0.8284449577331543,
+          "stsb": 0.6213839650154114,
+          "qqp": -0.5056461095809937,
+          "mnli": 1.1699620485305786,
+          "qnli": 0.1190488412976265,
+          "rte": 0.0337601900100708
+        },
+        "best_holdout_loss": 0.46483514830470085,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.39671875443309546
+      }
+    },
+    "calib:task@lr0.01,l20.01": {
+      "mean": 0.14167706120198217,
+      "worst": -1.85714208598671,
+      "replay_obj": 1.2267498860041204,
+      "disp": 14.186573104557304,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.05571962893009186,
+          "sst2": -0.15762721002101898,
+          "mrpc": 0.8005585074424744,
+          "stsb": 0.6221832633018494,
+          "qqp": -0.477113276720047,
+          "mnli": 1.1673765182495117,
+          "qnli": 0.1115046963095665,
+          "rte": 0.04278663545846939
+        },
+        "best_holdout_loss": 0.4648554138839245,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.39695957861840725
+      }
+    },
+    "calib:task@lr0.01,l20.1": {
+      "mean": 0.2609089386205787,
+      "worst": -0.9523805569162609,
+      "replay_obj": 1.1227453927526978,
+      "disp": 12.89004144909817,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.035866040736436844,
+          "sst2": -0.0368211567401886,
+          "mrpc": 0.5544895529747009,
+          "stsb": 0.6292449235916138,
+          "qqp": -0.27125900983810425,
+          "mnli": 1.136291265487671,
+          "qnli": 0.07919299602508545,
+          "rte": 0.12785544991493225
+        },
+        "best_holdout_loss": 0.46883499016985297,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.4018905428238213
+      }
+    },
+    "calib:task@lr0.03,l20.001": {
+      "mean": 0.11100810444423556,
+      "worst": -1.9047611138325218,
+      "replay_obj": 1.246244309890974,
+      "disp": 14.656393334222521,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 211,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.06686810404062271,
+          "sst2": -0.15751464664936066,
+          "mrpc": 0.8826478719711304,
+          "stsb": 0.6188408136367798,
+          "qqp": -0.5679327249526978,
+          "mnli": 1.1754287481307983,
+          "qnli": 0.16433191299438477,
+          "rte": -0.013766607269644737
+        },
+        "best_holdout_loss": 0.46337703987956047,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.415913712233305
+      }
+    },
+    "calib:task@lr0.03,l20.01": {
+      "mean": 0.13279248329779847,
+      "worst": -1.9047611138325218,
+      "replay_obj": 1.2330150589360909,
+      "disp": 14.472379342012307,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 211,
+        "lr": 0.03,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.06602959334850311,
+          "sst2": -0.14563918113708496,
+          "mrpc": 0.8577094674110413,
+          "stsb": 0.619559645652771,
+          "qqp": -0.5327190160751343,
+          "mnli": 1.1733146905899048,
+          "qnli": 0.14750920236110687,
+          "rte": -0.004028980154544115
+        },
+        "best_holdout_loss": 0.46305258106440306,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.41623337287455797
+      }
+    },
+    "calib:task@lr0.03,l20.1": {
+      "mean": 0.24136928981208172,
+      "worst": -0.9999995847620771,
+      "replay_obj": 1.1224263042331142,
+      "disp": 12.91595697038504,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 211,
+        "lr": 0.03,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "cola": 0.044171836227178574,
+          "sst2": -0.03022633120417595,
+          "mrpc": 0.5776317715644836,
+          "stsb": 0.6274901032447815,
+          "qqp": -0.27690333127975464,
+          "mnli": 1.1386103630065918,
+          "qnli": 0.07813771069049835,
+          "rte": 0.1160130500793457
+        },
+        "best_holdout_loss": 0.46775871282443404,
+        "fit_loss_first": 1.1139397025108337,
+        "fit_loss_last": 0.4221687875688076
+      }
+    },
+    "apr<-calib@lr8": {
+      "mean": 0.629273599346589,
+      "worst": -0.012422356033336215,
+      "replay_obj": 0.5652661316236497,
+      "disp": 13.357254179571052,
+      "lr": 8.0
+    },
+    "apr<-calib@lr16": {
+      "mean": 0.6459670892802456,
+      "worst": 0.0062111780166662234,
+      "replay_obj": 0.5283158060485819,
+      "disp": 13.334340157156326,
+      "lr": 16.0
+    },
+    "apr<-calib@lr32": {
+      "mean": 0.6495833827212154,
+      "worst": 0.043478246116667334,
+      "replay_obj": 0.481070348608234,
+      "disp": 13.295409679909168,
+      "lr": 32.0
+    },
+    "apr<-calib@lr64": {
+      "mean": 0.6638513986805862,
+      "worst": 0.018633534049998672,
+      "replay_obj": 0.4284661722798017,
+      "disp": 13.230099864343513,
+      "lr": 64.0
+    },
+    "apr<-ta@lr8": {
+      "mean": 0.44440358892099796,
+      "worst": 0.018895348298087603,
+      "replay_obj": 0.7919918732949408,
+      "disp": 0.41521850708811187,
+      "lr": 8.0
+    },
+    "apr<-ta@lr16": {
+      "mean": 0.4781850735311347,
+      "worst": 0.08837209050182541,
+      "replay_obj": 0.7360263217778115,
+      "disp": 0.5700378594529639,
+      "lr": 16.0
+    },
+    "apr<-ta@lr32": {
+      "mean": 0.5367337006672221,
+      "worst": 0.023569492431882125,
+      "replay_obj": 0.6802008431898698,
+      "disp": 0.7509517247074363,
+      "lr": 32.0
+    },
+    "apr<-ta@lr64": {
+      "mean": 0.5574952079142237,
+      "worst": -0.1026087061785303,
+      "replay_obj": 0.6197522527252777,
+      "disp": 0.9867884449751525,
+      "lr": 64.0
+    }
+  },
+  "best_calibrated": "calib:layer@lr0.01,l20.001"
+}

@@ -1,0 +1,214 @@
+{
+  "config": {
+    "base_model": "meta-llama/Llama-3.2-3B",
+    "experts": [
+      {
+        "name": "math",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "coding",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "instruction",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "multilingual",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "causal_lm",
+    "model_dtype": "bfloat16",
+    "eval_dtype": "bfloat16",
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 1024,
+      "eval_batch_size": 16,
+      "grad_batch_size": 4,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": false,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": 300
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/mergebench3b",
+    "tag": "mergebench3b"
+  },
+  "steps": 5,
+  "base": {
+    "math": 0.06666666666666667,
+    "coding": 0.38,
+    "instruction": 0.21333333333333335,
+    "multilingual": 0.46
+  },
+  "expert": {
+    "math": 0.7366666666666667,
+    "coding": 0.4766666666666667,
+    "instruction": 0.47,
+    "multilingual": 0.44333333333333336
+  },
+  "tasks": [
+    "math",
+    "coding",
+    "instruction",
+    "multilingual"
+  ],
+  "methods": {
+    "merge(S=0)": {
+      "scores": {
+        "math": 0.5266666666666666,
+        "coding": 0.4266666666666667,
+        "instruction": 0.2866666666666667,
+        "multilingual": 0.51
+      },
+      "normret": {
+        "math": 0.6865671539318334,
+        "coding": 0.4827585707491136,
+        "instruction": 0.2857142745825608,
+        "multilingual": -3.00000180000108
+      },
+      "aggregate": {
+        "mean_normret": -0.3862404501843931,
+        "worst_normret": -3.00000180000108,
+        "hmean_normret": 3.9999718883948354e-06
+      },
+      "displacement": 0.0
+    },
+    "apr@lr4,g1": {
+      "scores": {
+        "math": 0.5,
+        "coding": 0.43,
+        "instruction": 0.30333333333333334,
+        "multilingual": 0.5033333333333333
+      },
+      "normret": {
+        "math": 0.6467661595010026,
+        "coding": 0.5172413258026213,
+        "instruction": 0.35064933698768824,
+        "multilingual": -2.6000015600009334
+      },
+      "aggregate": {
+        "mean_normret": -0.27133618442740537,
+        "worst_normret": -2.6000015600009334,
+        "hmean_normret": 3.99997467480288e-06
+      },
+      "displacement": 0.0075347851571137365,
+      "gate_density": 0.41352413147000144,
+      "clip_frac_gated": 3.6455622384351513e-09
+    },
+    "apr@lr16,g1": {
+      "scores": {
+        "math": 0.5066666666666667,
+        "coding": 0.44333333333333336,
+        "instruction": 0.31,
+        "multilingual": 0.5
+      },
+      "normret": {
+        "math": 0.6567164081087103,
+        "coding": 0.655172346016654,
+        "instruction": 0.37662336194973917,
+        "multilingual": -2.400001440000864
+      },
+      "aggregate": {
+        "mean_normret": -0.17787233098144006,
+        "worst_normret": -2.400001440000864,
+        "hmean_normret": 3.999977183267111e-06
+      },
+      "displacement": 0.027277570092161058,
+      "gate_density": 0.4134900244570055,
+      "clip_frac_gated": 2.3306457560868735e-07
+    },
+    "apr@lr64,g1": {
+      "scores": {
+        "math": 0.49333333333333335,
+        "coding": 0.43666666666666665,
+        "instruction": 0.29,
+        "multilingual": 0.49666666666666665
+      },
+      "normret": {
+        "math": 0.6368159108932948,
+        "coding": 0.5862068359096374,
+        "instruction": 0.2987012870635862,
+        "multilingual": -2.20000132000079
+      },
+      "aggregate": {
+        "mean_normret": -0.16956932153356796,
+        "worst_normret": -2.20000132000079,
+        "hmean_normret": 3.999973504090429e-06
+      },
+      "displacement": 0.10370779750636924,
+      "gate_density": 0.4135313377111557,
+      "clip_frac_gated": 1.077205834447507e-06
+    },
+    "ordinary_gd@5e-05": {
+      "scores": {
+        "math": 0.5033333333333333,
+        "coding": 0.43666666666666665,
+        "instruction": 0.2966666666666667,
+        "multilingual": 0.5066666666666667
+      },
+      "normret": {
+        "math": 0.6517412838048563,
+        "coding": 0.5862068359096374,
+        "instruction": 0.3246753120256373,
+        "multilingual": -2.80000168000101
+      },
+      "aggregate": {
+        "mean_normret": -0.30934456206521976,
+        "worst_normret": -2.80000168000101,
+        "hmean_normret": 3.999974719224511e-06
+      },
+      "displacement": 0.0018737670520211594,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    },
+    "ordinary_gd@0.0002": {
+      "scores": {
+        "math": 0.49666666666666665,
+        "coding": 0.44,
+        "instruction": 0.3,
+        "multilingual": 0.5066666666666667
+      },
+      "normret": {
+        "math": 0.6417910351971486,
+        "coding": 0.6206895909631457,
+        "instruction": 0.33766232450666267,
+        "multilingual": -2.80000168000101
+      },
+      "aggregate": {
+        "mean_normret": -0.29996468233351326,
+        "worst_normret": -2.80000168000101,
+        "hmean_normret": 3.999975476992694e-06
+      },
+      "displacement": 0.006727004693154854,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    }
+  }
+}

@@ -1,0 +1,395 @@
+{
+  "config": {
+    "base_model": "meta-llama/Llama-3.2-3B",
+    "experts": [
+      {
+        "name": "math",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "coding",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "instruction",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "multilingual",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "causal_lm",
+    "model_dtype": "bfloat16",
+    "eval_dtype": "bfloat16",
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "n_val": 0,
+      "max_length": 1024,
+      "eval_batch_size": 48,
+      "grad_batch_size": 4,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": false,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": 300,
+      "max_eval_by_task": {
+        "instruction": 150,
+        "multilingual": 5000
+      },
+      "eval0_cache": true
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/mergebench3b",
+    "tag": "mb3b_sweep"
+  },
+  "tasks": [
+    "math",
+    "coding",
+    "instruction",
+    "multilingual"
+  ],
+  "steps": 20,
+  "base": {
+    "math": 0.06333333333333334,
+    "coding": 0.38666666666666666,
+    "instruction": 0.18,
+    "multilingual": 0.4954
+  },
+  "expert": {
+    "math": 0.73,
+    "coding": 0.48,
+    "instruction": 0.4866666666666667,
+    "multilingual": 0.4936
+  },
+  "grids": {
+    "config": "configs/mergebench_llama3b_sweep.yaml",
+    "n_probe": null,
+    "probe_seed": null,
+    "ta_lams": [
+      0.5
+    ],
+    "ties_densities": [
+      0.1,
+      0.2
+    ],
+    "ties_lams": [
+      0.8,
+      1.0
+    ],
+    "dare_densities": [
+      0.3
+    ],
+    "dare_seeds": [
+      0,
+      1
+    ],
+    "dt_drops": [
+      0.5
+    ],
+    "dt_trims": [
+      0.1,
+      0.2
+    ],
+    "dt_lams": [
+      0.8,
+      1.0
+    ],
+    "dt_seed": 0,
+    "della_densities": [
+      0.7
+    ],
+    "della_windows": [
+      0.14
+    ],
+    "della_lams": [
+      1.1
+    ],
+    "della_seeds": [
+      42
+    ],
+    "bc_densities": [
+      0.1,
+      0.2
+    ],
+    "bc_outliers": [
+      0.01,
+      0.05
+    ],
+    "bc_lams": [
+      0.4
+    ],
+    "ls_fracs": [
+      0.05,
+      0.1
+    ],
+    "ls_lams": [
+      1.0
+    ],
+    "ada_variants": [
+      "task",
+      "layer"
+    ],
+    "ada_steps": 300,
+    "ada_lr": 0.001,
+    "ada_bs": 16,
+    "ada_init_lam": 0.3,
+    "ada_workers": 0,
+    "ada_data": [
+      "eval_ds"
+    ],
+    "apr_schedules": [
+      "constant"
+    ],
+    "apr_order": "random",
+    "apr_gate_modes": [],
+    "topk_fracs": [
+      0.05
+    ],
+    "gd_lrs": [],
+    "gd_steps": [],
+    "gd_schedules": [
+      "constant"
+    ],
+    "gd_lr_min_frac": 0.05,
+    "gd_order": "random",
+    "nogate_lrs": [
+      128.0
+    ],
+    "refine_from": [
+      "ta"
+    ],
+    "apr_lrs": [
+      256.0
+    ],
+    "control_gd_lrs": [
+      1e-05,
+      0.0001,
+      0.001
+    ],
+    "steps": 20,
+    "skip_families": [
+      "ties",
+      "dare",
+      "dareties",
+      "della",
+      "bc",
+      "ls",
+      "ada"
+    ],
+    "select_by": "mean_normret",
+    "retention_tasks": null,
+    "out": "results/compare/mb3b_longhorizon_S20.json"
+  },
+  "methods": {
+    "merge:TA@l0.5": {
+      "scores": {
+        "math": 0.6133333333333333,
+        "coding": 0.43,
+        "instruction": 0.30666666666666664,
+        "multilingual": 0.5044
+      },
+      "normret": {
+        "math": 0.824999987625,
+        "coding": 0.46428566454082176,
+        "instruction": 0.41304346479206083,
+        "multilingual": -5.000027777932007
+      },
+      "aggregate": {
+        "mean_acc": 0.46359999999999996,
+        "worst_acc": 0.30666666666666664,
+        "mean_normret": -0.8244246652435311,
+        "worst_normret": -5.000027777932007,
+        "hmean_normret": 3.999976852052656e-06,
+        "mean_normret_nondeg": 0.5674430389859609,
+        "worst_normret_nondeg": 0.41304346479206083,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 6.69626774414518,
+      "lam": 0.5
+    },
+    "apr:from=ta@lr256": {
+      "scores": {
+        "math": 0.6133333333333333,
+        "coding": 0.44333333333333336,
+        "instruction": 0.4,
+        "multilingual": 0.5024
+      },
+      "normret": {
+        "math": 0.824999987625,
+        "coding": 0.6071427920918442,
+        "instruction": 0.7173912809546322,
+        "multilingual": -3.8889104939471095
+      },
+      "aggregate": {
+        "mean_acc": 0.48976666666666663,
+        "worst_acc": 0.4,
+        "mean_normret": -0.4348441083189083,
+        "worst_normret": -3.8889104939471095,
+        "hmean_normret": 3.999982987593677e-06,
+        "mean_normret_nondeg": 0.7165113535571588,
+        "worst_normret_nondeg": 0.6071427920918442,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 0.8477623618194507,
+      "init": "TA@l0.5",
+      "lr": 256.0,
+      "schedule": "constant",
+      "gate_mode": "coordinate",
+      "topk_frac": null,
+      "gate_density": 0.42233539362883177,
+      "replay_obj": 0.7910908931477043
+    },
+    "nogate:from=ta@lr128": {
+      "scores": {
+        "math": 0.5466666666666666,
+        "coding": 0.39,
+        "instruction": 0.42,
+        "multilingual": 0.4766
+      },
+      "normret": {
+        "math": 0.7249999891250001,
+        "coding": 0.035714281887755744,
+        "instruction": 0.7826086701323258,
+        "multilingual": 10.444502469458016
+      },
+      "aggregate": {
+        "mean_acc": 0.4583166666666667,
+        "worst_acc": 0.39,
+        "mean_normret": 2.9969563526507743,
+        "worst_normret": 0.035714281887755744,
+        "hmean_normret": 0.13006930764497518,
+        "mean_normret_nondeg": 0.514440980381694,
+        "worst_normret_nondeg": 0.035714281887755744,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 2.9785885146758924,
+      "init": "TA@l0.5",
+      "lr": 128.0,
+      "replay_obj": 0.573129999492529
+    },
+    "gd:from=ta@lr1e-05": {
+      "scores": {
+        "math": 0.6366666666666667,
+        "coding": 0.43333333333333335,
+        "instruction": 0.31333333333333335,
+        "multilingual": 0.5042
+      },
+      "normret": {
+        "math": 0.8599999871000003,
+        "coding": 0.4999999464285775,
+        "instruction": 0.4347825945179589,
+        "multilingual": -4.888916049533529
+      },
+      "aggregate": {
+        "mean_acc": 0.4718833333333333,
+        "worst_acc": 0.31333333333333335,
+        "mean_normret": -0.7735333803717481,
+        "worst_normret": -4.888916049533529,
+        "hmean_normret": 3.9999781489553496e-06,
+        "mean_normret_nondeg": 0.5982608426821788,
+        "worst_normret_nondeg": 0.4347825945179589,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 0.001802085294124813,
+      "init": "TA@l0.5",
+      "lr": 1e-05,
+      "replay_obj": 0.9715245694095264
+    },
+    "gd:from=ta@lr0.0001": {
+      "scores": {
+        "math": 0.6,
+        "coding": 0.44666666666666666,
+        "instruction": 0.32,
+        "multilingual": 0.5048
+      },
+      "normret": {
+        "math": 0.804999987925,
+        "coding": 0.6428570739795993,
+        "instruction": 0.45652172424385684,
+        "multilingual": -5.222251234729024
+      },
+      "aggregate": {
+        "mean_acc": 0.46786666666666665,
+        "worst_acc": 0.32,
+        "mean_normret": -0.8294681121451419,
+        "worst_normret": -5.222251234729024,
+        "hmean_normret": 3.999980047027421e-06,
+        "mean_normret_nondeg": 0.6347929287161521,
+        "worst_normret_nondeg": 0.45652172424385684,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 0.015215901893355054,
+      "init": "TA@l0.5",
+      "lr": 0.0001,
+      "replay_obj": 0.950979564917251
+    },
+    "gd:from=ta@lr0.001": {
+      "scores": {
+        "math": 0.5866666666666667,
+        "coding": 0.44,
+        "instruction": 0.32,
+        "multilingual": 0.4974
+      },
+      "normret": {
+        "math": 0.7849999882250002,
+        "coding": 0.5714285102040884,
+        "instruction": 0.45652172424385684,
+        "multilingual": -1.1111172839848973
+      },
+      "aggregate": {
+        "mean_acc": 0.4610166666666667,
+        "worst_acc": 0.32,
+        "mean_normret": 0.175458234672012,
+        "worst_normret": -1.1111172839848973,
+        "hmean_normret": 3.9999791426614825e-06,
+        "mean_normret_nondeg": 0.6043167408909818,
+        "worst_normret_nondeg": 0.45652172424385684,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      },
+      "displacement": 0.06770831189839974,
+      "init": "TA@l0.5",
+      "lr": 0.001,
+      "replay_obj": 0.9148210597552742
+    }
+  },
+  "best_per_family": {
+    "ta": "merge:TA@l0.5"
+  },
+  "best_apr_from_ta": "apr:from=ta@lr256"
+}

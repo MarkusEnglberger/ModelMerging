@@ -1,0 +1,274 @@
+{
+  "config": {
+    "base_model": "meta-llama/Llama-3.2-3B",
+    "experts": [
+      {
+        "name": "math",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "coding",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "instruction",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "causal_lm",
+    "model_dtype": "bfloat16",
+    "eval_dtype": "bfloat16",
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 1024,
+      "eval_batch_size": 16,
+      "grad_batch_size": 4,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": false,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": 200
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/mergebench3b",
+    "tag": "mergebench3b"
+  },
+  "steps": 5,
+  "base": {
+    "math": 0.08,
+    "coding": 0.39,
+    "instruction": 0.155
+  },
+  "expert": {
+    "math": 0.725,
+    "coding": 0.495,
+    "instruction": 0.465
+  },
+  "tasks": [
+    "math",
+    "coding",
+    "instruction"
+  ],
+  "methods": {
+    "merge(S=0)": {
+      "scores": {
+        "math": 0.495,
+        "coding": 0.445,
+        "instruction": 0.245
+      },
+      "normret": {
+        "math": 0.6434108427378163,
+        "coding": 0.5238094739229073,
+        "instruction": 0.290322571279917
+      },
+      "aggregate": {
+        "mean_normret": 0.4858476293135469,
+        "worst_normret": 0.290322571279917,
+        "hmean_normret": 0.43429465422847424
+      },
+      "displacement": 0.0
+    },
+    "apr@lr4,g1": {
+      "scores": {
+        "math": 0.505,
+        "coding": 0.46,
+        "instruction": 0.245
+      },
+      "normret": {
+        "math": 0.6589147184664383,
+        "coding": 0.6666666031746095,
+        "instruction": 0.290322571279917
+      },
+      "aggregate": {
+        "mean_normret": 0.5386346309736548,
+        "worst_normret": 0.290322571279917,
+        "hmean_normret": 0.46424595963329923
+      },
+      "displacement": 0.0017190734417126526,
+      "gate_density": 0.42294014379294953,
+      "clip_frac_gated": 7.864509566343234e-10
+    },
+    "apr@lr8,g1": {
+      "scores": {
+        "math": 0.48,
+        "coding": 0.45,
+        "instruction": 0.25
+      },
+      "normret": {
+        "math": 0.6201550291448832,
+        "coding": 0.571428517006808,
+        "instruction": 0.3064516030176902
+      },
+      "aggregate": {
+        "mean_normret": 0.4993450497231271,
+        "worst_normret": 0.3064516030176902,
+        "hmean_normret": 0.45278520461155247
+      },
+      "displacement": 0.0030862441066981695,
+      "gate_density": 0.4229381047297299,
+      "clip_frac_gated": 1.0780213444548306e-08
+    },
+    "apr@lr16,g1": {
+      "scores": {
+        "math": 0.5,
+        "coding": 0.46,
+        "instruction": 0.25
+      },
+      "normret": {
+        "math": 0.6511627806021273,
+        "coding": 0.6666666031746095,
+        "instruction": 0.3064516030176902
+      },
+      "aggregate": {
+        "mean_normret": 0.5414269955981423,
+        "worst_normret": 0.3064516030176902,
+        "hmean_normret": 0.47627571802410607
+      },
+      "displacement": 0.006230267941823712,
+      "gate_density": 0.42294022953466043,
+      "clip_frac_gated": 1.1191068525300184e-07
+    },
+    "nogate@lr1,g1": {
+      "scores": {
+        "math": 0.495,
+        "coding": 0.44,
+        "instruction": 0.245
+      },
+      "normret": {
+        "math": 0.6434108427378163,
+        "coding": 0.4761904308390066,
+        "instruction": 0.290322571279917
+      },
+      "aggregate": {
+        "mean_normret": 0.46997461495224657,
+        "worst_normret": 0.290322571279917,
+        "hmean_normret": 0.42261487434273776
+      },
+      "displacement": 0.0009638701416300391,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    },
+    "nogate@lr2,g1": {
+      "scores": {
+        "math": 0.505,
+        "coding": 0.445,
+        "instruction": 0.25
+      },
+      "normret": {
+        "math": 0.6589147184664383,
+        "coding": 0.5238094739229073,
+        "instruction": 0.3064516030176902
+      },
+      "aggregate": {
+        "mean_normret": 0.4963919318023453,
+        "worst_normret": 0.3064516030176902,
+        "hmean_normret": 0.44843745288459125
+      },
+      "displacement": 0.0020847752045305397,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    },
+    "nogate@lr4,g1": {
+      "scores": {
+        "math": 0.5,
+        "coding": 0.44,
+        "instruction": 0.24
+      },
+      "normret": {
+        "math": 0.6511627806021273,
+        "coding": 0.4761904308390066,
+        "instruction": 0.2741935395421438
+      },
+      "aggregate": {
+        "mean_normret": 0.4671822503277592,
+        "worst_normret": 0.2741935395421438,
+        "hmean_normret": 0.4119309793594544
+      },
+      "displacement": 0.005403083476671331,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 3.94230298325072e-10
+    },
+    "ordinary_gd@1e-05": {
+      "scores": {
+        "math": 0.495,
+        "coding": 0.455,
+        "instruction": 0.275
+      },
+      "normret": {
+        "math": 0.6434108427378163,
+        "coding": 0.6190475600907087,
+        "instruction": 0.3870967617065561
+      },
+      "aggregate": {
+        "mean_normret": 0.5498517215116937,
+        "worst_normret": 0.3870967617065561,
+        "hmean_normret": 0.5214729454799639
+      },
+      "displacement": 0.00013130826285506336,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    },
+    "ordinary_gd@5e-05": {
+      "scores": {
+        "math": 0.46,
+        "coding": 0.445,
+        "instruction": 0.26
+      },
+      "normret": {
+        "math": 0.5891472776876391,
+        "coding": 0.5238094739229073,
+        "instruction": 0.3387096664932365
+      },
+      "aggregate": {
+        "mean_normret": 0.4838888060345943,
+        "worst_normret": 0.3387096664932365,
+        "hmean_normret": 0.4573979136573138
+      },
+      "displacement": 0.0008510217655063096,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    },
+    "ordinary_gd@0.0001": {
+      "scores": {
+        "math": 0.495,
+        "coding": 0.455,
+        "instruction": 0.255
+      },
+      "normret": {
+        "math": 0.6434108427378163,
+        "coding": 0.6190475600907087,
+        "instruction": 0.32258063475546334
+      },
+      "aggregate": {
+        "mean_normret": 0.5283463458613294,
+        "worst_normret": 0.32258063475546334,
+        "hmean_normret": 0.4784992914156991
+      },
+      "displacement": 0.001644479291306404,
+      "gate_density": 1.0000815948998087,
+      "clip_frac_gated": 0.0
+    }
+  }
+}

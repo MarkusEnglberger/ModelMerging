@@ -5,7 +5,14 @@
 .mats_data/
 __pycache__/
 *.pyc
-results/
+# Experiment outputs are large -- the merge cache alone holds 351 MB model
+# states and results/ totals several GB. The compare/ summaries are different:
+# a few MB of JSON that are the provenance for every number in the paper, so
+# they are versioned and everything else is not.
+results/*
+!results/compare/
+results/compare/*
+!results/compare/*.json
 logs/
 experts/
 
