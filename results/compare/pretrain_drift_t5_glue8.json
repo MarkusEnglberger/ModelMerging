@@ -1,0 +1,38 @@
+{
+ "config": "configs/t5_glue8.yaml",
+ "n_probe": 16,
+ "probe_seed": 0,
+ "wikitext_blocks": 256,
+ "block_len": 128,
+ "states": {
+  "theta0": {
+   "dist_theta0": 0.0,
+   "drift_loss": 3.617689311504364
+  },
+  "merge:TA@l0.3": {
+   "dist_theta0": 13.377485722310796,
+   "drift_loss": 3.6462895274162292
+  },
+  "apr:from=theta0@lr512,S50": {
+   "dist_theta0": 4.786077760382804,
+   "drift_loss": 3.6446294635534286,
+   "arm": "apr",
+   "lr": 512.0,
+   "steps": 50
+  },
+  "nogate:from=theta0@lr32,S5": {
+   "dist_theta0": 2.862783646824181,
+   "drift_loss": 3.890790492296219,
+   "arm": "nogate",
+   "lr": 32.0,
+   "steps": 5
+  },
+  "gd:from=theta0@lr0.001,S50": {
+   "dist_theta0": 0.4336057836576785,
+   "drift_loss": 3.8504965603351593,
+   "arm": "gd",
+   "lr": 0.001,
+   "steps": 50
+  }
+ }
+}

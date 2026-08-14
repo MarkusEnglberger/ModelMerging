@@ -1,0 +1,38 @@
+{
+ "config": "configs/glue8.yaml",
+ "n_probe": 16,
+ "probe_seed": 0,
+ "wikitext_blocks": 256,
+ "block_len": 128,
+ "states": {
+  "theta0": {
+   "dist_theta0": 0.0,
+   "drift_loss": 2.5090103493462372
+  },
+  "merge:TA@l0.3": {
+   "dist_theta0": 107.65692297678183,
+   "drift_loss": 5.021538297524254
+  },
+  "apr:from=theta0@lr8,S50": {
+   "dist_theta0": 2.467905471505416,
+   "drift_loss": 3.5886961132725435,
+   "arm": "apr",
+   "lr": 8.0,
+   "steps": 50
+  },
+  "nogate:from=theta0@lr8,S50": {
+   "dist_theta0": 5.32023830337301,
+   "drift_loss": 16.10379938421748,
+   "arm": "nogate",
+   "lr": 8.0,
+   "steps": 50
+  },
+  "gd:from=theta0@lr0.001,S50": {
+   "dist_theta0": 0.4521889510433795,
+   "drift_loss": 4.125800472610076,
+   "arm": "gd",
+   "lr": 0.001,
+   "steps": 50
+  }
+ }
+}
