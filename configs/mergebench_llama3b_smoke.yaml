@@ -1,0 +1,44 @@
+# SMOKE-ONLY variant of configs/mergebench_llama3b.yaml: identical model/refine
+# setup, evaluation shrunk to minutes. Exists to validate the n+n split wiring
+# on the causal_lm path (selection buffer disjointness, selection_obj recorded
+# on APR and GD cells, eval untouched by selection) before a multi-hour job.
+# Numbers from this config are meaningless; max_eval is part of the eval0 cache
+# key, so these tiny scores can never collide with real 300-item entries.
+base_model: meta-llama/Llama-3.2-3B
+modality: causal_lm
+model_dtype: bfloat16
+eval_dtype: bfloat16
+tag: mb3b_smoke
+output_dir: results/mergebench3b
+device: cuda
+seed: 0
+
+experts:
+  - {name: math,        lam: 0.3}
+  - {name: coding,      lam: 0.3}
+  - {name: instruction, lam: 0.3}
+  - {name: multilingual, lam: 0.3}
+
+refine:
+  steps: 5
+  lr: 8.0
+  clip_frac: 1.0
+  gate_eps: 0.0
+  order: fixed
+  gate_mode: coordinate
+  update_mode: gated_grad
+  clip_mode: vdist
+  aggregated: false
+
+data:
+  n_probe: 8
+  max_length: 1024
+  eval_batch_size: 48
+  grad_batch_size: 4
+  probe_seed: 0
+  class_balanced: false
+  max_eval: 8             # SMOKE: 8 items per generation task
+  eval0_cache: true
+  max_eval_by_task:
+    instruction: 6        # SMOKE: IFEval generation is the cost driver even at 8
+    multilingual: 200
