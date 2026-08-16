@@ -38,8 +38,9 @@ LABELS = {  # selective direct labels: frontier + cautionary points
     "apr:from=ada14@lr4": (r"APR$\leftarrow$AdaMerging", (-30, 9)),
     "merge:BC14@d0.1,o0.01,l0.2": ("Breadcrumbs", (6, -11)),
     "merge:TA14@l0.2": (r"TA $\lambda$=0.2", (6, 3)),
-    "merge:RegMean14@nd1": ("RegMean (dist 386)", (-40, -13)),
+    "merge:RegMean14@nd1": ("RegMean", (-40, -13)),  # dist appended at runtime
     "merge:TIES14@d0.1,l0.8": (r"TIES $\lambda$=0.8", (6, -3)),
+    "apr:from=base14@lr2": ("APR base lr2", (-14, 8)),
     "nogate:from=base14@lr2": ("ungated lr2", (4, -11)),
     "nogate:from=base14@lr8": ("ungated lr8", (5, -3)),
 }
@@ -59,7 +60,13 @@ SRC2 = os.path.join(HERE, "..", "results/compare/heldout_nogate_sweep.json")
 
 
 def main():
-    d = json.load(open(SRC))
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--src", default=SRC)
+    ap.add_argument("--out", default=OUT)
+    a = ap.parse_args()
+    out = a.out
+    d = json.load(open(a.src))
     pts = {k: (v["train_mean"], v["held_mean"]) for k, v in d["cells"].items()}
     if os.path.exists(SRC2):
         for k, v in json.load(open(SRC2))["cells"].items():
@@ -91,6 +98,8 @@ def main():
                    edgecolors="white", linewidths=0.6)
         if k in LABELS:
             txt, (dx, dy) = LABELS[k]
+            if k == "merge:RegMean14@nd1":
+                txt = f"RegMean (dist {d['cells'][k]['dist_theta0']:.0f})"
             ax.annotate(txt, (t, h), textcoords="offset points", xytext=(dx, dy),
                         fontsize=7.5, color="#333333")
 
@@ -103,9 +112,9 @@ def main():
         ax.spines[s].set_visible(False)
     ax.legend(loc="lower right", frameon=False, fontsize=8)
     fig.tight_layout()
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    fig.savefig(OUT, bbox_inches="tight")
-    print(f"[done] -> {OUT}  ({len(pts)} points, {len(front)} on frontier)")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    fig.savefig(out, bbox_inches="tight")
+    print(f"[done] -> {out}  ({len(pts)} points, {len(front)} on frontier)")
 
 
 if __name__ == "__main__":

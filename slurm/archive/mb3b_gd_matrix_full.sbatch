@@ -8,6 +8,13 @@
 #SBATCH --output=logs/mb3b_full-%j.out
 #SBATCH --error=logs/mb3b_full-%j.out
 
+# RETIRED 2026-08-15, never submitted: the n+n split protocol (merge_baselines
+# --n_select, commit 6ba18f1) superseded the premise of this job. Selection now
+# happens on a held-out replay buffer and never touches the evaluation split,
+# so there are no eval-selected winners to re-score at full precision; the
+# full-protocol evaluation is bought once, for the split-selected cell per arm.
+# Replacement: slurm/mb3b_n8_base.sbatch.
+#
 # DEFERRED -- do not submit until the (lr, S) grid is settled at the cheap
 # protocol. Cancelled once at 9 min (job 25193797) for exactly that reason: it
 # re-scores the S=5 winners at 300 items, but the S=20 job running alongside it

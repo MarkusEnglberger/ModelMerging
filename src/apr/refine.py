@@ -170,7 +170,10 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         u[name] = u_t
         masks[name] = m
         ap_sum += float((gi * vi).sum())
-        gated += int(m.sum().item())
+        # count via bool->int64: float-dtype m.sum() accumulates in fp32 and
+        # loses integer precision on >2^24-element tensors (logged density 1.0001
+        # for an all-ones mask on Llama's 394M-param tied embedding)
+        gated += int((m > 0).sum().item())
         total += m.numel()
     stats = {"ap_sum": ap_sum, "gate_density": gated / max(total, 1),
              "clip_frac_gated": clipped / max(gated, 1),
