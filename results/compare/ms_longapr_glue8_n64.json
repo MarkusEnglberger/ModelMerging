@@ -1,0 +1,170 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": "JeremiahZ/roberta-base-cola",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "JeremiahZ/roberta-base-sst2",
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": "JeremiahZ/roberta-base-mrpc",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "JeremiahZ/roberta-base-stsb",
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": "JeremiahZ/roberta-base-qqp",
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": "JeremiahZ/roberta-base-mnli",
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": "JeremiahZ/roberta-base-qnli",
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": "JeremiahZ/roberta-base-rte",
+        "lam": 0.3
+      }
+    ],
+    "modality": "glue",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 16.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/glue8",
+    "tag": "glue8"
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "n_probe": 64,
+  "arms": {
+    "apr-short": {
+      "mean": 0.5419986501523262,
+      "mean_std": 0.062349269150759314,
+      "worst": -0.17021707741629186,
+      "worst_std": 0.4295192941657472,
+      "means": [
+        0.5946705586456985,
+        0.46359536656764644,
+        0.6149888861062964,
+        0.5279620848745055,
+        0.5087763545674838
+      ],
+      "worsts": [
+        0.10834994214042323,
+        0.002423345726147281,
+        0.03325383837803814,
+        -0.06463553294966752,
+        -0.9304769803764005
+      ]
+    },
+    "apr-anneal": {
+      "mean": 0.6410689980484563,
+      "mean_std": 0.028102871599901665,
+      "worst": 0.11820675067978396,
+      "worst_std": 0.055145878168096324,
+      "means": [
+        0.6191454700103662,
+        0.6607670599797985,
+        0.667397745022967,
+        0.6034562166813986,
+        0.6545784985477507
+      ],
+      "worsts": [
+        0.1232805296097636,
+        0.17728367198274728,
+        0.09081369017533716,
+        0.03973423792913549,
+        0.15992162370193633
+      ]
+    },
+    "calibrated": {
+      "mean": 0.5850548628230866,
+      "mean_std": 0.03450611757825697,
+      "worst": 0.06100852959801308,
+      "worst_std": 0.08796825639822184,
+      "means": [
+        0.579810655435494,
+        0.5884654235754283,
+        0.6339443314518873,
+        0.5367655945232712,
+        0.5862883091293523
+      ],
+      "worsts": [
+        0.021406028141992866,
+        0.17342086906298454,
+        0.1001873680282684,
+        -0.06185527528375385,
+        0.07188365804057348
+      ]
+    },
+    "apr<-calib": {
+      "mean": 0.47983704766555696,
+      "mean_std": 0.15311464383989865,
+      "worst": -0.7151957950137593,
+      "worst_std": 0.7978007832356541,
+      "means": [
+        0.6616914341961857,
+        0.5362725295920712,
+        0.33982180938022427,
+        0.302077851291192,
+        0.5593216138681116
+      ],
+      "worsts": [
+        0.16262204247914214,
+        -0.3447472401943815,
+        -1.8864249695017028,
+        -1.1166213656257864,
+        -0.39080744222606795
+      ]
+    }
+  }
+}

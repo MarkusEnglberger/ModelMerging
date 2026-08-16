@@ -1,0 +1,462 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "mrpc",
+        "checkpoint": "textattack/roberta-base-MRPC",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "textattack/roberta-base-STS-B",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "textattack/roberta-base-SST-2",
+        "lam": 0.3
+      }
+    ],
+    "refine": {
+      "steps": 5,
+      "lr": 1.0,
+      "clip_frac": 0.5,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 64,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/poc3",
+    "tag": "poc3_roberta"
+  },
+  "gamma": 0.5,
+  "steps": 5,
+  "tasks": [
+    "mrpc",
+    "stsb",
+    "sst2"
+  ],
+  "methods": {
+    "merge(S=0)": {
+      "normret": {
+        "mrpc": 0.12176083863191456,
+        "stsb": 0.7077285222391,
+        "sst2": 0.8457446612369856
+      },
+      "aggregate": {
+        "mean_normret": 0.5584113407026666,
+        "worst_normret": 0.12176083863191456,
+        "hmean_normret": 0.27756748537495174
+      },
+      "displacement": 0.0
+    },
+    "ordinary_gd@0.0001": {
+      "normret": {
+        "mrpc": 0.13076080486706793,
+        "stsb": 0.8082731555696129,
+        "sst2": 0.8829787029266641
+      },
+      "aggregate": {
+        "mean_normret": 0.6073375544544484,
+        "worst_normret": 0.13076080486706793,
+        "hmean_normret": 0.29948227792602045
+      },
+      "displacement": 0.035149305131295404
+    },
+    "ordinary_gd@0.0005": {
+      "normret": {
+        "mrpc": 0.561274689662248,
+        "stsb": 0.9227408232419574,
+        "sst2": 0.9255318934291539
+      },
+      "aggregate": {
+        "mean_normret": 0.8031824687777864,
+        "worst_normret": 0.561274689662248,
+        "hmean_normret": 0.7602931257672532
+      },
+      "displacement": 0.08232437468335055
+    },
+    "ordinary_gd@0.001": {
+      "normret": {
+        "mrpc": 0.6469896391050254,
+        "stsb": 0.9412044896369167,
+        "sst2": 0.9281914678355595
+      },
+      "aggregate": {
+        "mean_normret": 0.8387951988591672,
+        "worst_normret": 0.6469896391050254,
+        "hmean_normret": 0.8140113942366135
+      },
+      "displacement": 0.11452820997110191
+    },
+    "ordinary_gd@0.002": {
+      "normret": {
+        "mrpc": -0.8696707620985424,
+        "stsb": 0.8088309755350872,
+        "sst2": 0.9069148725843147
+      },
+      "aggregate": {
+        "mean_normret": 0.28202502867361984,
+        "worst_normret": -0.8696707620985424,
+        "hmean_normret": 2.9999929830416843e-06
+      },
+      "displacement": 0.2181622404284815
+    },
+    "ordinary_gd@0.005": {
+      "normret": {
+        "mrpc": 0.0,
+        "stsb": 0.02139759255916732,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": -0.00705186598110746,
+        "worst_normret": -0.0425531905024897,
+        "hmean_normret": 1.4999649501469381e-06
+      },
+      "displacement": 0.67087262731236
+    },
+    "ordinary_gd@0.01": {
+      "normret": {
+        "mrpc": 0.0,
+        "stsb": 0.08019740765056867,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": 0.012548072382692989,
+        "worst_normret": -0.0425531905024897,
+        "hmean_normret": 1.4999906481350702e-06
+      },
+      "displacement": 2.0856777914672713
+    },
+    "ordinary_gd@0.1": {
+      "normret": {
+        "mrpc": -3.3551828058497777,
+        "stsb": 0.09228518651923327,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": -1.1018169366110113,
+        "worst_normret": -3.3551828058497777,
+        "hmean_normret": 1.4999918730625702e-06
+      },
+      "displacement": 11.782836499929614
+    },
+    "apr_paperclip@1": {
+      "normret": {
+        "mrpc": 0.16372001628811259,
+        "stsb": 0.8373705113802553,
+        "sst2": 0.8909574261458809
+      },
+      "aggregate": {
+        "mean_normret": 0.6306826512714162,
+        "worst_normret": 0.16372001628811259,
+        "hmean_normret": 0.3561003639938855
+      },
+      "displacement": 0.06662022039615473
+    },
+    "apr_paperclip@2": {
+      "normret": {
+        "mrpc": 0.22558126272262904,
+        "stsb": 0.8866846441847902,
+        "sst2": 0.8962765749586923
+      },
+      "aggregate": {
+        "mean_normret": 0.6695141606220373,
+        "worst_normret": 0.22558126272262904,
+        "hmean_normret": 0.449336150218736
+      },
+      "displacement": 0.1065634867577677
+    },
+    "apr_paperclip@4": {
+      "normret": {
+        "mrpc": 0.47084188231211677,
+        "stsb": 0.9237717262768715,
+        "sst2": 0.9202127446163426
+      },
+      "aggregate": {
+        "mean_normret": 0.7716087844017769,
+        "worst_normret": 0.47084188231211677,
+        "hmean_normret": 0.6987991622456405
+      },
+      "displacement": 0.1486439509553104
+    },
+    "apr_paperclip@8": {
+      "normret": {
+        "mrpc": 0.61788841969134,
+        "stsb": 0.9413161218681757,
+        "sst2": 0.9308510422419652
+      },
+      "aggregate": {
+        "mean_normret": 0.8300185279338269,
+        "worst_normret": 0.61788841969134,
+        "hmean_normret": 0.798925542579186
+      },
+      "displacement": 0.19789659472769747
+    },
+    "apr_paperclip@12": {
+      "normret": {
+        "mrpc": 0.0,
+        "stsb": -0.060369910587021056,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": -0.03430770036317025,
+        "worst_normret": -0.060369910587021056,
+        "hmean_normret": 1e-06
+      },
+      "displacement": 4.691048223296554
+    },
+    "apr_paperclip@16": {
+      "normret": {
+        "mrpc": 0.0,
+        "stsb": -0.29330551423193313,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": -0.11195290157814093,
+        "worst_normret": -0.29330551423193313,
+        "hmean_normret": 1e-06
+      },
+      "displacement": 5.458363632238484
+    },
+    "apr_paperclip@32": {
+      "normret": {
+        "mrpc": -3.3551828058497777,
+        "stsb": 0.2830763056969312,
+        "sst2": -0.0425531905024897
+      },
+      "aggregate": {
+        "mean_normret": -1.038219896885112,
+        "worst_normret": -3.3551828058497777,
+        "hmean_normret": 1.4999973505423797e-06
+      },
+      "displacement": 30.358904235898862
+    },
+    "apr_sat@1": {
+      "normret": {
+        "mrpc": 0.16372001628811259,
+        "stsb": 0.8373705113802553,
+        "sst2": 0.8909574261458809
+      },
+      "aggregate": {
+        "mean_normret": 0.6306826512714162,
+        "worst_normret": 0.16372001628811259,
+        "hmean_normret": 0.3561003639938855
+      },
+      "displacement": 0.06662022039615473
+    },
+    "nogate_sat@1": {
+      "normret": {
+        "mrpc": 0.35210268258933947,
+        "stsb": 0.8783162835640055,
+        "sst2": 0.9122340213971257
+      },
+      "aggregate": {
+        "mean_normret": 0.7142176625168236,
+        "worst_normret": 0.35210268258933947,
+        "hmean_normret": 0.5911525078960561
+      },
+      "displacement": 0.09226520196945348
+    },
+    "apr_sat@2": {
+      "normret": {
+        "mrpc": 0.22558126272262904,
+        "stsb": 0.8849589499221574,
+        "sst2": 0.8962765749586923
+      },
+      "aggregate": {
+        "mean_normret": 0.6689389292011597,
+        "worst_normret": 0.22558126272262904,
+        "hmean_normret": 0.44918818829297313
+      },
+      "displacement": 0.10798865278341722
+    },
+    "nogate_sat@2": {
+      "normret": {
+        "mrpc": 0.6280104157265438,
+        "stsb": 0.9220642761524585,
+        "sst2": 0.9281914678355595
+      },
+      "aggregate": {
+        "mean_normret": 0.8260887199048539,
+        "worst_normret": 0.6280104157265438,
+        "hmean_normret": 0.7991013216446688
+      },
+      "displacement": 0.1388502264942518
+    },
+    "apr_sat@4": {
+      "normret": {
+        "mrpc": 0.37358456096323156,
+        "stsb": 0.920658622124898,
+        "sst2": 0.9148935958035316
+      },
+      "aggregate": {
+        "mean_normret": 0.7363789262972205,
+        "worst_normret": 0.37358456096323156,
+        "hmean_normret": 0.6177959380822083
+      },
+      "displacement": 0.16062170957643793
+    },
+    "nogate_sat@4": {
+      "normret": {
+        "mrpc": 0.6356603495626174,
+        "stsb": 0.9388408752475035,
+        "sst2": 0.9627659351188325
+      },
+      "aggregate": {
+        "mean_normret": 0.8457557199763178,
+        "worst_normret": 0.6356603495626174,
+        "hmean_normret": 0.8158859598615019
+      },
+      "displacement": 0.19279040046063686
+    },
+    "apr_sat@8": {
+      "normret": {
+        "mrpc": 0.5159785325793126,
+        "stsb": 0.9398255250424732,
+        "sst2": 0.9281914678355595
+      },
+      "aggregate": {
+        "mean_normret": 0.7946651751524484,
+        "worst_normret": 0.5159785325793126,
+        "hmean_normret": 0.735392110194646
+      },
+      "displacement": 0.21968688326270874
+    },
+    "nogate_sat@8": {
+      "normret": {
+        "mrpc": 0.6396833556078118,
+        "stsb": 0.9326611499860532,
+        "sst2": 0.9228723190227484
+      },
+      "aggregate": {
+        "mean_normret": 0.8317389415388711,
+        "worst_normret": 0.6396833556078118,
+        "hmean_normret": 0.8066581089153145
+      },
+      "displacement": 0.254609881696838
+    },
+    "apr_sat@16": {
+      "normret": {
+        "mrpc": 0.6210639836993332,
+        "stsb": 0.9480623093084026,
+        "sst2": 0.9175531702099371
+      },
+      "aggregate": {
+        "mean_normret": 0.828893154405891,
+        "worst_normret": 0.6210639836993332,
+        "hmean_normret": 0.7989819583662189
+      },
+      "displacement": 0.29130339593948773
+    },
+    "nogate_sat@16": {
+      "normret": {
+        "mrpc": 0.7500296620453565,
+        "stsb": 0.9235006594121127,
+        "sst2": 0.9494680630868045
+      },
+      "aggregate": {
+        "mean_normret": 0.8743327948480912,
+        "worst_normret": 0.7500296620453565,
+        "hmean_normret": 0.8647182396435454
+      },
+      "displacement": 0.35043211870720226
+    },
+    "apr_sat@64": {
+      "normret": {
+        "mrpc": 0.38760003839417323,
+        "stsb": 0.9449282622263995,
+        "sst2": 0.95212763749321
+      },
+      "aggregate": {
+        "mean_normret": 0.761551979371261,
+        "worst_normret": 0.38760003839417323,
+        "hmean_normret": 0.6398580567453446
+      },
+      "displacement": 0.5954358931291799
+    },
+    "nogate_sat@64": {
+      "normret": {
+        "mrpc": -3.3551828058497777,
+        "stsb": 0.8434906607684605,
+        "sst2": -0.018617020844839252
+      },
+      "aggregate": {
+        "mean_normret": -0.8434363886420521,
+        "worst_normret": -3.3551828058497777,
+        "hmean_normret": 1.4999991108383409e-06
+      },
+      "displacement": 1.1949583929082181
+    },
+    "apr_sat@256": {
+      "normret": {
+        "mrpc": -1.6867198046626735,
+        "stsb": 0.9443511901154246,
+        "sst2": 0.7952127475152789
+      },
+      "aggregate": {
+        "mean_normret": 0.017614710989343346,
+        "worst_normret": -1.6867198046626735,
+        "hmean_normret": 2.999993050656496e-06
+      },
+      "displacement": 1.3754715197539538
+    },
+    "nogate_sat@256": {
+      "normret": {
+        "mrpc": -2.151941800056776,
+        "stsb": 0.08823914605803346,
+        "sst2": 0.7393616849807608
+      },
+      "aggregate": {
+        "mean_normret": -0.44144698967266055,
+        "worst_normret": -2.151941800056776,
+        "hmean_normret": 2.9999619444129143e-06
+      },
+      "displacement": 2.459779654634085
+    },
+    "apr_sat@1024": {
+      "normret": {
+        "mrpc": 0.5094905021623708,
+        "stsb": 0.9298219890444993,
+        "sst2": 0.013297872032028184
+      },
+      "aggregate": {
+        "mean_normret": 0.4842034544129661,
+        "worst_normret": 0.013297872032028184,
+        "hmean_normret": 0.03834442988105272
+      },
+      "displacement": 2.182306795603548
+    },
+    "nogate_sat@1024": {
+      "normret": {
+        "mrpc": -0.1135084444675915,
+        "stsb": -0.017489686485951932,
+        "sst2": 0.07446808337935727
+      },
+      "aggregate": {
+        "mean_normret": -0.018843349191395384,
+        "worst_normret": -0.1135084444675915,
+        "hmean_normret": 1.4999899286388171e-06
+      },
+      "displacement": 4.690516852029693
+    }
+  }
+}

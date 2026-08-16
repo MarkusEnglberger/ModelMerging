@@ -1,0 +1,170 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": "JeremiahZ/roberta-base-cola",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "JeremiahZ/roberta-base-sst2",
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": "JeremiahZ/roberta-base-mrpc",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "JeremiahZ/roberta-base-stsb",
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": "JeremiahZ/roberta-base-qqp",
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": "JeremiahZ/roberta-base-mnli",
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": "JeremiahZ/roberta-base-qnli",
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": "JeremiahZ/roberta-base-rte",
+        "lam": 0.3
+      }
+    ],
+    "modality": "glue",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 16.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05
+    },
+    "data": {
+      "n_probe": 32,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/glue8",
+    "tag": "glue8"
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "n_probe": 32,
+  "arms": {
+    "apr-short": {
+      "mean": 0.5535721571215537,
+      "mean_std": 0.06846800188812655,
+      "worst": -0.04064713951052755,
+      "worst_std": 0.17197868480158374,
+      "means": [
+        0.5541096138311892,
+        0.6086290820780891,
+        0.5562810171578851,
+        0.608125205690888,
+        0.44071586684971675
+      ],
+      "worsts": [
+        -0.3439038948381565,
+        0.0785289996452535,
+        0.021062370321556403,
+        0.04107682731870885,
+        0.0
+      ]
+    },
+    "apr-anneal": {
+      "mean": 0.5958166842751628,
+      "mean_std": 0.0322334851221462,
+      "worst": 0.02599736446752556,
+      "worst_std": 0.06846729433062246,
+      "means": [
+        0.6197700174883665,
+        0.628284675922399,
+        0.6011054634262187,
+        0.547698695882646,
+        0.582224568656184
+      ],
+      "worsts": [
+        0.1379807973480497,
+        -0.03728061436675313,
+        -0.010585613130725906,
+        0.0,
+        0.039872252487057135
+      ]
+    },
+    "calibrated": {
+      "mean": 0.5441207123212551,
+      "mean_std": 0.019714596689378413,
+      "worst": 0.06259006330590197,
+      "worst_std": 0.07901731124773184,
+      "means": [
+        0.5564641715958782,
+        0.5184868459322385,
+        0.5699277485347551,
+        0.5372032022551946,
+        0.5385215932882095
+      ],
+      "worsts": [
+        0.13481385647543231,
+        0.11300857137383852,
+        -0.012649886703711718,
+        -0.0333333323074074,
+        0.11111110769135817
+      ]
+    },
+    "apr<-calib": {
+      "mean": 0.45000377103293915,
+      "mean_std": 0.14043058472829678,
+      "worst": -0.6264595903537649,
+      "worst_std": 1.6096574633860643,
+      "means": [
+        0.5632466357851488,
+        0.5377209542943742,
+        0.21803530170939417,
+        0.5106445189694719,
+        0.4203714444063069
+      ],
+      "worsts": [
+        0.11655420665386766,
+        0.13237173622850867,
+        -3.504572279293254,
+        0.11413969070040411,
+        0.009208693941648735
+      ]
+    }
+  }
+}

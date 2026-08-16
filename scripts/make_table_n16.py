@@ -1,11 +1,13 @@
-"""Generate the n=16+16 split-selected panel (Table 2) for paperICLR/main.tex.
+"""Generate a split-selected Table 2 panel for a requested n+n budget.
 
 Selection mirrors merge_baselines.py exactly: within a group the winner MINIMISES
 selection_obj (held-out replay loss on the disjoint selection buffer). The
 evaluation split is read only at that winner, so every number printed here is
 one a practitioner could have obtained without ever touching test data.
 """
-import json, os
+import argparse
+import json
+import os
 
 BENCH = ["glue8", "clip8", "t5_glue8", "clip20"]          # column order
 HEAD = {"glue8": "GLUE-8", "clip8": "CLIP-8",
@@ -14,14 +16,18 @@ MEAN = {"clip20": "mean_acc"}          # default mean_normret
 WORST = {"clip20": "worst_acc"}        # default worst_normret
 ROWS = [("pretrained", "Pretrained"), ("ta", "Task arithmetic"),
         ("bc", "Breadcrumbs"), ("dareties", "DARE-TIES"),
-        ("ties", "TIES"), ("ada", "AdaMerging"), ("regmean", "RegMean")]
+        ("ties", "TIES"), ("ada", "AdaMerging"), ("regmean", "RegMean"),
+        ("fisher", "Fisher merging"), ("ls_learned", "Learned L\\&S")]
 ARMS = [("alone", "alone"), ("gd", "$+$GD"),
         ("nogate", "$+$ungated"), ("apr", "$+$APR")]
 
 
-def load(bench, mode):
-    for suffix in ("_fast", ""):
-        p = f"results/compare/grid_nn_{bench}_{mode}_n16{suffix}.json"
+def load(bench, mode, n):
+    # A recovery wave may extend a boundary-hit grid without overwriting the
+    # canonical run.  Prefer that strict superset once it exists, otherwise
+    # retain the established n=16 fast-file and canonical fallbacks.
+    for suffix in ("_edge", "_fast", ""):
+        p = f"results/compare/grid_nn_{bench}_{mode}_n{n}{suffix}.json"
         if os.path.exists(p):
             with open(p) as f:
                 return json.load(f), p, suffix == "_fast"
@@ -49,10 +55,10 @@ def pick(methods, pred, mkey, wkey):
     return c
 
 
-def collect(bench):
+def collect(bench, n):
     mkey, wkey = MEAN.get(bench, "mean_normret"), WORST.get(bench, "worst_normret")
     out, meta = {}, {}
-    base, bp, bfast = load(bench, "base")
+    base, bp, bfast = load(bench, "base", n)
     if base:
         m = base["methods"]
         r = {}
@@ -63,7 +69,7 @@ def collect(bench):
             r[a] = pick(m, lambda k, a=a: k.startswith(f"{a}:from=ta@"), mkey, wkey)
         out["pretrained"] = r
         meta["base"] = {"file": bp, "S": base.get("steps")}
-    mer, mp, mfast = load(bench, "merges")
+    mer, mp, mfast = load(bench, "merges", n)
     if mer:
         m = mer["methods"]
         # The paper reports the MATCHED-BUDGET AdaMerging (n unlabeled inputs per
@@ -83,6 +89,17 @@ def collect(bench):
             if any(r.values()):
                 out[key] = r
         meta["merges"] = {"file": mp, "S": mer.get("steps")}
+    labeled_path = f"results/compare/grid_nn_{bench}_labeled_n{n}.json"
+    if os.path.exists(labeled_path):
+        with open(labeled_path) as f:
+            labeled = json.load(f)
+        methods = labeled.get("methods", {})
+        mapping = {"fisher": "labeled:fisher",
+                   "ls_learned": "labeled:ls-learned"}
+        for row, method in mapping.items():
+            if method in methods:
+                out[row] = {"alone": cell(methods[method], mkey, wkey)}
+        meta["labeled"] = {"file": labeled_path, "S": None}
     return out, meta
 
 
@@ -109,7 +126,14 @@ def fmt(c, best, smax=None):
 
 
 def main():
-    data = {b: collect(b) for b in BENCH}
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--n", type=int, default=16,
+                    help="replay and selection examples per task (default: 16)")
+    args = ap.parse_args()
+    if args.n <= 0:
+        ap.error("--n must be positive")
+
+    data = {b: collect(b, args.n) for b in BENCH}
     # bold the best mean per benchmark column
     best = {}
     for b in BENCH:
@@ -122,7 +146,8 @@ def main():
     for i, (rk, rlabel) in enumerate(ROWS):
         if i:
             lines.append(r"\midrule")
-        for j, (ak, alabel) in enumerate(ARMS):
+        row_arms = ARMS if rk not in {"fisher", "ls_learned"} else [("alone", "alone")]
+        for j, (ak, alabel) in enumerate(row_arms):
             left = rlabel if j == 0 else ""
             cells = []
             for b in BENCH:
@@ -141,7 +166,10 @@ def main():
     print("\n%%% provenance")
     for b in BENCH:
         for k, v in data[b][1].items():
-            print(f"%   {b:9s} {k:8s} {v['file']}  S={v['S']}")
+            if isinstance(v, dict) and "file" in v:
+                print(f"%   {b:9s} {k:8s} {v['file']}  S={v['S']}")
+            else:
+                print(f"%   {b:9s} {k:8s} {v}")
     print("\n%%% selected cells + EDGE AUDIT (a cell at a grid edge is a lower bound)")
     GRIDKEY = {"apr": "apr_lrs", "nogate": "nogate_lrs", "gd": "control_gd_lrs"}
     for b in BENCH:

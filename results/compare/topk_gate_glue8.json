@@ -1,0 +1,212 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": "JeremiahZ/roberta-base-cola",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "JeremiahZ/roberta-base-sst2",
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": "JeremiahZ/roberta-base-mrpc",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "JeremiahZ/roberta-base-stsb",
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": "JeremiahZ/roberta-base-qqp",
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": "JeremiahZ/roberta-base-mnli",
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": "JeremiahZ/roberta-base-qnli",
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": "JeremiahZ/roberta-base-rte",
+        "lam": 0.3
+      }
+    ],
+    "modality": "glue",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 16.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/glue8",
+    "tag": "glue8"
+  },
+  "grids": {
+    "config": "configs/glue8.yaml",
+    "n_probe": 64,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "steps": 5,
+    "lr": 16.0,
+    "topk_fracs": [
+      0.01,
+      0.05,
+      0.1
+    ],
+    "out": "results/compare/topk_gate_glue8.json"
+  },
+  "arms": {
+    "sign-gate": {
+      "mean": 0.5577516037732139,
+      "mean_std": 0.08217211425558138,
+      "worst": 0.04800904208153622,
+      "worst_std": 0.0544830063802193,
+      "means": [
+        0.5946705586456985,
+        0.46359536656764644,
+        0.6149888861062964
+      ],
+      "worsts": [
+        0.10834994214042323,
+        0.002423345726147281,
+        0.03325383837803814
+      ]
+    },
+    "topk@0.01": {
+      "mean": 0.5183881118059422,
+      "mean_std": 0.09322194915955137,
+      "worst": -0.009266406610524289,
+      "worst_std": 0.02570604990283537,
+      "means": [
+        0.5609951467689428,
+        0.4114761120703323,
+        0.5826930765785517
+      ],
+      "worsts": [
+        -0.005401380714572574,
+        0.01428827688843727,
+        -0.036686116005437565
+      ]
+    },
+    "random@0.01": {
+      "mean": 0.37465285847896523,
+      "mean_std": 0.012320027000703046,
+      "worst": -0.19165350579802545,
+      "worst_std": 0.08639645677273472,
+      "means": [
+        0.3805005710469782,
+        0.38296004215524204,
+        0.3604979622346755
+      ],
+      "worsts": [
+        -0.131773334247457,
+        -0.15249133738295145,
+        -0.29069584576366797
+      ]
+    },
+    "topk@0.05": {
+      "mean": 0.5996957244893725,
+      "mean_std": 0.0210372421670266,
+      "worst": 0.0502953142065996,
+      "worst_std": 0.1015667002710226,
+      "means": [
+        0.5924327627858168,
+        0.5832522807220233,
+        0.6234021299602774
+      ],
+      "worsts": [
+        0.135945965826757,
+        0.07685131882283633,
+        -0.061911342029794536
+      ]
+    },
+    "random@0.05": {
+      "mean": 0.5631023111123896,
+      "mean_std": 0.012597830203640486,
+      "worst": 0.033515230602167385,
+      "worst_std": 0.06720335620978155,
+      "means": [
+        0.5711343039757153,
+        0.5485829512278908,
+        0.5695896781335628
+      ],
+      "worsts": [
+        0.0366115686223711,
+        0.09911689855394701,
+        -0.035182775369815955
+      ]
+    },
+    "topk@0.1": {
+      "mean": 0.5485503585868329,
+      "mean_std": 0.06130154083470593,
+      "worst": 0.04933736187630921,
+      "worst_std": 0.058810882968155356,
+      "means": [
+        0.5806167327011964,
+        0.47786655719570803,
+        0.587167785863594
+      ],
+      "worsts": [
+        0.1144175324901569,
+        0.0,
+        0.03359455313877071
+      ]
+    },
+    "random@0.1": {
+      "mean": 0.563846653972714,
+      "mean_std": 0.02601009181171127,
+      "worst": 0.027865254074047097,
+      "worst_std": 0.04898209989143363,
+      "means": [
+        0.568769617339596,
+        0.5357268753890518,
+        0.5870434691894943
+      ],
+      "worsts": [
+        0.07766082144124105,
+        0.026195625993270136,
+        -0.020260685212369886
+      ]
+    }
+  }
+}

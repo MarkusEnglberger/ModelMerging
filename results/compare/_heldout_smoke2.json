@@ -1,0 +1,326 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 1.0,
+      "clip_frac": 0.5,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip_poc",
+    "tag": "clip_poc"
+  },
+  "train_tasks": [
+    "eurosat",
+    "gtsrb"
+  ],
+  "heldout_tasks": [
+    "mnist"
+  ],
+  "grids": {
+    "heldout": [
+      "mnist"
+    ],
+    "n_probe": 64,
+    "probe_seed": null,
+    "ta_lams": [
+      0.3
+    ],
+    "ties_densities": [
+      0.1
+    ],
+    "ties_lams": [
+      0.8
+    ],
+    "dt_drops": [
+      0.5
+    ],
+    "dt_trims": [
+      0.1
+    ],
+    "dt_lams": [
+      0.4
+    ],
+    "bc_densities": [
+      0.1
+    ],
+    "bc_outliers": [
+      0.01
+    ],
+    "bc_lams": [
+      0.2
+    ],
+    "ada": true,
+    "ada_init_lam": 0.3,
+    "ada_steps": 20,
+    "ada_lr": 0.001,
+    "ada_bs": 16,
+    "ada_workers": 0,
+    "regmean": true,
+    "regmean_nd": 1.0,
+    "regmean_eps": 0.001,
+    "apr_base_lrs": [
+      8.0
+    ],
+    "apr_ta_lrs": [
+      8.0
+    ],
+    "apr_ada_lrs": [
+      8.0
+    ],
+    "gd_base_lrs": [
+      0.0001
+    ],
+    "nogate_base_lrs": [
+      2.0
+    ],
+    "steps": 2,
+    "apr_schedule": "cosine",
+    "apr_order": "random",
+    "lr_min_frac": 0.05,
+    "out": "results/compare/_heldout_smoke2.json"
+  },
+  "base": {
+    "eurosat": 0.45,
+    "gtsrb": 0.3252573238321457,
+    "mnist": 0.4826
+  },
+  "expert": {
+    "eurosat": 0.9907407407407407,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958
+  },
+  "cells": {
+    "base:theta0": {
+      "scores": {
+        "eurosat": 0.45,
+        "gtsrb": 0.3252573238321457,
+        "mnist": 0.4826
+      },
+      "train_mean": 0.3876286619160728,
+      "train_worst": 0.3252573238321457,
+      "held_mean": 0.4826,
+      "held_worst": 0.4826,
+      "held_drop_vs_base": 0.0,
+      "dist_theta0": 0.0
+    },
+    "merge:TA14@l0.3": {
+      "scores": {
+        "eurosat": 0.93,
+        "gtsrb": 0.8058590657165479,
+        "mnist": 0.4933
+      },
+      "train_mean": 0.8679295328582739,
+      "train_worst": 0.8058590657165479,
+      "held_mean": 0.4933,
+      "held_worst": 0.4933,
+      "held_drop_vs_base": 0.010700000000000043,
+      "dist_theta0": 1.0034454553503183,
+      "lam": 0.3
+    },
+    "merge:TIES14@d0.1,l0.8": {
+      "scores": {
+        "eurosat": 0.8951851851851852,
+        "gtsrb": 0.8627870150435472,
+        "mnist": 0.5374
+      },
+      "train_mean": 0.8789861001143662,
+      "train_worst": 0.8627870150435472,
+      "held_mean": 0.5374,
+      "held_worst": 0.5374,
+      "held_drop_vs_base": 0.054800000000000015,
+      "dist_theta0": 1.8122622754776456,
+      "density": 0.1,
+      "lam": 0.8
+    },
+    "merge:DARETIES14@dd0.5,t0.1,l0.4": {
+      "scores": {
+        "eurosat": 0.8755555555555555,
+        "gtsrb": 0.7619952494061758,
+        "mnist": 0.5297
+      },
+      "train_mean": 0.8187754024808657,
+      "train_worst": 0.7619952494061758,
+      "held_mean": 0.5297,
+      "held_worst": 0.5297,
+      "held_drop_vs_base": 0.047099999999999975,
+      "dist_theta0": 1.5234245313771406,
+      "lam": 0.4
+    },
+    "merge:BC14@d0.1,o0.01,l0.2": {
+      "scores": {
+        "eurosat": 0.6992592592592592,
+        "gtsrb": 0.45075217735550277,
+        "mnist": 0.5533
+      },
+      "train_mean": 0.575005718307381,
+      "train_worst": 0.45075217735550277,
+      "held_mean": 0.5533,
+      "held_worst": 0.5533,
+      "held_drop_vs_base": 0.07070000000000004,
+      "dist_theta0": 0.41886376642861445,
+      "lam": 0.2
+    },
+    "merge:ADA14-layer": {
+      "scores": {
+        "eurosat": 0.9407407407407408,
+        "gtsrb": 0.8292953285827395,
+        "mnist": 0.4885
+      },
+      "train_mean": 0.8850180346617401,
+      "train_worst": 0.8292953285827395,
+      "held_mean": 0.4885,
+      "held_worst": 0.4885,
+      "held_drop_vs_base": 0.005900000000000016,
+      "dist_theta0": 1.0413520801262048,
+      "ada_lam_per_task": {
+        "eurosat": 0.30681511759757996,
+        "gtsrb": 0.3090168833732605
+      }
+    },
+    "merge:RegMean14@nd1": {
+      "scores": {
+        "eurosat": 0.05592592592592593,
+        "gtsrb": 0.029374505146476642,
+        "mnist": 0.0966
+      },
+      "train_mean": 0.04265021553620128,
+      "train_worst": 0.029374505146476642,
+      "held_mean": 0.0966,
+      "held_worst": 0.0966,
+      "held_drop_vs_base": -0.38599999999999995,
+      "dist_theta0": 5698.801449285302
+    },
+    "apr:from=base14@lr8": {
+      "scores": {
+        "eurosat": 0.6192592592592593,
+        "gtsrb": 0.29960411718131436,
+        "mnist": 0.2667
+      },
+      "train_mean": 0.4594316882202868,
+      "train_worst": 0.29960411718131436,
+      "held_mean": 0.2667,
+      "held_worst": 0.2667,
+      "held_drop_vs_base": -0.21589999999999998,
+      "dist_theta0": 0.12527081458874784,
+      "lr": 8.0,
+      "steps": 2,
+      "schedule": "cosine",
+      "kind": "apr"
+    },
+    "nogate:from=base14@lr2": {
+      "scores": {
+        "eurosat": 0.7396296296296296,
+        "gtsrb": 0.3995249406175772,
+        "mnist": 0.522
+      },
+      "train_mean": 0.5695772851236034,
+      "train_worst": 0.3995249406175772,
+      "held_mean": 0.522,
+      "held_worst": 0.522,
+      "held_drop_vs_base": 0.039400000000000046,
+      "dist_theta0": 0.03828170765045931,
+      "lr": 2.0,
+      "steps": 2,
+      "schedule": "cosine",
+      "kind": "nogate"
+    },
+    "gd:from=base14@lr0.0001": {
+      "scores": {
+        "eurosat": 0.6751851851851852,
+        "gtsrb": 0.3416468725257324,
+        "mnist": 0.5244
+      },
+      "train_mean": 0.5084160288554588,
+      "train_worst": 0.3416468725257324,
+      "held_mean": 0.5244,
+      "held_worst": 0.5244,
+      "held_drop_vs_base": 0.041800000000000004,
+      "dist_theta0": 0.01147990740322576,
+      "lr": 0.0001,
+      "steps": 2,
+      "schedule": "cosine",
+      "kind": "gd"
+    },
+    "apr:from=ta14@lr8": {
+      "scores": {
+        "eurosat": 0.9533333333333334,
+        "gtsrb": 0.8840855106888361,
+        "mnist": 0.4892
+      },
+      "train_mean": 0.9187094220110847,
+      "train_worst": 0.8840855106888361,
+      "held_mean": 0.4892,
+      "held_worst": 0.4892,
+      "held_drop_vs_base": 0.00660000000000005,
+      "dist_theta0": 1.0121920981975432,
+      "lr": 8.0,
+      "steps": 2,
+      "schedule": "cosine",
+      "kind": "apr"
+    },
+    "apr:from=ada14@lr8": {
+      "scores": {
+        "eurosat": 0.9574074074074074,
+        "gtsrb": 0.8939034045922407,
+        "mnist": 0.4838
+      },
+      "train_mean": 0.9256554059998241,
+      "train_worst": 0.8939034045922407,
+      "held_mean": 0.4838,
+      "held_worst": 0.4838,
+      "held_drop_vs_base": 0.0012000000000000344,
+      "dist_theta0": 1.0493302914617173,
+      "lr": 8.0,
+      "steps": 2,
+      "schedule": "cosine",
+      "kind": "apr"
+    }
+  }
+}

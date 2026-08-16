@@ -300,6 +300,56 @@ RegMean         & alone      & --- & --- & --- & --- \\
 \end{tabular}
 \end{table}
 
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{\textbf{The canonical grid under split selection at an $8{+}8$ budget.} Each task contributes eight labeled replay examples and a disjoint eight-example selection buffer. Every hyperparameter, including $S\in\{5,20,50\}$, is selected on the selection buffer before the evaluation split is read. Entries follow Table~\ref{tab:main16}: mean normalized retention with worst-task retention in parentheses, except CLIP-20, which reports absolute top-1 accuracy. $^{\dagger}$ marks a selected horizon at the longest value offered. Blank cells are experiments not yet available.}
+\label{tab:main8}
+\setlength{\arraystretch}{0.95}
+\begin{tabular}{llcccc}
+\toprule
+Initialization & Treatment & GLUE-8 & CLIP-8 & GLUE-8 t2t & CLIP-20 \\
+ & & \multicolumn{3}{c}{normalized retention} & top-1 acc. \\
+\midrule
+Pretrained      & alone      & $0$ & $0$ & & \\
+                & $+$GD      & $-0.361\ ({-}3.52)$ & $-0.148\ ({-}1.04)$ & & \\
+                & $+$ungated & $0.089^{\dagger}\ ({-}.31)$ & $-0.006\ ({-}.41)$ & & \\
+                & $+$APR     & $0.223^{\dagger}\ ({-}.33)$ & $0.295^{\dagger}\ ({-}.45)$ & & \\
+\midrule
+Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & & \\
+                & $+$GD      & $0.530\ ({+}.04)$ & $0.167^{\dagger}\ ({-}1.10)$ & & \\
+                & $+$ungated & $0.529\ ({+}.03)$ & $0.241^{\dagger}\ ({-}.79)$ & & \\
+                & $+$APR     & $0.498\ ({-}.18)$ & $0.462^{\dagger}\ ({-}.12)$ & & \\
+\midrule
+Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & & \\
+                & $+$GD      & $0.512\ ({-}.00)$ & $0.479^{\dagger}\ ({+}.04)$ & & \\
+                & $+$ungated & $0.536\ ({+}.05)$ & $0.391^{\dagger}\ ({-}.40)$ & & \\
+                & $+$APR     & $0.528\ ({-}.06)$ & $0.339^{\dagger}\ ({-}.46)$ & & \\
+\midrule
+DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & & \\
+                & $+$GD      & $0.484\ ({-}.08)$ & $-1.273^{\dagger}\ ({-}4.87)$ & & \\
+                & $+$ungated & $0.534\ ({+}.08)$ & $-0.578\ ({-}3.11)$ & & \\
+                & $+$APR     & $\mathbf{0.576}\ ({+}.19)$ & $0.498^{\dagger}\ ({-}.31)$ & & \\
+\midrule
+TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & & \\
+                & $+$GD      & $0.442\ ({-}.10)$ & $\mathbf{0.585}^{\dagger}\ ({+}.18)$ & & \\
+                & $+$ungated & $0.442\ ({-}.07)$ & $0.318^{\dagger}\ ({-}1.57)$ & & \\
+                & $+$APR     & $0.489^{\dagger}\ ({+}.01)$ & $0.566^{\dagger}\ ({-}.08)$ & & \\
+\midrule
+AdaMerging      & alone      & $0.028\ ({-}3.01)$ & $0.463\ ({-}.04)$ & & \\
+                & $+$GD      & $0.016\ ({-}2.95)$ & $0.502^{\dagger}\ ({-}.06)$ & & \\
+                & $+$ungated & $0.466\ ({-}.10)$ & $0.285^{\dagger}\ ({-}1.41)$ & & \\
+                & $+$APR     & $0.543\ ({+}.02)$ & $0.554^{\dagger}\ ({+}.15)$ & & \\
+\midrule
+RegMean         & alone      & & & & \\
+                & $+$GD      & & & & \\
+                & $+$ungated & & & & \\
+                & $+$APR     & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \paragraph{What split selection changes.}
 Table~\ref{tab:main16} repeats the grid under a protocol in which no test data is used for tuning, at a quarter of the labeled budget. The result splits cleanly in two, along the axis of whether a usable merge already exists.
 

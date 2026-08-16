@@ -1,0 +1,191 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": "JeremiahZ/roberta-base-cola",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "JeremiahZ/roberta-base-sst2",
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": "JeremiahZ/roberta-base-mrpc",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "JeremiahZ/roberta-base-stsb",
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": "JeremiahZ/roberta-base-qqp",
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": "JeremiahZ/roberta-base-mnli",
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": "JeremiahZ/roberta-base-qnli",
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": "JeremiahZ/roberta-base-rte",
+        "lam": 0.3
+      }
+    ],
+    "modality": "glue",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 16.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/glue8",
+    "tag": "glue8"
+  },
+  "tasks": [
+    "cola",
+    "sst2",
+    "mrpc",
+    "stsb",
+    "qqp",
+    "mnli",
+    "qnli",
+    "rte"
+  ],
+  "grids": {
+    "config": "configs/glue8.yaml",
+    "n_probe": 64,
+    "gram_ns": [
+      64,
+      256
+    ],
+    "nondiag_scales": [
+      0.9,
+      1.0
+    ],
+    "eps": 0.001,
+    "gram_bs": 16,
+    "apr_lrs": [
+      0.25,
+      0.5,
+      1.0,
+      2.0
+    ],
+    "steps": 5,
+    "out": "results/compare/regmean_glue8_lowlr.json"
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": 0.3198714458009927,
+      "worst": -0.17500032412602154,
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "regmean@n64,nd0.9": {
+      "mean": 0.41945556585816557,
+      "worst": 0.055555553845679,
+      "replay_obj": 0.985453900466287,
+      "disp": 87.34993453619578,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 0.9,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n64,nd1": {
+      "mean": 0.4784984668877693,
+      "worst": 0.17777777230617298,
+      "replay_obj": 0.9396145293023147,
+      "disp": 167.737813792528,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n256,nd0.9": {
+      "mean": 0.43438350765446465,
+      "worst": 0.0444444430765432,
+      "replay_obj": 1.0980079937391127,
+      "disp": 85.31160115220575,
+      "gram_n": 256,
+      "n_linear": 72,
+      "nondiag_scale": 0.9,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n256,nd1": {
+      "mean": 0.4825796543050166,
+      "worst": 0.0999999969222222,
+      "replay_obj": 1.070694187207605,
+      "disp": 160.67292413766788,
+      "gram_n": 256,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "apr<-regmean@lr0.25": {
+      "mean": 0.10259610533183416,
+      "worst": -0.06248490413080054,
+      "replay_obj": 1.5535897278998105,
+      "disp": 167.5012526400731,
+      "lr": 0.25
+    },
+    "apr<-regmean@lr0.5": {
+      "mean": -0.3111708916186984,
+      "worst": -3.547333252166996,
+      "replay_obj": 1.5766403749072095,
+      "disp": 167.25276848790614,
+      "lr": 0.5
+    },
+    "apr<-regmean@lr1": {
+      "mean": -0.05248389784869113,
+      "worst": -0.23356989386493157,
+      "replay_obj": 1.671278240391537,
+      "disp": 166.8947627187509,
+      "lr": 1.0
+    },
+    "apr<-regmean@lr2": {
+      "mean": -0.49818998639265366,
+      "worst": -3.516892734221853,
+      "replay_obj": 1.5942872622821742,
+      "disp": 167.30155009995426,
+      "lr": 2.0
+    }
+  },
+  "best_regmean": "regmean@n64,nd1"
+}

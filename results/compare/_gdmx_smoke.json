@@ -1,0 +1,285 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 1.0,
+      "clip_frac": 0.5,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip_poc",
+    "tag": "clip_poc"
+  },
+  "tasks": [
+    "eurosat",
+    "gtsrb",
+    "mnist"
+  ],
+  "steps": 2,
+  "base": {
+    "eurosat": 0.45,
+    "gtsrb": 0.3252573238321457,
+    "mnist": 0.4826
+  },
+  "expert": {
+    "eurosat": 0.9907407407407407,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958
+  },
+  "grids": {
+    "config": "configs/clip_poc.yaml",
+    "n_probe": null,
+    "ta_lams": [
+      0.3
+    ],
+    "ties_densities": [
+      0.1,
+      0.2
+    ],
+    "ties_lams": [
+      0.8,
+      1.0
+    ],
+    "dare_densities": [
+      0.3
+    ],
+    "dare_seeds": [
+      0,
+      1
+    ],
+    "dt_drops": [
+      0.5
+    ],
+    "dt_trims": [
+      0.1,
+      0.2
+    ],
+    "dt_lams": [
+      0.8,
+      1.0
+    ],
+    "dt_seed": 0,
+    "bc_densities": [
+      0.1,
+      0.2
+    ],
+    "bc_outliers": [
+      0.01,
+      0.05
+    ],
+    "bc_lams": [
+      0.4
+    ],
+    "ada_variants": [
+      "task",
+      "layer"
+    ],
+    "ada_steps": 300,
+    "ada_lr": 0.001,
+    "ada_bs": 16,
+    "ada_init_lam": 0.3,
+    "ada_workers": 0,
+    "ada_data": [
+      "eval_ds"
+    ],
+    "gd_lrs": [
+      0.0001
+    ],
+    "gd_steps": [
+      2
+    ],
+    "gd_schedules": [
+      "constant",
+      "cosine"
+    ],
+    "gd_lr_min_frac": 0.05,
+    "gd_order": "random",
+    "nogate_lrs": [
+      1.0
+    ],
+    "refine_from": [
+      "ta"
+    ],
+    "apr_lrs": [
+      8.0
+    ],
+    "steps": 2,
+    "skip_families": [
+      "ties",
+      "dare",
+      "dareties",
+      "bc",
+      "ada"
+    ],
+    "select_by": "mean_acc",
+    "out": "results/compare/_gdmx_smoke.json"
+  },
+  "methods": {
+    "merge:TA@l0.3": {
+      "scores": {
+        "eurosat": 0.8785185185185185,
+        "gtsrb": 0.8039588281868567,
+        "mnist": 0.9551
+      },
+      "normret": {
+        "eurosat": 0.792465738769469,
+        "gtsrb": 0.7211354853197266,
+        "mnist": 0.9206936687316117
+      },
+      "aggregate": {
+        "mean_acc": 0.8791924489017916,
+        "worst_acc": 0.8039588281868567,
+        "mean_normret": 0.8114316309402692,
+        "worst_normret": 0.7211354853197266,
+        "hmean_normret": 0.8032722599027908,
+        "degenerate_tasks": []
+      },
+      "displacement": 0.0,
+      "lam": 0.3
+    },
+    "apr:from=ta@lr8": {
+      "scores": {
+        "eurosat": 0.9511111111111111,
+        "gtsrb": 0.880443388756928,
+        "mnist": 0.9625
+      },
+      "normret": {
+        "eurosat": 0.9267123116292927,
+        "gtsrb": 0.8363549492328686,
+        "mnist": 0.9351129981466678
+      },
+      "aggregate": {
+        "mean_acc": 0.931351499956013,
+        "worst_acc": 0.880443388756928,
+        "mean_normret": 0.8993934196696096,
+        "worst_normret": 0.8363549492328686,
+        "hmean_normret": 0.8970922705948741,
+        "degenerate_tasks": []
+      },
+      "displacement": 0.05684830859212824,
+      "init": "TA@l0.3",
+      "lr": 8.0,
+      "gate_density": 0.525087144773753
+    },
+    "nogate:from=ta@lr1": {
+      "scores": {
+        "eurosat": 0.9211111111111111,
+        "gtsrb": 0.831908155186065,
+        "mnist": 0.9606
+      },
+      "normret": {
+        "eurosat": 0.8712328606004881,
+        "gtsrb": 0.7632394923190425,
+        "mnist": 0.9314107378914507
+      },
+      "aggregate": {
+        "mean_acc": 0.904539755432392,
+        "worst_acc": 0.831908155186065,
+        "mean_normret": 0.8552943636036604,
+        "worst_normret": 0.7632394923190425,
+        "hmean_normret": 0.8494628174841213,
+        "degenerate_tasks": []
+      },
+      "displacement": 0.01381949893081674,
+      "init": "TA@l0.3",
+      "lr": 1.0
+    },
+    "gd:from=ta@lr0.0001,S2,constant": {
+      "scores": {
+        "eurosat": 0.9211111111111111,
+        "gtsrb": 0.8258115597783057,
+        "mnist": 0.9601
+      },
+      "normret": {
+        "eurosat": 0.8712328606004881,
+        "gtsrb": 0.7540553321520529,
+        "mnist": 0.9304364588769198
+      },
+      "aggregate": {
+        "mean_acc": 0.9023408902964722,
+        "worst_acc": 0.8258115597783057,
+        "mean_normret": 0.8519082172098202,
+        "worst_normret": 0.7540553321520529,
+        "hmean_normret": 0.845373850080151,
+        "degenerate_tasks": []
+      },
+      "displacement": 0.009161186718193109,
+      "init": "TA@l0.3",
+      "lr": 0.0001,
+      "gd_steps": 2,
+      "schedule": "constant"
+    },
+    "gd:from=ta@lr0.0001,S2,cosine": {
+      "scores": {
+        "eurosat": 0.9137037037037037,
+        "gtsrb": 0.815914489311164,
+        "mnist": 0.9579
+      },
+      "normret": {
+        "eurosat": 0.8575342307168325,
+        "gtsrb": 0.7391459812316153,
+        "mnist": 0.9261496312129843
+      },
+      "aggregate": {
+        "mean_acc": 0.8958393976716225,
+        "worst_acc": 0.815914489311164,
+        "mean_normret": 0.8409432810538107,
+        "worst_normret": 0.7391459812316153,
+        "hmean_normret": 0.8336144327229227,
+        "degenerate_tasks": []
+      },
+      "displacement": 0.006004015360599051,
+      "init": "TA@l0.3",
+      "lr": 0.0001,
+      "gd_steps": 2,
+      "schedule": "cosine"
+    }
+  },
+  "best_per_family": {
+    "ta": "merge:TA@l0.3"
+  },
+  "best_apr_from_ta": "apr:from=ta@lr8"
+}

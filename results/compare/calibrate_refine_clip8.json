@@ -1,0 +1,490 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "grids": {
+    "config": "configs/clip8.yaml",
+    "n_probe": 64,
+    "variants": [
+      "layer",
+      "task"
+    ],
+    "cal_lrs": [
+      0.01,
+      0.03
+    ],
+    "l2_regs": [
+      0.001,
+      0.01,
+      0.1
+    ],
+    "cal_steps": 300,
+    "cal_bs": 16,
+    "holdout_frac": 0.25,
+    "apr_lrs": [
+      4.0,
+      6.0,
+      8.0
+    ],
+    "steps": 5,
+    "out": "results/compare/calibrate_refine_clip8.json"
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": 0.2702924657357717,
+      "worst": -0.5265200066777828,
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "calib:layer@lr0.01,l20.001": {
+      "mean": 0.7368518013539822,
+      "worst": 0.389823166287237,
+      "replay_obj": 0.19967932170341235,
+      "disp": 3.7911147160837064,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.31328192353248596,
+          "cars": 0.41407111287117004,
+          "resisc45": 0.3072442412376404,
+          "eurosat": 0.2948389947414398,
+          "svhn": 0.32969823479652405,
+          "gtsrb": 0.3336971700191498,
+          "mnist": 0.3057713806629181,
+          "dtd": 0.46734553575515747
+        },
+        "best_holdout_loss": 0.3688469803892076,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.09902858035638928
+      }
+    },
+    "calib:layer@lr0.01,l20.01": {
+      "mean": 0.7218377660029724,
+      "worst": 0.35187577841856765,
+      "replay_obj": 0.28466673494658856,
+      "disp": 2.539808807464228,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.01,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.30451709032058716,
+          "cars": 0.3512905538082123,
+          "resisc45": 0.30272310972213745,
+          "eurosat": 0.2970728576183319,
+          "svhn": 0.3103608191013336,
+          "gtsrb": 0.32087716460227966,
+          "mnist": 0.29921483993530273,
+          "dtd": 0.40259790420532227
+        },
+        "best_holdout_loss": 0.4354349309578538,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.1921182437799871
+      }
+    },
+    "calib:layer@lr0.01,l20.1": {
+      "mean": 0.6378727298017453,
+      "worst": 0.20655453169423307,
+      "replay_obj": 0.5311972321518073,
+      "disp": 1.0640368997538363,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 261,
+        "lr": 0.01,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.29609790444374084,
+          "cars": 0.30846700072288513,
+          "resisc45": 0.2971566617488861,
+          "eurosat": 0.2908605635166168,
+          "svhn": 0.2914663255214691,
+          "gtsrb": 0.3051054775714874,
+          "mnist": 0.28460678458213806,
+          "dtd": 0.3338606059551239
+        },
+        "best_holdout_loss": 0.577533814124763,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.335468796081841
+      }
+    },
+    "calib:layer@lr0.03,l20.001": {
+      "mean": 0.733652623122068,
+      "worst": 0.36006896443566694,
+      "replay_obj": 0.17398852470187567,
+      "disp": 4.3219153378257165,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.32699769735336304,
+          "cars": 0.4072696566581726,
+          "resisc45": 0.30997979640960693,
+          "eurosat": 0.3245789110660553,
+          "svhn": 0.33088019490242004,
+          "gtsrb": 0.35055357217788696,
+          "mnist": 0.31971997022628784,
+          "dtd": 0.4733884334564209
+        },
+        "best_holdout_loss": 0.35359614668413997,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.06932401098310947
+      }
+    },
+    "calib:layer@lr0.03,l20.01": {
+      "mean": 0.716067568161659,
+      "worst": 0.339801609551264,
+      "replay_obj": 0.2778808076658069,
+      "disp": 2.6015205486786517,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 211,
+        "lr": 0.03,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.3041265606880188,
+          "cars": 0.35209494829177856,
+          "resisc45": 0.3000088334083557,
+          "eurosat": 0.29811832308769226,
+          "svhn": 0.3116145730018616,
+          "gtsrb": 0.32179954648017883,
+          "mnist": 0.30084118247032166,
+          "dtd": 0.40159177780151367
+        },
+        "best_holdout_loss": 0.43016502168029547,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.16240059304982424
+      }
+    },
+    "calib:layer@lr0.03,l20.1": {
+      "mean": 0.6405212208081816,
+      "worst": 0.19965500662720254,
+      "replay_obj": 0.5121835416195241,
+      "disp": 1.1013393914251648,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 191,
+        "lr": 0.03,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.29513731598854065,
+          "cars": 0.3085775077342987,
+          "resisc45": 0.2968308627605438,
+          "eurosat": 0.2898096740245819,
+          "svhn": 0.2938802242279053,
+          "gtsrb": 0.3051984906196594,
+          "mnist": 0.2857028543949127,
+          "dtd": 0.3338567912578583
+        },
+        "best_holdout_loss": 0.5735676884651184,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.34410588815808296
+      }
+    },
+    "calib:task@lr0.01,l20.001": {
+      "mean": 0.40234673434338697,
+      "worst": -0.09357480872160416,
+      "replay_obj": 1.3698033792073596,
+      "disp": 0.7747870313475983,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 181,
+        "lr": 0.01,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.20311740040779114,
+          "cars": 0.2845977544784546,
+          "resisc45": 0.19309605658054352,
+          "eurosat": 0.24108847975730896,
+          "svhn": 0.19105882942676544,
+          "gtsrb": 0.23841670155525208,
+          "mnist": 0.11469803005456924,
+          "dtd": 0.47578367590904236
+        },
+        "best_holdout_loss": 0.8898588828742504,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.6761817000806332
+      }
+    },
+    "calib:task@lr0.01,l20.01": {
+      "mean": 0.40238605425537055,
+      "worst": -0.09314358840491457,
+      "replay_obj": 1.3691970111945595,
+      "disp": 0.7741385245070491,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 181,
+        "lr": 0.01,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.20326866209506989,
+          "cars": 0.2846394181251526,
+          "resisc45": 0.1931944489479065,
+          "eurosat": 0.24107526242733002,
+          "svhn": 0.1910666972398758,
+          "gtsrb": 0.2384500950574875,
+          "mnist": 0.11484188586473465,
+          "dtd": 0.4754989743232727
+        },
+        "best_holdout_loss": 0.8898343816399574,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.6761876009404659
+      }
+    },
+    "calib:task@lr0.01,l20.1": {
+      "mean": 0.40311790863115915,
+      "worst": -0.08883138523802062,
+      "replay_obj": 1.3690573579251066,
+      "disp": 0.7789983567845593,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 111,
+        "lr": 0.01,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.20352627336978912,
+          "cars": 0.28793981671333313,
+          "resisc45": 0.18660178780555725,
+          "eurosat": 0.23999354243278503,
+          "svhn": 0.19042512774467468,
+          "gtsrb": 0.23919303715229034,
+          "mnist": 0.11509368568658829,
+          "dtd": 0.4741969704627991
+        },
+        "best_holdout_loss": 0.8906925581395626,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.8557832464575768
+      }
+    },
+    "calib:task@lr0.03,l20.001": {
+      "mean": 0.4012967509137943,
+      "worst": -0.09184992745484581,
+      "replay_obj": 1.2852526248465825,
+      "disp": 0.7526854429881092,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 81,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.19481907784938812,
+          "cars": 0.25396931171417236,
+          "resisc45": 0.18074248731136322,
+          "eurosat": 0.24726377427577972,
+          "svhn": 0.2097007930278778,
+          "gtsrb": 0.23727525770664215,
+          "mnist": 0.12669992446899414,
+          "dtd": 0.4609551727771759
+        },
+        "best_holdout_loss": 0.8815104737877846,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.8450879007577896
+      }
+    },
+    "calib:task@lr0.03,l20.01": {
+      "mean": 0.40148297471691274,
+      "worst": -0.09184992745484581,
+      "replay_obj": 1.2847595391761493,
+      "disp": 0.752063257025025,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 81,
+        "lr": 0.03,
+        "l2_reg": 0.01,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.19502446055412292,
+          "cars": 0.2540530562400818,
+          "resisc45": 0.18078097701072693,
+          "eurosat": 0.24718572199344635,
+          "svhn": 0.20970332622528076,
+          "gtsrb": 0.2372514307498932,
+          "mnist": 0.12682297825813293,
+          "dtd": 0.46060091257095337
+        },
+        "best_holdout_loss": 0.8815120458602905,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.8450435996055603
+      }
+    },
+    "calib:task@lr0.03,l20.1": {
+      "mean": 0.40121120781851216,
+      "worst": -0.08969382587139883,
+      "replay_obj": 1.2799378340885763,
+      "disp": 0.7459649636885761,
+      "calibrate": {
+        "layerwise": false,
+        "steps_run": 81,
+        "lr": 0.03,
+        "l2_reg": 0.1,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.1970330774784088,
+          "cars": 0.2549293339252472,
+          "resisc45": 0.18116940557956696,
+          "eurosat": 0.24641138315200806,
+          "svhn": 0.20971977710723877,
+          "gtsrb": 0.23702576756477356,
+          "mnist": 0.12804001569747925,
+          "dtd": 0.4571276009082794
+        },
+        "best_holdout_loss": 0.8815553709864616,
+        "fit_loss_first": 0.9047752157784998,
+        "fit_loss_last": 0.8446133956313133
+      }
+    },
+    "apr<-calib@lr4": {
+      "mean": 0.8062835009977036,
+      "worst": 0.494178482926077,
+      "replay_obj": 0.03835564337833423,
+      "disp": 4.154398860367432,
+      "lr": 4.0
+    },
+    "apr<-calib@lr6": {
+      "mean": 0.8214809205199931,
+      "worst": 0.5450624802954283,
+      "replay_obj": 0.03354729600239991,
+      "disp": 4.081882451254695,
+      "lr": 6.0
+    },
+    "apr<-calib@lr8": {
+      "mean": 0.8250563176469361,
+      "worst": 0.5433375990286708,
+      "replay_obj": 0.03184531856919668,
+      "disp": 3.9771210951791596,
+      "lr": 8.0
+    },
+    "apr<-ta@lr4": {
+      "mean": 0.5652715906269152,
+      "worst": 0.047003014519146874,
+      "replay_obj": 0.1746296489163581,
+      "disp": 0.19730312432106267,
+      "lr": 4.0
+    },
+    "apr<-ta@lr6": {
+      "mean": 0.5900761894945259,
+      "worst": 0.10608019790559836,
+      "replay_obj": 0.14277019324196827,
+      "disp": 0.2630497742661238,
+      "lr": 6.0
+    },
+    "apr<-ta@lr8": {
+      "mean": 0.5978166980265126,
+      "worst": 0.1591202968583966,
+      "replay_obj": 0.12973277228756683,
+      "disp": 0.3667176779663783,
+      "lr": 8.0
+    }
+  },
+  "best_calibrated": "calib:layer@lr0.03,l20.001"
+}

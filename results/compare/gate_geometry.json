@@ -1,0 +1,73 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "mrpc",
+        "checkpoint": "textattack/roberta-base-MRPC",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "textattack/roberta-base-STS-B",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "textattack/roberta-base-SST-2",
+        "lam": 0.3
+      }
+    ],
+    "refine": {
+      "steps": 5,
+      "lr": 1.0,
+      "clip_frac": 0.5,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 64,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/poc3",
+    "tag": "poc3_roberta"
+  },
+  "tasks": {
+    "mrpc": {
+      "true": 0.36120334973895457,
+      "negv": 0.3317072808972533,
+      "shuf": 0.3464505754864937,
+      "rand": 0.34638632980973605,
+      "magwt_neg": 0.5778507365186768
+    },
+    "stsb": {
+      "true": 0.3711388831924926,
+      "negv": 0.3193933515317072,
+      "shuf": 0.34531825550981243,
+      "rand": 0.34530759894962754,
+      "magwt_neg": 0.6409230743402619
+    },
+    "sst2": {
+      "true": 0.36441032947956004,
+      "negv": 0.32433180465702965,
+      "shuf": 0.34435691609143815,
+      "rand": 0.3444312943674034,
+      "magwt_neg": 0.6035825883758865
+    }
+  }
+}

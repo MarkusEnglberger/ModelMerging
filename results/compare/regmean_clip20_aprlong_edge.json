@@ -1,0 +1,342 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cifar100",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "stl10",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "flowers102",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "pets",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "pcam",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "fer2013",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "emnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cifar10",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "food101",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "fashion_mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "kmnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "rendered_sst2",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip20",
+    "tag": "clip20"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd",
+    "cifar100",
+    "stl10",
+    "flowers102",
+    "pets",
+    "pcam",
+    "fer2013",
+    "emnist",
+    "cifar10",
+    "food101",
+    "fashion_mnist",
+    "kmnist",
+    "rendered_sst2"
+  ],
+  "grids": {
+    "config": "configs/clip20.yaml",
+    "n_probe": 64,
+    "gram_ns": [
+      64
+    ],
+    "nondiag_scales": [
+      1.0
+    ],
+    "eps": 0.001,
+    "gram_bs": 16,
+    "apr_lrs": [
+      0.125
+    ],
+    "apr_schedules": [
+      "constant"
+    ],
+    "apr_order": "random",
+    "n_val": 0,
+    "nogate_lrs": [],
+    "gd_lrs": [],
+    "gd_steps": [],
+    "gd_schedules": [
+      "constant"
+    ],
+    "gd_lr_min_frac": 0.05,
+    "gd_order": "fixed",
+    "steps": 30,
+    "select_by": "mean_acc",
+    "out": "results/compare/regmean_clip20_aprlong_edge.json"
+  },
+  "base": {
+    "sun397": 0.6317380352644836,
+    "cars": 0.5966919537370974,
+    "resisc45": 0.5815873015873015,
+    "eurosat": 0.45037037037037037,
+    "svhn": 0.3151505838967425,
+    "gtsrb": 0.32478226444972286,
+    "mnist": 0.4825,
+    "dtd": 0.43882978723404253,
+    "cifar100": 0.6165,
+    "stl10": 0.97125,
+    "flowers102": 0.6644982924052691,
+    "pets": 0.8329245025892614,
+    "pcam": 0.5562744140625,
+    "fer2013": 0.3764279743661187,
+    "emnist": 0.10951923076923077,
+    "cifar10": 0.8831,
+    "food101": 0.827089108910891,
+    "fashion_mnist": 0.661,
+    "kmnist": 0.0995,
+    "rendered_sst2": 0.585941790225151
+  },
+  "expert": {
+    "sun397": 0.7485642317380352,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957,
+    "cifar100": 0.8825,
+    "stl10": 0.9755,
+    "flowers102": 0.8855098389982111,
+    "pets": 0.9242300354319978,
+    "pcam": 0.887481689453125,
+    "fer2013": 0.7105043187517415,
+    "emnist": 0.942451923076923,
+    "cifar10": 0.9748,
+    "food101": 0.8621782178217822,
+    "fashion_mnist": 0.948,
+    "kmnist": 0.9823,
+    "rendered_sst2": 0.7127951674903898
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": -4.979736641685792,
+      "worst": -61.558678685460656,
+      "mean_acc": 0.36420662350647603,
+      "worst_acc": 0.12125357542594205,
+      "scores": {
+        "sun397": 0.20408060453400503,
+        "cars": 0.12125357542594205,
+        "resisc45": 0.2415873015873016,
+        "eurosat": 0.25592592592592595,
+        "svhn": 0.30293484941610327,
+        "gtsrb": 0.29794140934283453,
+        "mnist": 0.7799,
+        "dtd": 0.2170212765957447,
+        "cifar100": 0.292,
+        "stl10": 0.709625,
+        "flowers102": 0.21125386241665312,
+        "pets": 0.4238212046879259,
+        "pcam": 0.58624267578125,
+        "fer2013": 0.3764279743661187,
+        "emnist": 0.17225961538461537,
+        "cifar10": 0.6046,
+        "food101": 0.14895049504950494,
+        "fashion_mnist": 0.6725,
+        "kmnist": 0.154,
+        "rendered_sst2": 0.5118066996155958
+      },
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "regmean@n64,nd1": {
+      "mean": 0.40261111988951004,
+      "worst": -1.2352912110794727,
+      "mean_acc": 0.7260726232863041,
+      "worst_acc": 0.2333653846153846,
+      "scores": {
+        "sun397": 0.6559697732997481,
+        "cars": 0.6371098122124114,
+        "resisc45": 0.7628571428571429,
+        "eurosat": 0.8788888888888889,
+        "svhn": 0.7531883835279656,
+        "gtsrb": 0.6604117181314331,
+        "mnist": 0.912,
+        "dtd": 0.5579787234042554,
+        "cifar100": 0.7131,
+        "stl10": 0.966,
+        "flowers102": 0.7129614571475037,
+        "pets": 0.874897792313982,
+        "pcam": 0.81512451171875,
+        "fer2013": 0.6057397603789356,
+        "emnist": 0.2333653846153846,
+        "cifar10": 0.944,
+        "food101": 0.8295841584158415,
+        "fashion_mnist": 0.8149,
+        "kmnist": 0.4998,
+        "rendered_sst2": 0.6935749588138386
+      },
+      "replay_obj": 0.3145252938662009,
+      "disp": 455.16682080162593,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "apr<-regmean@lr0.125,S30": {
+      "mean": 0.45045975538183824,
+      "worst": -0.37471772616678795,
+      "mean_acc": 0.7593749217903458,
+      "worst_acc": 0.4745673076923077,
+      "scores": {
+        "sun397": 0.6370277078085642,
+        "cars": 0.6272851635368735,
+        "resisc45": 0.7706349206349207,
+        "eurosat": 0.927037037037037,
+        "svhn": 0.8649354640442533,
+        "gtsrb": 0.7531274742676168,
+        "mnist": 0.9035,
+        "dtd": 0.5792553191489361,
+        "cifar100": 0.6636,
+        "stl10": 0.970125,
+        "flowers102": 0.731826313221662,
+        "pets": 0.8806214227309894,
+        "pcam": 0.85064697265625,
+        "fer2013": 0.5980774589022012,
+        "emnist": 0.4745673076923077,
+        "cifar10": 0.9169,
+        "food101": 0.8139405940594059,
+        "fashion_mnist": 0.8002,
+        "kmnist": 0.7405,
+        "rendered_sst2": 0.6836902800658978
+      },
+      "replay_obj": 0.024124984014490945,
+      "disp": 454.8839134098381,
+      "lr": 0.125,
+      "apr_steps": 30,
+      "schedule": "constant"
+    }
+  },
+  "best_regmean": "regmean@n64,nd1"
+}

@@ -1,0 +1,212 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "grids": {
+    "config": "configs/clip8.yaml",
+    "n_probe": 64,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "steps": 5,
+    "lr": 8.0,
+    "topk_fracs": [
+      0.01,
+      0.05,
+      0.1
+    ],
+    "out": "results/compare/topk_gate_clip8.json"
+  },
+  "arms": {
+    "sign-gate": {
+      "mean": 0.6029162459389664,
+      "mean_std": 0.009863388231702913,
+      "worst": 0.16400746044754366,
+      "worst_std": 0.007372900678793589,
+      "means": [
+        0.5978166980265126,
+        0.5966465876160874,
+        0.6142854521742993
+      ],
+      "worsts": [
+        0.1591202968583966,
+        0.17248812667576904,
+        0.16041395780846537
+      ]
+    },
+    "topk@0.01": {
+      "mean": 0.5633411601409827,
+      "mean_std": 0.006383636772023037,
+      "worst": 0.0334914445962122,
+      "worst_std": 0.006740476115684668,
+      "means": [
+        0.5559982955650926,
+        0.5664535098748908,
+        0.5675716749829647
+      ],
+      "worsts": [
+        0.026304439318055275,
+        0.03449762533515457,
+        0.039672269135426756
+      ]
+    },
+    "random@0.01": {
+      "mean": 0.3363674650029962,
+      "mean_std": 0.002986113494546668,
+      "worst": -0.4037659565268606,
+      "worst_std": 0.007620937189733707,
+      "means": [
+        0.33961259123125764,
+        0.33575422870625454,
+        0.33373557507147633
+      ],
+      "worsts": [
+        -0.39499781008750917,
+        -0.40879686022157025,
+        -0.40750319927150247
+      ]
+    },
+    "topk@0.05": {
+      "mean": 0.59818504050712,
+      "mean_std": 0.005292670204359477,
+      "worst": 0.11801062666733853,
+      "worst_std": 0.006042215828062012,
+      "means": [
+        0.5922109246294567,
+        0.602287810103282,
+        0.6000563867886213
+      ],
+      "worsts": [
+        0.11211728233924972,
+        0.11772314645621246,
+        0.1241914512065534
+      ]
+    },
+    "random@0.05": {
+      "mean": 0.43780608188926634,
+      "mean_std": 0.004697652864064492,
+      "worst": -0.2342963720679184,
+      "worst_std": 0.007571979913058805,
+      "means": [
+        0.4356690174829448,
+        0.443192328675824,
+        0.4345568995090301
+      ],
+      "worsts": [
+        -0.23501507259573437,
+        -0.22639066626194548,
+        -0.2414833773460753
+      ]
+    },
+    "topk@0.1": {
+      "mean": 0.6015438727638586,
+      "mean_std": 0.006870851158798287,
+      "worst": 0.1421589644019465,
+      "worst_std": 0.0067404761156850965,
+      "means": [
+        0.5941236456498865,
+        0.6028221623491797,
+        0.6076858102925097
+      ],
+      "worsts": [
+        0.13497195912378926,
+        0.14833978894116168,
+        0.14316514514088854
+      ]
+    },
+    "random@0.1": {
+      "mean": 0.48591262975354255,
+      "mean_std": 0.004835091182068496,
+      "worst": -0.16400746044754302,
+      "worst_std": 0.009211711139064849,
+      "means": [
+        0.48103252188930196,
+        0.49070141039687243,
+        0.4860039569744531
+      ],
+      "worsts": [
+        -0.1707632454090107,
+        -0.15351443274143386,
+        -0.16774470319218454
+      ]
+    }
+  }
+}

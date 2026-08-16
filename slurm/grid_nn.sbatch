@@ -15,8 +15,8 @@
 # to score the finally selected cells. Total labeled cost is stated honestly as
 # n_probe + n_select per task.
 #
-#   sbatch --export=ALL,BENCH=clip8,MODE=merges,N=64 slurm/grid_nn.sbatch
-#   sbatch --export=ALL,BENCH=clip20,MODE=base,N=16  slurm/grid_nn.sbatch
+#   sbatch --export=ALL,BENCH=clip8,MODE=merges,N=8 slurm/grid_nn.sbatch
+#   sbatch --export=ALL,BENCH=clip20,MODE=base,N=16 slurm/grid_nn.sbatch
 #
 # Two protocol points this job exists to get right:
 #
@@ -45,19 +45,36 @@ source slurm/common.sh
 # AdaMerging is excluded on the shared-output track: its entropy objective
 # assumes a classification head and the graph detaches on a seq2seq LM head.
 case "$BENCH" in
-  glue8)     CFG=configs/glue8.yaml;       APR="1 2 4 8 16 32";        NG="0.5 1 2 4 8";  GD="1e-5 5e-5 1e-4 5e-4 1e-3"; INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
-  clip8)     CFG=configs/clip8.yaml;       APR="2 4 8 16 32";          NG="2 4 8 16";     GD="1e-4 5e-4 1e-3 5e-3";      INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
-  clip20)    CFG=configs/clip20_l008.yaml; APR="1 2 4 8 16";           NG="1 2 4 8";      GD="1e-5 1e-4 5e-4 1e-3";      INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
-  t5_glue8)  CFG=configs/t5_glue8.yaml;    APR="64 128 256 512 1024";  NG="4 8 16 32";    GD="1e-3 3e-3 1e-2 3e-2";      INITS="ta ties dareties bc";     SKIP="dare della ls ada" ;;
+  # These are the full, bracketed Table 2 from-pretrained grids (the saved n=16
+  # files with the _fast suffix). The merge-grid adjustment below reproduces
+  # the corresponding composition grids exactly. Keep both unchanged across
+  # replay budgets so n=8 and n=16 compare the data protocol rather than two
+  # differently sized searches.
+  glue8)     CFG=configs/glue8.yaml;       APR="0.5 1 2 4 8 16 32";     NG="0.25 0.5 1 2 4 8"; GD="1e-5 5e-5 1e-4 5e-4 1e-3 5e-3 1e-2"; INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  clip8)     CFG=configs/clip8.yaml;       APR="1 2 4 8 16 32";         NG="0.5 1 2 4 8 16";  GD="1e-6 1e-5 1e-4 5e-4 1e-3 5e-3";       INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  clip20)    CFG=configs/clip20_l008.yaml; APR="0.5 1 2 4 8 16";       NG="0.5 1 2 4 8";     GD="1e-7 1e-6 1e-5 1e-4 5e-4 1e-3";       INITS="ta ties dareties bc ada"; SKIP="dare della ls" ;;
+  t5_glue8)  CFG=configs/t5_glue8.yaml;    APR="32 64 128 256 512 1024"; NG="2 4 8 16 32";     GD="3e-4 1e-3 3e-3 1e-2 3e-2";              INITS="ta ties dareties bc";     SKIP="dare della ls ada" ;;
   *) echo "unknown BENCH=$BENCH" >&2; exit 2 ;;
 esac
+
+# The n=16 Table 2 composition runs used narrower grids where their earlier
+# optima were already bracketed. Reproduce those grids rather than silently
+# giving the n=8 composition rows a larger search.
+if [ "$MODE" = merges ]; then
+  case "$BENCH" in
+    glue8)  APR="1 2 4 8 16 32";       NG="0.5 1 2 4 8"; GD="1e-5 5e-5 1e-4 5e-4 1e-3" ;;
+    clip8)  APR="2 4 8 16 32";         NG="2 4 8 16";    GD="1e-4 5e-4 1e-3 5e-3" ;;
+    clip20) APR="1 2 4 8 16";          NG="1 2 4 8";     GD="1e-5 1e-4 5e-4 1e-3" ;;
+    # t5_glue8 used the full grid in both modes.
+  esac
+fi
 
 # Overrides for extension waves. The (lr, S) optima trade off along a roughly
 # constant lr*S product, so a longer horizon needs a PROPORTIONALLY LOWER
 # learning-rate grid: going from S=20 to S=50 (2.5x) shifts the grid down by
 # about the same factor. Extending S while holding lr fixed would test the
 # wrong cells.
-: "${STEPS_GRID:=5 20}"
+: "${STEPS_GRID:=5 20 50}"
 [ -n "${APR_OVR:-}" ] && APR="$APR_OVR"
 [ -n "${NG_OVR:-}"  ] && NG="$NG_OVR"
 [ -n "${GD_OVR:-}"  ] && GD="$GD_OVR"

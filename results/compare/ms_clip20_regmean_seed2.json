@@ -1,0 +1,414 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cifar100",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "stl10",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "flowers102",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "pets",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "pcam",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "fer2013",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "emnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cifar10",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "food101",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "fashion_mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "kmnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "rendered_sst2",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 8,
+      "probe_seed": 2,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip20",
+    "tag": "clip20"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd",
+    "cifar100",
+    "stl10",
+    "flowers102",
+    "pets",
+    "pcam",
+    "fer2013",
+    "emnist",
+    "cifar10",
+    "food101",
+    "fashion_mnist",
+    "kmnist",
+    "rendered_sst2"
+  ],
+  "grids": {
+    "config": "configs/clip20.yaml",
+    "n_probe": 64,
+    "gram_ns": [
+      64
+    ],
+    "nondiag_scales": [
+      1.0
+    ],
+    "eps": 0.001,
+    "gram_bs": 16,
+    "apr_lrs": [
+      0.5
+    ],
+    "apr_schedules": [
+      "cosine"
+    ],
+    "apr_order": "random",
+    "probe_seed": 2,
+    "n_val": 0,
+    "nogate_lrs": [],
+    "gd_lrs": [
+      0.0001
+    ],
+    "gd_steps": [
+      30
+    ],
+    "gd_schedules": [
+      "constant",
+      "cosine"
+    ],
+    "gd_lr_min_frac": 0.05,
+    "gd_order": "random",
+    "steps": 30,
+    "select_by": "mean_acc",
+    "out": "results/compare/ms_clip20_regmean_seed2.json"
+  },
+  "base": {
+    "sun397": 0.6317884130982367,
+    "cars": 0.5968163163785599,
+    "resisc45": 0.5819047619047619,
+    "eurosat": 0.45,
+    "svhn": 0.314920098340504,
+    "gtsrb": 0.3252573238321457,
+    "mnist": 0.4826,
+    "dtd": 0.43882978723404253,
+    "cifar100": 0.6166,
+    "stl10": 0.97125,
+    "flowers102": 0.6644982924052691,
+    "pets": 0.8331970564186427,
+    "pcam": 0.556365966796875,
+    "fer2013": 0.37628865979381443,
+    "emnist": 0.109375,
+    "cifar10": 0.8832,
+    "food101": 0.8271287128712871,
+    "fashion_mnist": 0.661,
+    "kmnist": 0.0995,
+    "rendered_sst2": 0.586490939044481
+  },
+  "expert": {
+    "sun397": 0.7486146095717884,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957,
+    "cifar100": 0.8825,
+    "stl10": 0.9755,
+    "flowers102": 0.8855098389982111,
+    "pets": 0.9245025892613791,
+    "pcam": 0.887481689453125,
+    "fer2013": 0.7106436333240457,
+    "emnist": 0.942451923076923,
+    "cifar10": 0.9748,
+    "food101": 0.8622574257425742,
+    "fashion_mnist": 0.9479,
+    "kmnist": 0.9823,
+    "rendered_sst2": 0.7127951674903898
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": -4.979589739554713,
+      "worst": -61.558678685460656,
+      "mean_acc": 0.3642091413176531,
+      "worst_acc": 0.12125357542594205,
+      "scores": {
+        "sun397": 0.20408060453400503,
+        "cars": 0.12125357542594205,
+        "resisc45": 0.24142857142857144,
+        "eurosat": 0.25592592592592595,
+        "svhn": 0.30293484941610327,
+        "gtsrb": 0.29794140934283453,
+        "mnist": 0.7799,
+        "dtd": 0.2170212765957447,
+        "cifar100": 0.292,
+        "stl10": 0.709625,
+        "flowers102": 0.21125386241665312,
+        "pets": 0.4238212046879259,
+        "pcam": 0.586212158203125,
+        "fer2013": 0.3764279743661187,
+        "emnist": 0.17225961538461537,
+        "cifar10": 0.6046,
+        "food101": 0.14899009900990098,
+        "fashion_mnist": 0.6726,
+        "kmnist": 0.1541,
+        "rendered_sst2": 0.5118066996155958
+      },
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "regmean@n64,nd1": {
+      "mean": 0.3524510513053046,
+      "worst": -1.7647017301135286,
+      "mean_acc": 0.722056660673195,
+      "worst_acc": 0.23514423076923077,
+      "scores": {
+        "sun397": 0.6553652392947104,
+        "cars": 0.6257928118393234,
+        "resisc45": 0.7541269841269841,
+        "eurosat": 0.8803703703703704,
+        "svhn": 0.746158574062692,
+        "gtsrb": 0.6830562153602534,
+        "mnist": 0.9137,
+        "dtd": 0.5595744680851064,
+        "cifar100": 0.7204,
+        "stl10": 0.96375,
+        "flowers102": 0.71182306066027,
+        "pets": 0.8724448078495503,
+        "pcam": 0.792449951171875,
+        "fer2013": 0.6025355252159376,
+        "emnist": 0.23514423076923077,
+        "cifar10": 0.9457,
+        "food101": 0.8215049504950495,
+        "fashion_mnist": 0.8094,
+        "kmnist": 0.4614,
+        "rendered_sst2": 0.686436024162548
+      },
+      "replay_obj": 0.3261070550836765,
+      "disp": 453.96238274892016,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "apr<-regmean@lr0.5,S30,cosine": {
+      "mean": 0.40326004737963717,
+      "worst": -1.1470561245737922,
+      "mean_acc": 0.7652372689232774,
+      "worst_acc": 0.5173557692307692,
+      "scores": {
+        "sun397": 0.638639798488665,
+        "cars": 0.6296480537246611,
+        "resisc45": 0.780952380952381,
+        "eurosat": 0.9181481481481482,
+        "svhn": 0.8863322065150584,
+        "gtsrb": 0.8442596991290579,
+        "mnist": 0.9245,
+        "dtd": 0.5856382978723405,
+        "cifar100": 0.6699,
+        "stl10": 0.966375,
+        "flowers102": 0.728411123759961,
+        "pets": 0.8732624693376942,
+        "pcam": 0.8004150390625,
+        "fer2013": 0.5812203956533853,
+        "emnist": 0.5173557692307692,
+        "cifar10": 0.9218,
+        "food101": 0.8053069306930694,
+        "fashion_mnist": 0.8172,
+        "kmnist": 0.7251,
+        "rendered_sst2": 0.6902800658978583
+      },
+      "replay_obj": 0.01393646602827014,
+      "disp": 453.5032006241655,
+      "lr": 0.5,
+      "apr_steps": 30,
+      "schedule": "cosine"
+    },
+    "gd<-regmean@lr0.0001,S30": {
+      "mean": 0.43707857404602557,
+      "worst": -0.8004507304241124,
+      "mean_acc": 0.7665604000830124,
+      "worst_acc": 0.5398076923076923,
+      "scores": {
+        "sun397": 0.636272040302267,
+        "cars": 0.6180823280686482,
+        "resisc45": 0.7834920634920635,
+        "eurosat": 0.9259259259259259,
+        "svhn": 0.8771127842655193,
+        "gtsrb": 0.8291369754552652,
+        "mnist": 0.9181,
+        "dtd": 0.5893617021276596,
+        "cifar100": 0.6837,
+        "stl10": 0.969625,
+        "flowers102": 0.725809074646284,
+        "pets": 0.8697192695557373,
+        "pcam": 0.8153076171875,
+        "fer2013": 0.5923655614377263,
+        "emnist": 0.5398076923076923,
+        "cifar10": 0.928,
+        "food101": 0.799009900990099,
+        "fashion_mnist": 0.8253,
+        "kmnist": 0.7148,
+        "rendered_sst2": 0.6902800658978583
+      },
+      "replay_obj": 0.013802689161619234,
+      "disp": 453.96240344206586,
+      "lr": 0.0001,
+      "gd_steps": 30,
+      "schedule": "constant"
+    },
+    "gd<-regmean@lr0.0001,S30,cosine": {
+      "mean": 0.4914403986207172,
+      "worst": -0.46561429811994015,
+      "mean_acc": 0.7669709134321084,
+      "worst_acc": 0.5085576923076923,
+      "scores": {
+        "sun397": 0.6429219143576826,
+        "cars": 0.6296480537246611,
+        "resisc45": 0.7853968253968254,
+        "eurosat": 0.9177777777777778,
+        "svhn": 0.8914028887523049,
+        "gtsrb": 0.8228028503562945,
+        "mnist": 0.9209,
+        "dtd": 0.5808510638297872,
+        "cifar100": 0.6858,
+        "stl10": 0.972,
+        "flowers102": 0.7323141974304765,
+        "pets": 0.8757154538021259,
+        "pcam": 0.81549072265625,
+        "fer2013": 0.5940373363053776,
+        "emnist": 0.5085576923076923,
+        "cifar10": 0.9321,
+        "food101": 0.8107722772277228,
+        "fashion_mnist": 0.8176,
+        "kmnist": 0.7125,
+        "rendered_sst2": 0.6908292147171884
+      },
+      "replay_obj": 0.0316097188784639,
+      "disp": 453.96239833646507,
+      "lr": 0.0001,
+      "gd_steps": 30,
+      "schedule": "cosine"
+    }
+  },
+  "best_regmean": "regmean@n64,nd1"
+}

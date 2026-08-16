@@ -1,0 +1,266 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "grids": {
+    "config": "configs/clip8.yaml",
+    "n_probes": [
+      64,
+      32
+    ],
+    "long_steps": 30,
+    "long_lrs": [
+      8.0,
+      16.0
+    ],
+    "schedule": "cosine",
+    "lr_min_frac": 0.05,
+    "base_lr": 8.0,
+    "base_steps": 5,
+    "cal_lr": 0.03,
+    "cal_l2": 0.001,
+    "cal_steps": 300,
+    "cal_refine_lr": 8.0,
+    "skip_calibrate": false,
+    "out": "results/compare/long_apr_clip8.json"
+  },
+  "cells": {
+    "n64:apr-short@lr8": {
+      "mean": 0.5978166980265126,
+      "worst": 0.1591202968583966,
+      "disp": 0.36671789143410316,
+      "steps": 5,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    },
+    "n64:apr-longsteps@lr8": {
+      "mean": 0.6160809146671525,
+      "worst": 0.12634755279000037,
+      "disp": 0.45924783717844453,
+      "steps": 30,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    },
+    "n64:apr-long-anneal@lr8": {
+      "mean": 0.6038672459966316,
+      "worst": 0.12677877310668997,
+      "disp": 0.4413205002046263,
+      "steps": 30,
+      "lr": 8.0,
+      "order": "random",
+      "lr_schedule": "cosine",
+      "lr_eff_last": 0.4
+    },
+    "n64:apr-long-anneal@lr16": {
+      "mean": 0.5783280171598539,
+      "worst": 0.04809618980132629,
+      "disp": 0.713812334869356,
+      "steps": 30,
+      "lr": 16.0,
+      "order": "random",
+      "lr_schedule": "cosine",
+      "lr_eff_last": 0.8
+    },
+    "n64:calibrated": {
+      "mean": 0.733652623122068,
+      "worst": 0.36006896443566694,
+      "disp": 4.321914855898757,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 300,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.32699769735336304,
+          "cars": 0.40726974606513977,
+          "resisc45": 0.30997970700263977,
+          "eurosat": 0.3245789408683777,
+          "svhn": 0.33088043332099915,
+          "gtsrb": 0.35055357217788696,
+          "mnist": 0.3197197914123535,
+          "dtd": 0.4733884036540985
+        },
+        "best_holdout_loss": 0.35359636740759015,
+        "fit_loss_first": 0.9047751352190971,
+        "fit_loss_last": 0.0693240447435528
+      }
+    },
+    "n64:apr<-calib@lr8": {
+      "mean": 0.8250490115508406,
+      "worst": 0.5433375990286708,
+      "disp": 3.9771191142659545,
+      "steps": 5,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    },
+    "n32:apr-short@lr8": {
+      "mean": 0.550746365679347,
+      "worst": 0.022044086992274597,
+      "disp": 0.3802473441847033,
+      "steps": 5,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    },
+    "n32:apr-longsteps@lr8": {
+      "mean": 0.5701301459098436,
+      "worst": 0.1241914512065534,
+      "disp": 0.4453005688756122,
+      "steps": 30,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    },
+    "n32:apr-long-anneal@lr8": {
+      "mean": 0.5781873637473314,
+      "worst": 0.11599826518945505,
+      "disp": 0.4027025584976806,
+      "steps": 30,
+      "lr": 8.0,
+      "order": "random",
+      "lr_schedule": "cosine",
+      "lr_eff_last": 0.4
+    },
+    "n32:apr-long-anneal@lr16": {
+      "mean": 0.5483497967910042,
+      "worst": 0.12807243405675872,
+      "disp": 0.8048264752150718,
+      "steps": 30,
+      "lr": 16.0,
+      "order": "random",
+      "lr_schedule": "cosine",
+      "lr_eff_last": 0.8
+    },
+    "n32:calibrated": {
+      "mean": 0.7123141323245434,
+      "worst": 0.32341523751706636,
+      "disp": 3.8669302284472797,
+      "calibrate": {
+        "layerwise": true,
+        "steps_run": 141,
+        "lr": 0.03,
+        "l2_reg": 0.001,
+        "init_lam": 0.3,
+        "holdout_frac": 0.25,
+        "lam_per_task": {
+          "sun397": 0.33380064368247986,
+          "cars": 0.40590476989746094,
+          "resisc45": 0.3042142689228058,
+          "eurosat": 0.30973488092422485,
+          "svhn": 0.3133864402770996,
+          "gtsrb": 0.334246963262558,
+          "mnist": 0.284791499376297,
+          "dtd": 0.4559513330459595
+        },
+        "best_holdout_loss": 0.40715162595734,
+        "fit_loss_first": 1.0416556778363883,
+        "fit_loss_last": 0.04704736219719052
+      }
+    },
+    "n32:apr<-calib@lr8": {
+      "mean": 0.7817524683185106,
+      "worst": 0.5683483773966574,
+      "disp": 3.3881637581022717,
+      "steps": 5,
+      "lr": 8.0,
+      "order": "fixed",
+      "lr_schedule": "constant",
+      "lr_eff_last": 8.0
+    }
+  }
+}

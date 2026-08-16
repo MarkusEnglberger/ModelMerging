@@ -1,0 +1,168 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "steps": 35,
+  "base": {
+    "sun397": 0.6317380352644836,
+    "cars": 0.5966919537370974,
+    "resisc45": 0.5815873015873015,
+    "eurosat": 0.45037037037037037,
+    "svhn": 0.3151505838967425,
+    "gtsrb": 0.32478226444972286,
+    "mnist": 0.4825,
+    "dtd": 0.43882978723404253
+  },
+  "expert": {
+    "sun397": 0.7485642317380352,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "methods": {
+    "merge(S=0)": {
+      "scores": {
+        "sun397": 0.5702267002518892,
+        "cars": 0.5530406665837583,
+        "resisc45": 0.6279365079365079,
+        "eurosat": 0.7337037037037037,
+        "svhn": 0.778119237861094,
+        "gtsrb": 0.6850356294536817,
+        "mnist": 0.9607,
+        "dtd": 0.4723404255319149
+      },
+      "normret": {
+        "sun397": -0.5265200066777828,
+        "cars": -0.23446892528146518,
+        "resisc45": 0.12618841488769658,
+        "eurosat": 0.5243317243612361,
+        "svhn": 0.7044245611446722,
+        "gtsrb": 0.5423122683558951,
+        "mnist": 0.9316189181449653,
+        "dtd": 0.09445277095095649
+      },
+      "aggregate": {
+        "mean_normret": 0.2702924657357717,
+        "worst_normret": -0.5265200066777828,
+        "hmean_normret": 3.999950488404886e-06
+      },
+      "displacement": 0.0
+    },
+    "ordinary_gd@0.0001": {
+      "scores": {
+        "sun397": 0.615919395465995,
+        "cars": 0.6170874269369482,
+        "resisc45": 0.7425396825396825,
+        "eurosat": 0.9192592592592592,
+        "svhn": 0.8789950829748002,
+        "gtsrb": 0.8521773555027712,
+        "mnist": 0.9733,
+        "dtd": 0.5526595744680851
+      },
+      "normret": {
+        "sun397": -0.1354031794404779,
+        "cars": 0.10955243232524327,
+        "resisc45": 0.4382022352606997,
+        "eurosat": 0.8677175987468297,
+        "svhn": 0.857911027919142,
+        "gtsrb": 0.7939213229711246,
+        "mnist": 0.9561659661763886,
+        "dtd": 0.3208395711667408
+      },
+      "aggregate": {
+        "mean_normret": 0.5261133718907114,
+        "worst_normret": -0.1354031794404779,
+        "hmean_normret": 7.999846799669501e-06
+      },
+      "displacement": 0.10421907747761254,
+      "gate_density": 1.0,
+      "clip_frac_gated": 0.0
+    }
+  }
+}

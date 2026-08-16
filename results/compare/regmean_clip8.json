@@ -1,0 +1,183 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "grids": {
+    "config": "configs/clip8.yaml",
+    "n_probe": 64,
+    "gram_ns": [
+      64,
+      256
+    ],
+    "nondiag_scales": [
+      0.9,
+      1.0
+    ],
+    "eps": 0.001,
+    "gram_bs": 16,
+    "apr_lrs": [
+      4.0,
+      6.0,
+      8.0
+    ],
+    "steps": 5,
+    "out": "results/compare/regmean_clip8.json"
+  },
+  "cells": {
+    "merge:TA": {
+      "mean": 0.2702924657357717,
+      "worst": -0.5265200066777828,
+      "replay_obj": 1.0,
+      "disp": 0.0
+    },
+    "regmean@n64,nd0.9": {
+      "mean": 0.727827005881942,
+      "worst": 0.4480379090403084,
+      "replay_obj": 0.28317897379649065,
+      "disp": 156.4112026023678,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 0.9,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n64,nd1": {
+      "mean": 0.7334464923715333,
+      "worst": 0.44329448555672485,
+      "replay_obj": 0.26197621091536266,
+      "disp": 282.98847868424406,
+      "gram_n": 64,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n256,nd0.9": {
+      "mean": 0.7466101295641996,
+      "worst": 0.4833979750088412,
+      "replay_obj": 0.48062103436613085,
+      "disp": 231.299016391263,
+      "gram_n": 256,
+      "n_linear": 72,
+      "nondiag_scale": 0.9,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "regmean@n256,nd1": {
+      "mean": 0.7356405335685927,
+      "worst": 0.4639930607578174,
+      "replay_obj": 0.4810049605886299,
+      "disp": 508.1897350365406,
+      "gram_n": 256,
+      "n_linear": 72,
+      "nondiag_scale": 1.0,
+      "eps": 0.001,
+      "buffer_key": "probe_buffer"
+    },
+    "apr<-regmean@lr4": {
+      "mean": 0.3603720498876576,
+      "worst": -2.0848362273602663,
+      "replay_obj": 0.33292018550099756,
+      "disp": 281.7338321426087,
+      "lr": 4.0
+    },
+    "apr<-regmean@lr6": {
+      "mean": 0.37415213076830744,
+      "worst": -1.475617823210134,
+      "replay_obj": 0.31621365235634513,
+      "disp": 280.62601394781126,
+      "lr": 6.0
+    },
+    "apr<-regmean@lr8": {
+      "mean": -1.5561824507392423,
+      "worst": -5.113410515303153,
+      "replay_obj": 6.090700623662786,
+      "disp": 281.85102086017963,
+      "lr": 8.0
+    }
+  },
+  "best_regmean": "regmean@n64,nd1"
+}

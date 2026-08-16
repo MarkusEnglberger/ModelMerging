@@ -1,0 +1,175 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "mrpc",
+        "checkpoint": "textattack/roberta-base-MRPC",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "textattack/roberta-base-STS-B",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "textattack/roberta-base-SST-2",
+        "lam": 0.3
+      }
+    ],
+    "refine": {
+      "steps": 5,
+      "lr": 1.0,
+      "clip_frac": 0.5,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 64,
+      "max_length": 128,
+      "eval_batch_size": 64,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/poc3",
+    "tag": "poc3_roberta"
+  },
+  "steps": 5,
+  "gamma": 1.0,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "merge_mean": 0.558411731371487,
+  "results": {
+    "64": {
+      "ordinary_gd": [
+        {
+          "mean": 0.8387954460584987,
+          "worst": 0.6469896391050254,
+          "lr": 0.001,
+          "disp": 0.1145282171736908,
+          "clip_frac_gated": 0.0
+        },
+        {
+          "mean": 0.8291802433259239,
+          "worst": 0.6043321895238325,
+          "lr": 0.001,
+          "disp": 0.09258393219802775,
+          "clip_frac_gated": 0.0
+        },
+        {
+          "mean": 0.8287875112421054,
+          "worst": 0.6174803120527865,
+          "lr": 0.001,
+          "disp": 0.10525347923224922,
+          "clip_frac_gated": 0.0
+        },
+        {
+          "mean": 0.833512662706393,
+          "worst": 0.6312490732747223,
+          "lr": 0.001,
+          "disp": 0.097431743395649,
+          "clip_frac_gated": 0.0
+        },
+        {
+          "mean": 0.8225252970118997,
+          "worst": 0.596587912945866,
+          "lr": 0.001,
+          "disp": 0.10075346792977144,
+          "clip_frac_gated": 0.0
+        }
+      ],
+      "apr": [
+        {
+          "mean": 0.8487149382747455,
+          "worst": 0.6423145641070679,
+          "lr": 64,
+          "disp": 0.6783902494127849,
+          "clip_frac_gated": 0.000876652623532243
+        },
+        {
+          "mean": 0.8282650277494112,
+          "worst": 0.598615456488797,
+          "lr": 32,
+          "disp": 0.3483520694848547,
+          "clip_frac_gated": 0.0001723132006760807
+        },
+        {
+          "mean": 0.8336253266399282,
+          "worst": 0.6190507343723409,
+          "lr": 32,
+          "disp": 0.3906922315556854,
+          "clip_frac_gated": 0.00022217921172975504
+        },
+        {
+          "mean": 0.8753425770953225,
+          "worst": 0.7094179197303387,
+          "lr": 64,
+          "disp": 0.5746227410859286,
+          "clip_frac_gated": 0.000591222861478624
+        },
+        {
+          "mean": 0.8151973864337593,
+          "worst": 0.5818505179646353,
+          "lr": 16,
+          "disp": 0.25166338684140666,
+          "clip_frac_gated": 5.826498287498026e-05
+        }
+      ],
+      "nogate": [
+        {
+          "mean": 0.8381834456790034,
+          "worst": 0.701098818035935,
+          "lr": 8,
+          "disp": 0.3296297912965638,
+          "clip_frac_gated": 2.6144309278634176e-05
+        },
+        {
+          "mean": 0.814835880682825,
+          "worst": 0.5682051421182278,
+          "lr": 2,
+          "disp": 0.14178697192968023,
+          "clip_frac_gated": 1.8921708729716536e-06
+        },
+        {
+          "mean": 0.8449676135857699,
+          "worst": 0.706902449122687,
+          "lr": 8,
+          "disp": 0.2976508148005955,
+          "clip_frac_gated": 1.915547593498284e-05
+        },
+        {
+          "mean": 0.8588096060324221,
+          "worst": 0.7623986036975915,
+          "lr": 8,
+          "disp": 0.3254206349223811,
+          "clip_frac_gated": 1.8298866911547217e-05
+        },
+        {
+          "mean": 0.8183114809237969,
+          "worst": 0.5895075738499094,
+          "lr": 2,
+          "disp": 0.14452940846761286,
+          "clip_frac_gated": 2.185589020271433e-06
+        }
+      ]
+    }
+  }
+}

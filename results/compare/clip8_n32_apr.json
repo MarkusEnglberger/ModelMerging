@@ -1,0 +1,198 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist_pre",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false
+    },
+    "data": {
+      "n_probe": 32,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "steps": 10,
+  "base": {
+    "sun397": 0.6317380352644836,
+    "cars": 0.5966919537370974,
+    "resisc45": 0.5815873015873015,
+    "eurosat": 0.45037037037037037,
+    "svhn": 0.3151505838967425,
+    "gtsrb": 0.32478226444972286,
+    "mnist": 0.4825,
+    "dtd": 0.43882978723404253
+  },
+  "expert": {
+    "sun397": 0.7485642317380352,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "methods": {
+    "merge(S=0)": {
+      "scores": {
+        "sun397": 0.5702267002518892,
+        "cars": 0.5530406665837583,
+        "resisc45": 0.6279365079365079,
+        "eurosat": 0.7337037037037037,
+        "svhn": 0.778119237861094,
+        "gtsrb": 0.6850356294536817,
+        "mnist": 0.9607,
+        "dtd": 0.4723404255319149
+      },
+      "normret": {
+        "sun397": -0.5265200066777828,
+        "cars": -0.23446892528146518,
+        "resisc45": 0.12618841488769658,
+        "eurosat": 0.5243317243612361,
+        "svhn": 0.7044245611446722,
+        "gtsrb": 0.5423122683558951,
+        "mnist": 0.9316189181449653,
+        "dtd": 0.09445277095095649
+      },
+      "aggregate": {
+        "mean_normret": 0.2702924657357717,
+        "worst_normret": -0.5265200066777828,
+        "hmean_normret": 3.999950488404886e-06
+      },
+      "displacement": 0.0
+    },
+    "apr@lr6,g1": {
+      "scores": {
+        "sun397": 0.6459445843828715,
+        "cars": 0.6247979107076235,
+        "resisc45": 0.7611111111111111,
+        "eurosat": 0.9066666666666666,
+        "svhn": 0.883720036877689,
+        "gtsrb": 0.8391923990498812,
+        "mnist": 0.962,
+        "dtd": 0.575
+      },
+      "normret": {
+        "sun397": 0.12160412930641683,
+        "cars": 0.15096859576527422,
+        "resisc45": 0.48876403163693427,
+        "eurosat": 0.844413966552997,
+        "svhn": 0.8651002264771235,
+        "gtsrb": 0.7743742434084067,
+        "mnist": 0.9341515500847153,
+        "dtd": 0.3838080851340449
+      },
+      "aggregate": {
+        "mean_normret": 0.570398103545739,
+        "worst_normret": 0.12160412930641683,
+        "hmean_normret": 0.3305677336124744
+      },
+      "displacement": 0.30691514324251773,
+      "gate_density": 0.5128770102966063,
+      "clip_frac_gated": 1.7713818095287956e-05
+    },
+    "apr@lr8,g1": {
+      "scores": {
+        "sun397": 0.6492191435768262,
+        "cars": 0.6144758114662355,
+        "resisc45": 0.7593650793650794,
+        "eurosat": 0.9081481481481481,
+        "svhn": 0.8791487400122926,
+        "gtsrb": 0.8344418052256533,
+        "mnist": 0.9574,
+        "dtd": 0.575531914893617
+      },
+      "normret": {
+        "sun397": 0.1496334498912295,
+        "cars": 0.09552437696652286,
+        "resisc45": 0.4840103584733567,
+        "eurosat": 0.8471555703405068,
+        "svhn": 0.8581448229941983,
+        "gtsrb": 0.7672228728366806,
+        "mnist": 0.9251899293748308,
+        "dtd": 0.38530733546659984
+      },
+      "aggregate": {
+        "mean_normret": 0.5640235895429906,
+        "worst_normret": 0.09552437696652286,
+        "hmean_normret": 0.3013986562969143
+      },
+      "displacement": 0.4025153215198742,
+      "gate_density": 0.5127511630134013,
+      "clip_frac_gated": 4.694285897006601e-05
+    }
+  }
+}
