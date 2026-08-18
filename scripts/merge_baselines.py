@@ -102,10 +102,11 @@ class Best:
     def __init__(self, label):
         self.label, self.mean, self.name, self.state = label, None, None, None
 
-    def offer(self, mean, name, state):
+    def offer(self, mean, name, state, selection_obj=None):
         # Under the n+n split, rank by held-out replay loss (negated: higher is
         # better) rather than by the evaluation aggregate that `mean` carries.
-        score = mean if SELECT_OBJ is None else -SELECT_OBJ(state)
+        score = (mean if SELECT_OBJ is None else
+                 -(selection_obj if selection_obj is not None else SELECT_OBJ(state)))
         if self.mean is None or score > self.mean:
             self.mean, self.name, self.state = score, name, state
 
@@ -166,11 +167,21 @@ def merge_cache_save(cfg, family, params, state, extra=None):
     path, key = _merge_cache_path(cfg, family, params, extra)
     os.makedirs(MERGE_CACHE_DIR, exist_ok=True)
     tmp = path + f".tmp{os.getpid()}"                 # atomic: concurrent jobs
-    torch.save(state, tmp)                            # share this directory
-    os.replace(tmp, path)
-    with open(path.replace(".pt", ".json"), "w") as fh:
-        json.dump(key, fh, indent=2, default=str)
-    _log(f"[merge-cache] saved {os.path.basename(path)} ({family})")
+    try:
+        torch.save(state, tmp)                        # share this directory
+        os.replace(tmp, path)
+        with open(path.replace(".pt", ".json"), "w") as fh:
+            json.dump(key, fh, indent=2, default=str)
+        _log(f"[merge-cache] saved {os.path.basename(path)} ({family})")
+    except Exception as exc:
+        # A cache is an optimization, not an experiment result. Multi-GB LLM
+        # states can exceed a home quota after training has already succeeded.
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        _log(f"[merge-cache] save failed ({exc}); continuing without cache")
 
 
 def sweep_arm(ctx, cfg, report, start_state, steps_grid, lrs, make_cfg, name_of,
@@ -287,6 +298,10 @@ def main():
     ap.add_argument("--apr_order", choices=["fixed", "cyclic", "random"],
                     default="random",
                     help="task order for non-constant-schedule APR arms")
+    ap.add_argument("--apr_constant_order",
+                    choices=["fixed", "cyclic", "random"], default=None,
+                    help="optional task-order override for constant-schedule "
+                         "APR arms (default: the config's order)")
     ap.add_argument("--apr_gate_modes", nargs="*", default=[],
                     choices=["coordinate", "none", "topk", "topk_g"],
                     help="gate variants for the APR arms (default: config's mode). "
@@ -421,6 +436,30 @@ def main():
     SELECT_BY = args.select_by
     _log(f"[select] best-per-family by {SELECT_BY}")
     skip = set(args.skip_families)
+    baseline_fast = (SELECT_OBJ is not None) and not args.eval_all_cells
+
+    def offer_baseline(family, name, state, **extra):
+        """Select merge cells without consulting the evaluation split.
+
+        Under the n+n protocol, evaluating every checkpoint-only candidate is
+        both unnecessary (selection is by held-out replay loss) and contrary to
+        the promise that the evaluation split is read only for selected cells.
+        Mirror ``sweep_arm(..., fast=True)``: record selection-only metadata now
+        and defer the expensive benchmark evaluation until the family winner is
+        known.
+        """
+        disp = pd_global_norm(pd_sub(state, ctx.merged0))
+        if baseline_fast:
+            sel = SELECT_OBJ(state)
+            report["methods"][name] = {
+                "selection_obj": sel, "displacement": disp,
+                "evaluated": False, **extra}
+            _log(f"  -> {name}: sel={sel:.4f} (not evaluated)")
+            family.offer(None, name, state, selection_obj=sel)
+            return
+        scores, nr, ag = eval_merge(ctx, state)
+        mean = record(report, name, scores, nr, ag, disp, state=state, **extra)
+        family.offer(mean, name, state)
 
     # ---- task arithmetic, lambda swept (the other families tune theirs, so must this) ----
     ta = Best("TA")
@@ -429,9 +468,7 @@ def main():
             state = task_arithmetic_merge(ctx.base_encoder, ctx.task_vectors,
                                           {n: lam for n in names})
             nm = f"merge:TA@l{lam:g}"
-            s, nr, ag = eval_merge(ctx, state)
-            ta.offer(record(report, nm, s, nr, ag,
-                            pd_global_norm(pd_sub(state, ctx.merged0)), state=state, lam=lam), nm, state)
+            offer_baseline(ta, nm, state, lam=lam)
 
     # ---- TIES (combined tau reused across the lambda grid) ----
     ties = Best("TIES")
@@ -443,10 +480,7 @@ def main():
                 state = ties_merge(ctx.base_encoder, ctx.task_vectors, lam=lam,
                                    density=d, combined=combined)
                 nm = f"merge:TIES@d{d:g},l{lam:g}"
-                s, nr, ag = eval_merge(ctx, state)
-                ties.offer(record(report, nm, s, nr, ag,
-                                  pd_global_norm(pd_sub(state, ctx.merged0)),
-                                  state=state, density=d, lam=lam), nm, state)
+                offer_baseline(ties, nm, state, density=d, lam=lam)
 
     # ---- DARE alone (control: expectation-preserving => ~= TA) ----
     dare = Best("DARE")
@@ -456,10 +490,7 @@ def main():
                 state = dare_ta_merge(ctx.base_encoder, ctx.task_vectors, ctx.lambdas,
                                       density=d, seed=sd)
                 nm = f"merge:DARE@d{d:g},s{sd}"
-                s, nr, ag = eval_merge(ctx, state)
-                dare.offer(record(report, nm, s, nr, ag,
-                                  pd_global_norm(pd_sub(state, ctx.merged0)),
-                                  state=state, density=d, seed=sd, note="control"), nm, state)
+                offer_baseline(dare, nm, state, density=d, seed=sd, note="control")
 
     # ---- DARE-TIES ----
     dt = Best("DARETIES")
@@ -471,10 +502,7 @@ def main():
                                             drop_density=dd, trim_density=tr,
                                             seed=args.dt_seed)
                     nm = f"merge:DARETIES@dd{dd:g},t{tr:g},l{lam:g}"
-                    s, nr, ag = eval_merge(ctx, state)
-                    dt.offer(record(report, nm, s, nr, ag,
-                                    pd_global_norm(pd_sub(state, ctx.merged0)),
-                                    state=state, drop=dd, trim=tr, lam=lam), nm, state)
+                    offer_baseline(dt, nm, state, drop=dd, trim=tr, lam=lam)
 
     # ---- DELLA (row-wise magnitude-ranked sampling, then sign election) ----
     della = Best("DELLA")
@@ -487,12 +515,8 @@ def main():
                                             lam=lam, density=d, window_size=w,
                                             seed=sd)
                         nm = f"merge:DELLA@d{d:g},w{w:g},l{lam:g},s{sd}"
-                        s, nr, ag = eval_merge(ctx, state)
-                        della.offer(record(
-                            report, nm, s, nr, ag,
-                            pd_global_norm(pd_sub(state, ctx.merged0)),
-                            state=state, density=d, window_size=w, lam=lam, seed=sd),
-                            nm, state)
+                        offer_baseline(della, nm, state, density=d,
+                                       window_size=w, lam=lam, seed=sd)
 
     # ---- Model Breadcrumbs ----
     bc = Best("BC")
@@ -504,10 +528,7 @@ def main():
                                               {n: lam for n in names},
                                               density=d, outlier_frac=o)
                     nm = f"merge:BC@d{d:g},o{o:g},l{lam:g}"
-                    s, nr, ag = eval_merge(ctx, state)
-                    bc.offer(record(report, nm, s, nr, ag,
-                                    pd_global_norm(pd_sub(state, ctx.merged0)),
-                                    state=state, density=d, outlier=o, lam=lam), nm, state)
+                    offer_baseline(bc, nm, state, density=d, outlier=o, lam=lam)
 
     # ---- Localize-and-Stitch, data-free magnitude variant ----
     # (the learned-mask variant needs per-task full-d float masks -- ~12 GB each at
@@ -521,10 +542,7 @@ def main():
             for lam in args.ls_lams:
                 state, info = stitch(ctx.base_encoder, ctx.task_vectors, masks, lam=lam)
                 nm = f"merge:LS-mag@f{frac:g},l{lam:g}"
-                s, nr, ag = eval_merge(ctx, state)
-                ls.offer(record(report, nm, s, nr, ag,
-                                pd_global_norm(pd_sub(state, ctx.merged0)),
-                                state=state, sparsity=frac, lam=lam, stitch=info), nm, state)
+                offer_baseline(ls, nm, state, sparsity=frac, lam=lam, stitch=info)
             del masks
 
     # ---- AdaMerging (label-free, uses unlabeled eval inputs: transductive) ----
@@ -556,15 +574,23 @@ def main():
                     merge_cache_save(cfg, "ada", ada_params, state, ada_extra)
                 tag = variant if dkey == "eval_ds" else f"{variant}-matched"
                 nm = f"merge:ADA-{tag}"
-                s, nr, ag = eval_merge(ctx, state)
-                ada.offer(record(report, nm, s, nr, ag,
-                                 pd_global_norm(pd_sub(state, ctx.merged0)),
-                                 state=state, adamerging=info), nm, state)
+                offer_baseline(ada, nm, state, adamerging=info)
 
     fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt,
             "della": della, "bc": bc, "ls": ls, "ada": ada}
     report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
     _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
+
+    if baseline_fast:
+        for key, family in fams.items():
+            if not family:
+                continue
+            scores, nr, ag = eval_merge(ctx, family.state)
+            entry = report["methods"][family.name]
+            entry.update({"scores": scores, "normret": nr, "aggregate": ag,
+                          "evaluated": True})
+            _log(f"  [winner] {family.name}: evaluated -> "
+                 f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
 
     # every family that consumes task vectors has run by here; the refinement
     # anchors on the expert encoders (v = theta_i - theta), never on tau, so the
@@ -586,23 +612,28 @@ def main():
          fracs = args.topk_fracs if gmode.startswith("topk") else [None]
          for frac in fracs:
           for sched in args.apr_schedules:
+            order = ((args.apr_constant_order or cfg.refine.order)
+                     if sched == "constant" else args.apr_order)
             def mk(lr, S, gmode=gmode, frac=frac, sched=sched):
                 return dataclasses.replace(
                     cfg.refine, steps=S, lr=lr, gate_mode=gmode,
                     topk_frac=(frac if frac is not None else cfg.refine.topk_frac),
                     lr_schedule=sched, lr_min_frac=args.gd_lr_min_frac,
-                    order=args.apr_order if sched != "constant" else cfg.refine.order)
+                    order=order)
             def nm_of(lr, S, gmode=gmode, frac=frac, sched=sched):
                 return (f"apr:from={key}@lr{lr:g}"
                         + ("" if len(steps_grid) == 1 else f",S{S}")
                         + ("" if sched == "constant" else f",{sched}")
+                        + (f",{order}-order" if sched == "constant" and
+                           args.apr_constant_order is not None else "")
                         + ("" if gmode == cfg.refine.gate_mode and frac is None
                            else f",{gmode}" + ("" if frac is None else f"{frac:g}")))
             def ex_of(lr, S, history, gmode=gmode, frac=frac, sched=sched):
                 gdens = (sum(h["gate_density"] for h in history) / len(history)
                          if history else None)
                 return dict(init=init_label, lr=lr, steps=S, schedule=sched,
-                            gate_mode=gmode, topk_frac=frac, gate_density=gdens)
+                            order=order, gate_mode=gmode, topk_frac=frac,
+                            gate_density=gdens)
             bn, bstate, _ = sweep_arm(
                 ctx, cfg, report, fam.state, steps_grid, args.apr_lrs, mk,
                 nm_of, ex_of, fast, f"APR from {init_label}")

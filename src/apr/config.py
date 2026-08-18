@@ -1,7 +1,7 @@
 """Experiment configuration.
 
 A single YAML file fully specifies a merge+refine+eval run. Defaults below match
-the method described in the proposal (gate threshold 0, clip fraction gamma,
+the method described in the paper (gate threshold 0, expert-distance trust region,
 sequential immediate updates).
 """
 
@@ -14,7 +14,6 @@ import yaml
 class RefineConfig:
     steps: int = 5  # S, number of sweeps (S=0 => plain task-arithmetic merge)
     lr: float = 1.0  # eta
-    clip_frac: float = 0.5  # gamma; clip each per-coord step to gamma*|v|
     gate_eps: float = 0.0  # epsilon_gate
     order: str = "fixed"  # task order per sweep: fixed | cyclic | random
     aggregated: bool = False  # if True, aggregated-U ablation (no immediate apply)
@@ -25,7 +24,7 @@ class RefineConfig:
     #   interp     :  v             (direct expert interpolation, u ~ m*v)
     update_mode: str = "gated_grad"
     # "vdist" is the trust region of the paper: the per-coordinate step is
-    # clipped to +/- gamma*|v| AFTER the learning-rate scaling, so a single
+    # clipped to +/- |v| AFTER the learning-rate scaling, so a single
     # update can never overshoot the expert at any lr. "none" disables the
     # clip entirely and exists only for the unconstrained-descent baselines.
     clip_mode: str = "vdist"

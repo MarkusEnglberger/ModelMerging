@@ -30,7 +30,6 @@ python scripts/mats_paper_compare.py \
   --config configs/mats_t5_8.yaml \
   --ta_lams 0.05 0.1 0.2 0.3 0.4 \
   --apr_lrs 8 16 32 64 128 256 \
-  --apr_gammas 0.5 1.0 \
   --nogate_lrs 8 16 32 64 128 256 \
   --gd_lrs 0.03 0.1 0.3 1.0 3.0 10.0 \
   --short_steps 5 \

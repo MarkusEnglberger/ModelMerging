@@ -9,7 +9,7 @@
 #SBATCH --error=logs/clip20_compare-%j.out
 
 # Full 20-task CLIP fair sweep (TALL-masks suite), same corrected main setting as
-# clip8 (steps=5, gamma=1, clip-after-lr). Optimal lr drops with task count
+# clip8 (steps=5, clip-after-lr). Optimal lr drops with task count
 # (3->8 tasks moved APR 32->8), so the APR grid brackets below the 8-task lr=8.
 # lam is still the untuned 0.3 from clip8.yaml -- retune (expect smaller, ~0.1)
 # before trusting absolute numbers; the merge degrades harder at 20 tasks.
@@ -19,7 +19,7 @@
 # --verify / expert-eval log before trusting their label order.
 source slurm/common.sh
 python scripts/compare_baselines.py --config configs/clip20.yaml \
-  --steps 5 --clip_mode vdist_pre --gammas 1.0 \
+  --steps 5 --clip_mode vdist \
   --apr_lrs 2 4 8 16 \
   --nogate_lrs 1 2 4 8 \
   --gd_lrs 5e-5 1e-4 5e-4 \

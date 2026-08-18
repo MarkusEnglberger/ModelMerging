@@ -10,6 +10,6 @@
 
 source slurm/common.sh
 python scripts/compare_baselines.py --config configs/poc3.yaml \
-  --steps 5 --gamma 0.5 \
+  --steps 5 \
   --gd_lrs 1e-5 5e-5 1e-4 5e-4 1e-3 5e-3 1e-2 \
   --out results/compare/poc3_compare.json "$@"

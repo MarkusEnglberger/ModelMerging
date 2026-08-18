@@ -26,7 +26,7 @@ from apr.pipeline import MergeContext, _log
 from apr.models import (load_encoder_state, pd_to, pd_clone, pd_sub, pd_global_norm)
 
 
-def run_lr(ctx, lr, gamma, steps, order):
+def run_lr(ctx, lr, steps, order):
     device = ctx.device
     theta = pd_to(pd_clone(ctx.merged0), device)
     names = list(theta.keys())
@@ -47,9 +47,9 @@ def run_lr(ctx, lr, gamma, steps, order):
                 m = (g[n] * v < 0)
                 cur_mask[n] = m
                 # apply the proposed clipped update immediately
-                u = torch.clamp(-g[n] * v.abs() * m.float(),
-                                min=-gamma * v.abs(), max=gamma * v.abs())
-                theta[n].add_(u, alpha=lr)
+                u = torch.clamp(-lr * g[n] * v.abs() * m.float(),
+                                min=-v.abs(), max=v.abs())
+                theta[n].add_(u)
                 kept += int(m.sum()); total += m.numel()
                 if task in prev_mask:
                     pm = prev_mask[task][n]
@@ -78,7 +78,6 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--steps", type=int, default=5)
-    ap.add_argument("--gamma", type=float, default=0.5)
     ap.add_argument("--lrs", type=float, nargs="*", default=[1.0, 8.0])
     ap.add_argument("--out", default="results/compare/gate_stability.json")
     args = ap.parse_args()
@@ -90,7 +89,7 @@ def main():
     out = {"config": cfg.to_dict(), "rows": []}
     for lr in args.lrs:
         _log(f"\n===== lr={lr} =====")
-        out["rows"].extend(run_lr(ctx, lr, args.gamma, args.steps, order))
+        out["rows"].extend(run_lr(ctx, lr, args.steps, order))
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:

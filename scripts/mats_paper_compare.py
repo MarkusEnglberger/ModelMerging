@@ -46,7 +46,6 @@ def main():
                     default=[0.2, 0.3, 0.4, 0.5])
     ap.add_argument("--apr_lrs", nargs="*", type=float,
                     default=[2, 4, 8, 16, 32])
-    ap.add_argument("--apr_gammas", nargs="*", type=float, default=[0.5, 1.0])
     ap.add_argument("--nogate_lrs", nargs="*", type=float,
                     default=[0.5, 1, 2, 4, 8, 16, 32, 64])
     ap.add_argument("--gd_lrs", nargs="*", type=float,
@@ -95,7 +94,7 @@ def main():
             cell.update({
                 "gate_density": (sum(x["gate_density"] for x in history) /
                                  max(len(history), 1)),
-                "clip_frac_gated": (sum(x.get("clip_frac_gated", 0.0) for x in history) /
+                "clipped_frac_gated": (sum(x.get("clipped_frac_gated", 0.0) for x in history) /
                                     max(len(history), 1)),
                 "last_lr": history[-1].get("lr_eff") if history else None,
             })
@@ -178,18 +177,17 @@ def main():
         del masks
 
     # Equal-sized short-horizon grids from the optimized task-arithmetic state.
-    for gamma in args.apr_gammas:
-        for lr in args.apr_lrs:
-            rc = dataclasses.replace(
-                cfg.refine, steps=args.short_steps, lr=lr, clip_frac=gamma,
-                gate_mode="coordinate", update_mode="gated_grad",
-                order="fixed", lr_schedule="constant")
-            state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
-            record(f"replay:APR-S{args.short_steps}@lr{lr:g},g{gamma:g}",
-                   state, history=hist, lr=lr, gamma=gamma)
+    for lr in args.apr_lrs:
+        rc = dataclasses.replace(
+            cfg.refine, steps=args.short_steps, lr=lr,
+            gate_mode="coordinate", update_mode="gated_grad",
+            order="fixed", lr_schedule="constant")
+        state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
+        record(f"replay:APR-S{args.short_steps}@lr{lr:g}",
+               state, history=hist, lr=lr)
     for lr in args.nogate_lrs:
         rc = dataclasses.replace(
-            cfg.refine, steps=args.short_steps, lr=lr, clip_frac=1.0,
+            cfg.refine, steps=args.short_steps, lr=lr,
             gate_mode="none", update_mode="gated_grad",
             order="fixed", lr_schedule="constant")
         state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
@@ -206,37 +204,37 @@ def main():
     # Matched random and inverted controls at the best short APR hyperparameters.
     best_apr_name = best(f"replay:APR-S{args.short_steps}@")
     best_apr = report["methods"][best_apr_name]
-    best_apr_lr, best_apr_gamma = best_apr["lr"], best_apr["gamma"]
+    best_apr_lr = best_apr["lr"]
     report["selected_apr_short"] = best_apr_name
     for mode in ["random", "inverted"]:
         rc = dataclasses.replace(
             cfg.refine, steps=args.short_steps, lr=best_apr_lr,
-            clip_frac=best_apr_gamma, gate_mode=mode,
+            gate_mode=mode,
             update_mode="gated_grad", order="fixed", lr_schedule="constant")
         state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
-        record(f"control:{mode}-S{args.short_steps}@lr{best_apr_lr:g},g{best_apr_gamma:g}",
-               state, history=hist, lr=best_apr_lr, gamma=best_apr_gamma)
+        record(f"control:{mode}-S{args.short_steps}@lr{best_apr_lr:g}",
+               state, history=hist, lr=best_apr_lr)
 
     # Requested long variant: random order and cosine decay, with peak and floor grid.
     for floor in args.long_min_fracs:
         for lr in args.long_lrs:
             rc = dataclasses.replace(
-                cfg.refine, steps=args.long_steps, lr=lr, clip_frac=best_apr_gamma,
+                cfg.refine, steps=args.long_steps, lr=lr,
                 gate_mode="coordinate", update_mode="gated_grad", order="random",
                 lr_schedule="cosine", lr_min_frac=floor)
             state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
             record(f"replay:APR-S{args.long_steps}-anneal@lr{lr:g},floor{floor:g}",
-                   state, history=hist, lr=lr, gamma=best_apr_gamma,
+                   state, history=hist, lr=lr,
                    floor=floor, schedule="cosine", order="random")
 
     # Steps-only control separates horizon from annealing/order randomization.
     rc = dataclasses.replace(
         cfg.refine, steps=args.long_steps, lr=best_apr_lr,
-        clip_frac=best_apr_gamma, gate_mode="coordinate",
+        gate_mode="coordinate",
         update_mode="gated_grad", order="fixed", lr_schedule="constant")
     state, hist = ctx.run_refine_from(best_ta, rc, seed=cfg.seed)
     record(f"control:APR-S{args.long_steps}-constant@lr{best_apr_lr:g}",
-           state, history=hist, lr=best_apr_lr, gamma=best_apr_gamma)
+           state, history=hist, lr=best_apr_lr)
 
     report["selected"] = {
         "TA_eval": best_ta_name,

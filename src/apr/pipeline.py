@@ -531,7 +531,7 @@ class MergeContext:
 
 def run_experiment(cfg: ExperimentConfig) -> Dict:
     ctx = MergeContext.build(cfg)
-    _log(f"[refine] S={cfg.refine.steps} lr={cfg.refine.lr} gamma={cfg.refine.clip_frac} "
+    _log(f"[refine] S={cfg.refine.steps} lr={cfg.refine.lr} "
          f"gate={cfg.refine.gate_mode} update={cfg.refine.update_mode} agg={cfg.refine.aggregated}")
     refined_cpu, history = ctx.run_refine(cfg.refine, seed=cfg.seed)
     refined_scores = ctx.eval_encoder(refined_cpu)

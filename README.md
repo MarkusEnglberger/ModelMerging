@@ -16,7 +16,7 @@ Given a shared pretrained encoder `θ₀` and experts `θ_i` (task vectors `τ_i
    - `m_{i,r} = 1[ g_{i,r} v_{i,r} < −ε_gate ]`  (move toward the expert only where it
      is locally loss-decreasing).
    - `ũ_{i,r} = −g_{i,r} |v_{i,r}| m_{i,r}`  (distance-scaled negative gradient, Eq. 12).
-   - `u_{i,r} = clip(ũ_{i,r}, ±γ|v_{i,r}|)`  (per-coordinate trust region, Eq. 18).
+   - `u_{i,r} = clip(η ũ_{i,r}, ±|v_{i,r}|)`  (per-coordinate trust region, Eq. 18).
 3. **Sequential refinement** (Algorithm 1): within each sweep, apply each task's
    clipped update to the model *immediately* before computing the next task's gradient.
 
@@ -122,8 +122,8 @@ python scripts/run_merge.py --config configs/mats_t5_8.yaml
 
 Implemented: core framework + Algorithm 1, GLUE multi-head merging, the DistilRoBERTa
 smoke test and the 3-task RoBERTa POC. **CLIP/ViT vision track** with a validated
-3-task POC (EuroSAT/GTSRB/MNIST): at the corrected main setting (S=5, gamma=1,
-clip-after-lr, n=64) a fair sweep gives APR@lr32 mean NormRet 0.940 / worst 0.915,
+3-task POC (EuroSAT/GTSRB/MNIST): at the corrected main setting (S=5, clip-after-lr,
+ n=64) a fair sweep gives APR@lr32 mean NormRet 0.940 / worst 0.915,
 beating ungated anchoring (0.917/0.876), ordinary replay GD (0.874/0.792) and the
 unrefined merge (0.811/0.721); inverted-gate control -0.579. On the **full 8-task
 suite** (SUN397/Cars/RESISC45/EuroSAT/SVHN/GTSRB/MNIST/DTD, `configs/clip8.yaml`) APR

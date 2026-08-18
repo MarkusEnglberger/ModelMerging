@@ -26,7 +26,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # refinement actually starts to move; no-gate family dropped (per protocol
 # decision), ordinary GD kept as the labeled-replay control at its two best lrs.
 python scripts/compare_baselines.py --config configs/mergebench_llama3b.yaml \
-  --steps 5 --clip_mode vdist_pre --gammas 1.0 \
+  --steps 5 --clip_mode vdist \
   --apr_lrs 4 16 64 \
   --nogate_lrs \
   --gd_lrs 5e-5 2e-4 \

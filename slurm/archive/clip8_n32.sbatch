@@ -16,7 +16,7 @@ source slurm/common.sh
 
 echo "===== APR (S=10, n=32, lr in {6,8}) ====="
 python scripts/compare_baselines.py --config configs/clip8.yaml \
-  --steps 10 --clip_mode vdist_pre --gammas 1.0 --skip_inverted --n_probe 32 \
+  --steps 10 --clip_mode vdist --skip_inverted --n_probe 32 \
   --apr_lrs 6 8 \
   --nogate_lrs \
   --gd_lrs \
@@ -24,7 +24,7 @@ python scripts/compare_baselines.py --config configs/clip8.yaml \
 
 echo "===== Ordinary GD (S=25, n=32, lr in {5e-5,1e-4}) ====="
 python scripts/compare_baselines.py --config configs/clip8.yaml \
-  --steps 25 --clip_mode vdist_pre --gammas 1.0 --skip_inverted --n_probe 32 \
+  --steps 25 --clip_mode vdist --skip_inverted --n_probe 32 \
   --apr_lrs \
   --nogate_lrs \
   --gd_lrs 5e-5 1e-4 \

@@ -8,8 +8,8 @@
 #SBATCH --output=logs/budgmain-%j.out
 #SBATCH --error=logs/budgmain-%j.out
 source slurm/common.sh
-# Multi-seed best-of-family confirmation at main setting: n=64, steps=5, gamma=1.
+# Multi-seed best-of-family confirmation at main setting: n=64, steps=5.
 python scripts/budget_sweep.py --config configs/poc3.yaml \
-  --steps 5 --gamma 1.0 \
+  --steps 5 \
   --n_probes 64 --seeds 0 1 2 3 4 \
   --out results/compare/budget_main_n64s5.json

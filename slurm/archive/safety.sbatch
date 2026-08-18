@@ -8,5 +8,5 @@
 #SBATCH --output=logs/safety-%j.out
 #SBATCH --error=logs/safety-%j.out
 source slurm/common.sh
-python scripts/safety_sweep.py --config configs/poc3.yaml --steps 5 --gamma 0.5 \
+python scripts/safety_sweep.py --config configs/poc3.yaml --steps 5 \
   --out results/compare/safety_sweep.json "$@"

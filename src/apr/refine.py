@@ -7,8 +7,8 @@ state theta:
     v_i   = theta_i - theta                             (Eq. 15, merge->expert)
     m_i,r = 1[ g_i,r * v_i,r < -eps_gate ]              (Eq. 16, AP gate)
     u~_i,r= -g_i,r * |v_i,r| * m_i,r                     (Eq. 17)
-    u_i,r = clip(u~_i,r, -gamma|v_i,r|, gamma|v_i,r|)    (Eq. 18, trust region)
-    theta <- theta + eta * u_i                          (Eq. 19, applied NOW)
+    u_i,r = clip(eta * u~_i,r, -|v_i,r|, |v_i,r|)      (Eq. 18, trust region)
+    theta <- theta + u_i                                  (Eq. 19, applied NOW)
 
 The defining behaviour is *sequential*: each task's clipped update is applied to
 the model immediately, before the next task's gradient and gate are computed.
@@ -126,7 +126,7 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
     ap_sum = 0.0
     gated = 0
     total = 0
-    clipped = 0  # gated coords whose step hit the +/- gamma|v| boundary
+    clipped = 0  # gated coords whose step hit the +/- |v| boundary
     for name in g:
         gi, vi = g[name], v[name]
         if frozen_mask is not None:
@@ -147,8 +147,8 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         u_raw = _base_update(gi, vi, cfg.update_mode) * m
         if cfg.clip_mode == "vdist":
             # The trust region: clip AFTER scaling by lr, so the move is bounded
-            # by gamma*|v| for ANY lr (no overshoot for gamma<=1 => safe).
-            bound = cfg.clip_frac * vi.abs()
+            # by |v| for ANY lr and cannot overshoot the expert.
+            bound = vi.abs()
             pre = lr_eff * u_raw
             u_t = torch.clamp(pre, min=-bound, max=bound)
         elif cfg.clip_mode == "none":
@@ -176,8 +176,8 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         gated += int((m > 0).sum().item())
         total += m.numel()
     stats = {"ap_sum": ap_sum, "gate_density": gated / max(total, 1),
-             "clip_frac_gated": clipped / max(gated, 1),
-             "clip_frac_all": clipped / max(total, 1)}
+             "clipped_frac_gated": clipped / max(gated, 1),
+             "clipped_frac_all": clipped / max(total, 1)}
     return u, masks, stats
 
 

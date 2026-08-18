@@ -16,7 +16,6 @@ experts:
 refine:
   steps: 5
   lr: 1.0
-  clip_frac: 0.5
   gate_eps: 0.0
   order: fixed
   gate_mode: coordinate

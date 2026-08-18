@@ -5,8 +5,8 @@ All methods start from the SAME task-arithmetic merge point, use the SAME replay
 buffers, and the SAME number of gradient evaluations (S sweeps x T tasks). Only
 the per-step update rule differs:
 
-  apr           : -g*|v|, AP-gated, clipped to +/-gamma|v|   (proposed; expert-anchored)
-  nogate_dist   : -g*|v|, NO gate,  clipped to +/-gamma|v|   (anchored, ungated)
+  apr           : -g*|v|, AP-gated, clipped to +/-|v|   (proposed; expert-anchored)
+  nogate_dist   : -g*|v|, NO gate,  clipped to +/-|v|   (anchored, ungated)
   inverted_gate : -g*|v|, inverted gate                       (sanity control)
   ordinary_gd   : -g (plain SGD), no gate, no clip            (NO expert anchoring)
 
@@ -28,24 +28,23 @@ from apr.metrics import aggregate_retention
 from apr.models import pd_sub, pd_global_norm
 
 
-def build_methods(steps, gd_lrs, apr_lrs, nogate_lrs, gammas, clip_mode="vdist",
+def build_methods(steps, gd_lrs, apr_lrs, nogate_lrs, clip_mode="vdist",
                   skip_inverted=False):
     """APR and no-gate get their OWN lr grids (their optima differ a lot: APR likes
     high lr, no-gate diverges at high lr). inverted_gate is a fixed sanity control
     (skip with skip_inverted). clip_mode default vdist = clip AFTER lr."""
     methods = {}
-    for g in gammas:
-        for lr in apr_lrs:
-            methods[f"apr@lr{lr:g},g{g:g}"] = RefineConfig(
-                steps=steps, lr=lr, clip_frac=g, gate_mode="coordinate",
-                update_mode="gated_grad", clip_mode=clip_mode)
-        for lr in nogate_lrs:
-            methods[f"nogate@lr{lr:g},g{g:g}"] = RefineConfig(
-                steps=steps, lr=lr, clip_frac=g, gate_mode="none",
-                update_mode="gated_grad", clip_mode=clip_mode)
+    for lr in apr_lrs:
+        methods[f"apr@lr{lr:g}"] = RefineConfig(
+            steps=steps, lr=lr, gate_mode="coordinate",
+            update_mode="gated_grad", clip_mode=clip_mode)
+    for lr in nogate_lrs:
+        methods[f"nogate@lr{lr:g}"] = RefineConfig(
+            steps=steps, lr=lr, gate_mode="none",
+            update_mode="gated_grad", clip_mode=clip_mode)
     if not skip_inverted and apr_lrs:
         methods["inverted_gate"] = RefineConfig(steps=steps, lr=apr_lrs[len(apr_lrs)//2],
-                                                clip_frac=gammas[0], gate_mode="inverted",
+                                                gate_mode="inverted",
                                                 update_mode="gated_grad", clip_mode=clip_mode)
     for lr in gd_lrs:
         methods[f"ordinary_gd@{lr:g}"] = RefineConfig(
@@ -61,7 +60,6 @@ def main():
                     default=[1e-5, 1e-4, 5e-4, 1e-3, 5e-3, 1e-2])
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[16, 32, 64, 128, 256])
     ap.add_argument("--nogate_lrs", type=float, nargs="*", default=[2, 4, 8, 16, 32])
-    ap.add_argument("--gammas", type=float, nargs="*", default=[1.0])
     ap.add_argument("--clip_mode", default="vdist")
     ap.add_argument("--skip_inverted", action="store_true",
                     help="omit the inverted-gate sanity control")
@@ -80,7 +78,7 @@ def main():
     ctx.task_vectors = {}
 
     methods = build_methods(args.steps, args.gd_lrs, args.apr_lrs, args.nogate_lrs,
-                            args.gammas, clip_mode=args.clip_mode,
+                            clip_mode=args.clip_mode,
                             skip_inverted=args.skip_inverted)
     report = {"config": cfg.to_dict(), "steps": args.steps,
               "base": ctx.base_scores, "expert": ctx.expert_scores,
@@ -100,14 +98,14 @@ def main():
         nr = ctx.normret(scores)
         disp = pd_global_norm(pd_sub(refined, ctx.merged0))
         ag = aggregate_retention(nr)
-        clip_g = (sum(h.get("clip_frac_gated", 0.0) for h in history) / len(history)
+        clip_g = (sum(h.get("clipped_frac_gated", 0.0) for h in history) / len(history)
                   if history else 0.0)
         report["methods"][name] = {
             "scores": scores, "normret": nr,
             "aggregate": ag, "displacement": disp,
             "gate_density": (sum(h["gate_density"] for h in history) / len(history)
                              if history else None),
-            "clip_frac_gated": clip_g,
+            "clipped_frac_gated": clip_g,
         }
         # incremental per-method result so progress is visible mid-run
         _log(f"  -> {name}: mean={ag['mean_normret']:.3f} worst={ag['worst_normret']:.3f} "

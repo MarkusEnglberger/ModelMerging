@@ -13,7 +13,7 @@
 # inverted control are omitted -> just APR vs ordinary GD (+ the merge reference).
 source slurm/common.sh
 python scripts/compare_baselines.py --config configs/clip8.yaml \
-  --steps 15 --clip_mode vdist_pre --gammas 1.0 --skip_inverted \
+  --steps 15 --clip_mode vdist --skip_inverted \
   --apr_lrs 8 \
   --nogate_lrs \
   --gd_lrs 1e-4 \

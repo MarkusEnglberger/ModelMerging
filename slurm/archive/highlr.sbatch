@@ -8,5 +8,5 @@
 #SBATCH --output=logs/highlr-%j.out
 #SBATCH --error=logs/highlr-%j.out
 source slurm/common.sh
-python scripts/highlr_diag.py --config configs/poc3.yaml --steps 5 --gamma 0.5 \
+python scripts/highlr_diag.py --config configs/poc3.yaml --steps 5 \
   --out results/compare/highlr_diag.json "$@"

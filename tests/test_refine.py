@@ -62,12 +62,12 @@ def test_gate_matches_sign_condition():
 def test_clip_respects_trust_region():
     g = OrderedDict({"enc.w": torch.tensor([-10.0, -0.1])})
     v = OrderedDict({"enc.w": torch.tensor([2.0, 2.0])})  # g*v<0 both -> gated on
-    cfg = RefineConfig(clip_frac=0.5, gate_mode="coordinate", update_mode="gated_grad")
+    cfg = RefineConfig(gate_mode="coordinate", update_mode="gated_grad")
     u, m, stats = _compute_update(g, v, cfg, None, None)
-    bound = 0.5 * v["enc.w"].abs()
+    bound = v["enc.w"].abs()
     assert torch.all(u["enc.w"].abs() <= bound + 1e-6), u["enc.w"]
     assert abs(stats["gate_density"] - 1.0) < 1e-9
-    print("ok: clip respects +/- gamma|v| trust region")
+    print("ok: clip respects +/- |v| trust region")
 
 
 def test_refine_descends_when_expert_is_optimum():
@@ -78,7 +78,7 @@ def test_refine_descends_when_expert_is_optimum():
     h, model = make_handle("t", d, expert_vec=expert, target_vec=expert)
     start = torch.randn(d)
     base = OrderedDict({"enc.w": start.clone()})
-    cfg = RefineConfig(steps=10, lr=1.0, clip_frac=0.5, gate_mode="coordinate")
+    cfg = RefineConfig(steps=10, lr=1.0, gate_mode="coordinate")
     refined, hist = refine(base, [h], cfg, device="cpu", move_model=False)
     w = refined["enc.w"]
     # loss strictly decreased and moved toward the expert
@@ -104,22 +104,21 @@ def test_inverted_gate_blocks_progress():
 
 
 def test_vdist_is_safe_at_huge_lr():
-    """Saturating trust region (clip after lr): for gamma<=1 the move never
-    overshoots the expert, so even an enormous lr stays bounded (no divergence)."""
+    """Clipping after lr prevents overshoot, even at an enormous learning rate."""
     torch.manual_seed(3)
     d = 16
     expert = torch.randn(d) * 5
     h, model = make_handle("t", d, expert_vec=expert, target_vec=expert)
     start = torch.randn(d)
     base = OrderedDict({"enc.w": start.clone()})
-    cfg = RefineConfig(steps=5, lr=1e6, clip_frac=1.0, gate_mode="coordinate",
+    cfg = RefineConfig(steps=5, lr=1e6, gate_mode="coordinate",
                        clip_mode="vdist")
     refined, hist = refine(base, [h], cfg, device="cpu", move_model=False)
     w = refined["enc.w"]
     assert torch.isfinite(w).all(), "vdist diverged at huge lr"
     # bounded by the expert: never lands farther from expert than it started
     assert (w - expert).norm() <= (start - expert).norm() + 1e-4
-    # and with gamma=1 + huge lr it essentially reaches the expert
+    # and with a huge lr it essentially reaches the expert
     assert (w - expert).norm() < 1e-3 * (start - expert).norm()
     print(f"ok: vdist safe at lr=1e6, dist {(start-expert).norm():.2f} -> {(w-expert).norm():.2e}")
 
@@ -134,7 +133,7 @@ def test_aggregated_vs_sequential_differ():
         h1, _ = make_handle("a", d, e1, e1)
         h2, _ = make_handle("b", d, e2, e2)
         base = OrderedDict({"enc.w": start.clone()})
-        cfg = RefineConfig(steps=3, lr=1.0, clip_frac=0.5, aggregated=aggregated)
+        cfg = RefineConfig(steps=3, lr=1.0, aggregated=aggregated)
         out, _ = refine(base, [h1, h2], cfg, device="cpu", move_model=False)
         return out["enc.w"]
 

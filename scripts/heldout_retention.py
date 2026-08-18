@@ -73,6 +73,14 @@ def main():
     ap.add_argument("--ada_lr", type=float, default=1e-3)
     ap.add_argument("--ada_bs", type=int, default=16)
     ap.add_argument("--ada_workers", type=int, default=0)
+    ap.add_argument("--ada_data", default="probe_buffer",
+                    choices=["probe_buffer", "eval_ds"],
+                    help="unlabeled source for AdaMerging. Default is the "
+                         "matched budget (APR's replay inputs, labels "
+                         "discarded), which is the protocol the grid runs and "
+                         "the paper use. 'eval_ds' is the standard transductive "
+                         "formulation: it adapts on the split it is then scored "
+                         "on and is NOT budget-comparable to the other arms.")
     ap.add_argument("--regmean", action="store_true",
                     help="RegMean over the TRAIN tasks (Grams from their probe "
                          "buffers). Its raw distance is dominated by "
@@ -91,6 +99,13 @@ def main():
     ap.add_argument("--nogate_base_lrs", type=float, nargs="*", default=[],
                     help="ungated anchored update from the base model")
     ap.add_argument("--steps", type=int, default=30)
+    ap.add_argument("--apr_base_steps", type=int, default=None,
+                    help="override --steps for the from-base APR arm (pin at a "
+                         "grid-selected cell); same pattern for the others")
+    ap.add_argument("--nogate_base_steps", type=int, default=None)
+    ap.add_argument("--gd_base_steps", type=int, default=None)
+    ap.add_argument("--apr_ta_steps", type=int, default=None)
+    ap.add_argument("--apr_ada_steps", type=int, default=None)
     ap.add_argument("--apr_schedule", default="cosine",
                     choices=["constant", "cosine", "linear"])
     ap.add_argument("--apr_order", default="random",
@@ -116,6 +131,9 @@ def main():
     handles_train = [h for h in ctx.handles if h.name in set(train)]
 
     report = {"config": cfg.to_dict(), "train_tasks": train, "heldout_tasks": held,
+              "data_sources": {"adamerging": args.ada_data,
+                               "regmean": "probe_buffer",
+                               "refinement": "probe_buffer"},
               "grids": {k: v for k, v in vars(args).items() if k != "config"},
               "base": ctx.base_scores, "expert": ctx.expert_scores, "cells": {}}
 
@@ -148,9 +166,9 @@ def main():
     for lam in args.ta_lams:
         state = task_arithmetic_merge(ctx.base_encoder, tv_train,
                                       {n: lam for n in train})
-        m = record(f"merge:TA14@l{lam:g}", state, lam=lam)
+        m = record(f"merge:TA{len(train)}@l{lam:g}", state, lam=lam)
         if best_ta is None or m > best_ta[0]:
-            best_ta = (m, f"merge:TA14@l{lam:g}", state)
+            best_ta = (m, f"merge:TA{len(train)}@l{lam:g}", state)
     _log(f"[best TA] {best_ta[1]}")
 
     # --- TIES merge over the TRAIN tasks ------------------------------------
@@ -159,7 +177,7 @@ def main():
         for lam in args.ties_lams:
             state = ties_merge(ctx.base_encoder, tv_train, lam=lam, density=d,
                                combined=combined)
-            record(f"merge:TIES14@d{d:g},l{lam:g}", state, density=d, lam=lam)
+            record(f"merge:TIES{len(train)}@d{d:g},l{lam:g}", state, density=d, lam=lam)
 
     # --- DARE-TIES and Breadcrumbs (checkpoint-only tier) -------------------
     for dd in args.dt_drops:
@@ -168,14 +186,14 @@ def main():
                 state = dare_ties_merge(ctx.base_encoder, tv_train, lam=lam,
                                         drop_density=dd, trim_density=t,
                                         seed=cfg.seed)
-                record(f"merge:DARETIES14@dd{dd:g},t{t:g},l{lam:g}", state, lam=lam)
+                record(f"merge:DARETIES{len(train)}@dd{dd:g},t{t:g},l{lam:g}", state, lam=lam)
     for d in args.bc_densities:
         for o in args.bc_outliers:
             for lam in args.bc_lams:
                 state = breadcrumbs_merge(ctx.base_encoder, tv_train,
                                           {n: lam for n in train},
                                           density=d, outlier_frac=o)
-                record(f"merge:BC14@d{d:g},o{o:g},l{lam:g}", state, lam=lam)
+                record(f"merge:BC{len(train)}@d{d:g},o{o:g},l{lam:g}", state, lam=lam)
 
     # --- AdaMerging over the TRAIN tasks (label-free, data-dependent) --------
     ada_state = None
@@ -187,8 +205,10 @@ def main():
             ctx.base_encoder, tv_train, ctx.per_task, train, ctx.device,
             layerwise=True, steps=args.ada_steps, lr=args.ada_lr,
             batch_size=args.ada_bs, init_lam=args.ada_init_lam, seed=cfg.seed,
-            num_workers=args.ada_workers, data_key="eval_ds", logger=_log)
-        record("merge:ADA14-layer", ada_state,
+            num_workers=args.ada_workers, data_key=args.ada_data, logger=_log)
+        suffix = "-matched" if args.ada_data == "probe_buffer" else "-transductive"
+        record(f"merge:ADA{len(train)}-layer{suffix}", ada_state,
+               ada_data=args.ada_data,
                ada_lam_per_task=ada_info.get("lam_per_task"))
 
     # --- RegMean over the TRAIN tasks (label-free, data-dependent) ----------
@@ -198,12 +218,14 @@ def main():
             ctx.base_encoder, ctx.per_task, train, ctx.device,
             buffer_key="probe_buffer", nondiag_scale=args.regmean_nd,
             eps=args.regmean_eps, batch_size=args.ada_bs, logger=_log)
-        record(f"merge:RegMean14@nd{args.regmean_nd:g}", rgm_state)
+        record(f"merge:RegMean{len(train)}@nd{args.regmean_nd:g}", rgm_state)
 
     # --- APR refinement restricted to the TRAIN handles ----------------------
-    def run_refine(start, lr, tag, kind="apr"):
+    def run_refine(start, lr, tag, kind="apr", steps=None):
         """kind: apr (gated anchored) | nogate (ungated anchored) | gd (plain)."""
-        over = dict(steps=args.steps, lr=lr, lr_schedule=args.apr_schedule,
+        if steps is None:
+            steps = args.steps
+        over = dict(steps=steps, lr=lr, lr_schedule=args.apr_schedule,
                     lr_min_frac=args.lr_min_frac,
                     order=(args.apr_order if args.apr_schedule != "constant"
                            else cfg.refine.order))
@@ -212,27 +234,33 @@ def main():
         elif kind == "gd":
             over.update(gate_mode="none", update_mode="grad", clip_mode="none")
         rc = dataclasses.replace(cfg.refine, **over)
-        _log(f"\n===== {kind.upper()} ({tag}) @ lr{lr:g} S={args.steps} "
+        _log(f"\n===== {kind.upper()} ({tag}) @ lr{lr:g} S={steps} "
              f"{args.apr_schedule}/{rc.order} on {len(handles_train)} tasks "
              f"({rc.gate_mode}/{rc.update_mode}/clip={rc.clip_mode}) =====")
         refined, _ = refine(start, handles_train, rc, ctx.device,
                             seed=cfg.seed, move_model=True, logger=_log)
         refined_cpu = OrderedDict((k, v.cpu()) for k, v in refined.items())
-        record(f"{kind}:{tag}@lr{lr:g}", refined_cpu, lr=lr, steps=args.steps,
+        record(f"{kind}:{tag}@lr{lr:g}", refined_cpu, lr=lr, steps=steps,
                schedule=args.apr_schedule, kind=kind)
 
+    nt = len(train)
     for lr in args.apr_base_lrs:
-        run_refine(ctx.base_encoder, lr, "from=base14", "apr")
+        run_refine(ctx.base_encoder, lr, f"from=base{nt}", "apr",
+                   steps=args.apr_base_steps)
     for lr in args.nogate_base_lrs:
-        run_refine(ctx.base_encoder, lr, "from=base14", "nogate")
+        run_refine(ctx.base_encoder, lr, f"from=base{nt}", "nogate",
+                   steps=args.nogate_base_steps)
     for lr in args.gd_base_lrs:
-        run_refine(ctx.base_encoder, lr, "from=base14", "gd")
+        run_refine(ctx.base_encoder, lr, f"from=base{nt}", "gd",
+                   steps=args.gd_base_steps)
     for lr in args.apr_ta_lrs:
-        run_refine(best_ta[2], lr, "from=ta14", "apr")
+        run_refine(best_ta[2], lr, f"from=ta{nt}", "apr",
+                   steps=args.apr_ta_steps)
     if args.apr_ada_lrs:
         assert ada_state is not None, "--apr_ada_lrs requires --ada"
         for lr in args.apr_ada_lrs:
-            run_refine(ada_state, lr, "from=ada14", "apr")
+            run_refine(ada_state, lr, f"from=ada{nt}", "apr",
+                       steps=args.apr_ada_steps)
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:

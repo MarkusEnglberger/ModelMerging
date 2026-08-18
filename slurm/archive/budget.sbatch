@@ -9,6 +9,6 @@
 #SBATCH --error=logs/budget-%j.out
 source slurm/common.sh
 python scripts/budget_sweep.py --config configs/poc3.yaml \
-  --steps 2 --gamma 1.0 \
+  --steps 2 \
   --n_probes 8 16 32 64 --seeds 0 1 2 \
   --out results/compare/budget_sweep.json "$@"

@@ -5,8 +5,7 @@ Three families, swept over a WIDE learning-rate range, all from the same merge
 point / replay buffers:
 
   ordinary_gd     : -g, no anchor, no clip          -> expected to diverge early
-  apr_paperclip   : -g|v|, gated, clip THEN *lr      -> move ~ lr*gamma*|v|, can overshoot
-  apr_sat         : -g|v|, gated, clip AFTER *lr     -> move <= gamma*|v| for ANY lr (safe)
+  apr_sat         : -g|v|, gated, clip AFTER *lr     -> move <= |v| for ANY lr (safe)
   nogate_sat      : -g|v|, ungated, clip AFTER *lr   -> same safety, isolates the gate
 
 We report mean/worst normalized retention and ||displacement|| for each lr, so we
@@ -31,32 +30,26 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--steps", type=int, default=5)
-    ap.add_argument("--gamma", type=float, default=0.5)
     ap.add_argument("--out", default="results/compare/safety_sweep.json")
     args = ap.parse_args()
 
     cfg = ExperimentConfig.from_yaml(args.config)
     ctx = MergeContext.build(cfg)
-    g = args.gamma
     S = args.steps
 
     methods = {}
     for lr in [1e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 1e-1]:
         methods[f"ordinary_gd@{lr:g}"] = RefineConfig(
             steps=S, lr=lr, gate_mode="none", update_mode="grad", clip_mode="none")
-    for lr in [1, 2, 4, 8, 12, 16, 32]:
-        methods[f"apr_paperclip@{lr:g}"] = RefineConfig(
-            steps=S, lr=lr, clip_frac=g, gate_mode="coordinate",
-            update_mode="gated_grad", clip_mode="vdist")
     for lr in [1, 2, 4, 8, 16, 64, 256, 1024]:
         methods[f"apr_sat@{lr:g}"] = RefineConfig(
-            steps=S, lr=lr, clip_frac=g, gate_mode="coordinate",
+            steps=S, lr=lr, gate_mode="coordinate",
             update_mode="gated_grad", clip_mode="vdist")
         methods[f"nogate_sat@{lr:g}"] = RefineConfig(
-            steps=S, lr=lr, clip_frac=g, gate_mode="none",
+            steps=S, lr=lr, gate_mode="none",
             update_mode="gated_grad", clip_mode="vdist")
 
-    report = {"config": cfg.to_dict(), "gamma": g, "steps": S,
+    report = {"config": cfg.to_dict(), "steps": S,
               "tasks": cfg.task_names, "methods": {}}
     mref = ctx.normret(ctx.merge_scores)
     report["methods"]["merge(S=0)"] = {

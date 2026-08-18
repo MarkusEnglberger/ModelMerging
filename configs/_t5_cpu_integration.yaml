@@ -11,5 +11,5 @@ seed: 0
 experts:
   - {name: mrpc, checkpoint: google/flan-t5-small, lam: 0.4}
   - {name: stsb, checkpoint: google/flan-t5-small, lam: 0.4}
-refine: {steps: 1, lr: 1.0, clip_frac: 1.0, gate_mode: coordinate, clip_mode: vdist}
+refine: {steps: 1, lr: 1.0, gate_mode: coordinate, clip_mode: vdist}
 data: {n_probe: 4, max_length: 128, eval_batch_size: 8, max_eval: 8}

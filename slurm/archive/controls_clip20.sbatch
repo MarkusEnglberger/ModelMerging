@@ -19,7 +19,7 @@
 # Requires: prefetch_clip.py --suite 20.
 source slurm/common.sh
 python scripts/compare_baselines.py --config configs/clip20_l008.yaml \
-  --steps 5 --clip_mode vdist_pre --gammas 1.0 \
+  --steps 5 --clip_mode vdist \
   --apr_lrs 1 2 4 8 \
   --nogate_lrs 0.5 1 2 4 \
   --gd_lrs 5e-5 1e-4 5e-4 \

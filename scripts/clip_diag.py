@@ -5,7 +5,7 @@ Reports:
   - pairwise ||theta_i - theta_j|| between experts, and ||theta_i - merge|| (the
     initial |v| scale each task update is measured against), and ||tau_i||.
   - for several refinement configs: the fraction of (gated) coordinates whose step
-    is pushed to the +/- gamma|v| trust-region boundary, the gate density, and the
+    is pushed to the +/- |v| trust-region boundary, the gate density, and the
     total displacement ||theta_refined - merge||.
 
 This explains why a method's displacement is large or small: a low clip fraction
@@ -57,18 +57,18 @@ def main():
     for i in tasks:
         print(f"  {i}: {geom['expert_to_merge'][i]:.3f}   (||tau_{i}||={geom['tau_norm'][i]:.3f})")
 
-    # ---- clip fraction per config ----
+    # ---- clipping diagnostics per config ----
     configs = {
-        "apr@lr1 (paperclip)":  RefineConfig(steps=args.steps, lr=1, clip_frac=0.5,
+        "apr@lr1":  RefineConfig(steps=args.steps, lr=1,
                                              gate_mode="coordinate", update_mode="gated_grad",
                                              clip_mode="vdist"),
-        "apr@lr8 (paperclip)":  RefineConfig(steps=args.steps, lr=8, clip_frac=0.5,
+        "apr@lr8":  RefineConfig(steps=args.steps, lr=8,
                                              gate_mode="coordinate", update_mode="gated_grad",
                                              clip_mode="vdist"),
-        "apr_sat@lr16":         RefineConfig(steps=args.steps, lr=16, clip_frac=0.5,
+        "apr_sat@lr16":         RefineConfig(steps=args.steps, lr=16,
                                              gate_mode="coordinate", update_mode="gated_grad",
                                              clip_mode="vdist"),
-        "nogate@lr4 (paperclip)": RefineConfig(steps=args.steps, lr=4, clip_frac=0.5,
+        "nogate@lr4": RefineConfig(steps=args.steps, lr=4,
                                                gate_mode="none", update_mode="gated_grad",
                                                clip_mode="vdist"),
         "ordinary_gd@1e-3":     RefineConfig(steps=args.steps, lr=1e-3, gate_mode="none",
@@ -81,10 +81,10 @@ def main():
         refined, hist = ctx.run_refine(rc, seed=cfg.seed)
         disp = pd_global_norm(pd_sub(refined, ctx.merged0))
         gd = sum(h["gate_density"] for h in hist) / len(hist)
-        cg = sum(h["clip_frac_gated"] for h in hist) / len(hist)
-        ca = sum(h["clip_frac_all"] for h in hist) / len(hist)
-        report["methods"][name] = {"gate_density": gd, "clip_frac_gated": cg,
-                                   "clip_frac_all": ca, "displacement": disp,
+        cg = sum(h["clipped_frac_gated"] for h in hist) / len(hist)
+        ca = sum(h["clipped_frac_all"] for h in hist) / len(hist)
+        report["methods"][name] = {"gate_density": gd, "clipped_frac_gated": cg,
+                                   "clipped_frac_all": ca, "displacement": disp,
                                    "history": hist}
         print(f"{name:<24} {100*gd:>5.1f}% {100*cg:>9.1f}% {100*ca:>8.1f}% {disp:>7.3f}")
 

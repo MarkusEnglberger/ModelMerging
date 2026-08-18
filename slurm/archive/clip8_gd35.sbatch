@@ -13,7 +13,7 @@
 # more steps. No APR/no-gate/inverted (empty grids + --skip_inverted).
 source slurm/common.sh
 python scripts/compare_baselines.py --config configs/clip8.yaml \
-  --steps 35 --clip_mode vdist_pre --gammas 1.0 --skip_inverted \
+  --steps 35 --clip_mode vdist --skip_inverted \
   --apr_lrs \
   --nogate_lrs \
   --gd_lrs 1e-4 \
