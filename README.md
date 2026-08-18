@@ -32,6 +32,7 @@ src/apr/
   data.py         GLUE loading, tokenization, replay-buffer sampling
   models.py       encoder/head split + param-dict vector algebra
   taskvec.py      task vectors + task-arithmetic merge (Eq. 1/4)
+  apgd.py         DOGE/adaptive projective gradient descent baseline
   gradients.py    replay-buffer task-gradient g_i (mean-loss, eval mode)
   refine.py       Algorithm 1: gate, clip, sequential/aggregated update
   metrics.py      GLUE scoring + normalized retention (Eq. 21)
@@ -41,6 +42,7 @@ src/apr/
 scripts/
   run_merge.py    main entry: run a config, write results/<tag>.json
   train_expert.py fine-tune a single-task expert from a shared base
+  apgd_baseline.py split-selected DOGE/APGD experiment entry point
 configs/          smoke.yaml (DistilRoBERTa MRPC+STS-B), poc3.yaml (RoBERTa x3)
 slurm/            sbatch scripts for the GPU partition (mcs.gpu.q)
 tests/            synthetic unit tests for the gate + Algorithm 1

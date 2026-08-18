@@ -1,0 +1,621 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 32.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 16,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null,
+      "max_eval_by_task": null,
+      "eval0_cache": true
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip8",
+    "tag": "clip8"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd"
+  ],
+  "grids": {
+    "config": "configs/clip8.yaml",
+    "n_probe": 16,
+    "n_select": 16,
+    "probe_seed": null,
+    "selection_seed": null,
+    "etas": [
+      0.03,
+      0.05,
+      0.07,
+      0.09,
+      0.11,
+      0.13,
+      0.15,
+      0.18
+    ],
+    "iterations": 400,
+    "apgd_lr": 0.0001,
+    "keep_density": 0.3,
+    "subspace_divisor": 6,
+    "out": "results/compare/grid_nn_clip8_apgd_n16.json"
+  },
+  "selection_protocol": {
+    "rule": "held-out replay loss on a disjoint selection buffer",
+    "method_data_regime": "checkpoint-only; n affects selection only",
+    "n_probe_per_task": 16,
+    "n_select_per_task": 16,
+    "total_labels_per_task": 32,
+    "probe_seed": 0,
+    "selection_seed": 1,
+    "train_selection_overlap": 0,
+    "selection_ref_losses": {
+      "sun397": 1.1805835962295532,
+      "cars": 1.6059139966964722,
+      "resisc45": 1.3021336793899536,
+      "eurosat": 0.8388900756835938,
+      "svhn": 0.37322574853897095,
+      "gtsrb": 1.074281930923462,
+      "mnist": 0.26984545588493347,
+      "dtd": 1.6259537935256958
+    }
+  },
+  "base": {
+    "sun397": 0.6317380352644836,
+    "cars": 0.5966919537370974,
+    "resisc45": 0.5815873015873015,
+    "eurosat": 0.45037037037037037,
+    "svhn": 0.3151505838967425,
+    "gtsrb": 0.32478226444972286,
+    "mnist": 0.4825,
+    "dtd": 0.43882978723404253
+  },
+  "expert": {
+    "sun397": 0.7485642317380352,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957
+  },
+  "methods": {
+    "merge:APGD@eta0.03": {
+      "selection_obj": 1.4730229417967318,
+      "evaluated": false,
+      "eta": 0.03,
+      "displacement": 11.690442598380349,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.03,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.05": {
+      "selection_obj": 1.1271100376259517,
+      "evaluated": false,
+      "eta": 0.05,
+      "displacement": 10.954377856642004,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.05,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.07": {
+      "selection_obj": 0.8926037250900609,
+      "evaluated": false,
+      "eta": 0.07,
+      "displacement": 10.13731085294576,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.07,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.09": {
+      "selection_obj": 0.804853469014899,
+      "evaluated": true,
+      "eta": 0.09,
+      "displacement": 9.393314999724886,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.09,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      },
+      "scores": {
+        "sun397": 0.4064987405541562,
+        "cars": 0.43862703643825396,
+        "resisc45": 0.7022222222222222,
+        "eurosat": 0.8166666666666667,
+        "svhn": 0.8976259987707437,
+        "gtsrb": 0.8847980997624703,
+        "mnist": 0.9881,
+        "dtd": 0.4946808510638298
+      },
+      "normret": {
+        "sun397": -1.9279860359184005,
+        "cars": -0.8490313505206338,
+        "resisc45": 0.3284356003926349,
+        "eurosat": 0.6778615364617809,
+        "svhn": 0.8862586807697199,
+        "gtsrb": 0.843027400896977,
+        "mnist": 0.9849990067212349,
+        "dtd": 0.15742128491826074
+      },
+      "aggregate": {
+        "mean_acc": 0.7036524519347928,
+        "worst_acc": 0.4064987405541562,
+        "mean_normret": 0.13762326546519676,
+        "worst_normret": -1.9279860359184005,
+        "hmean_normret": 3.999971595972025e-06,
+        "degenerate_tasks": []
+      }
+    },
+    "merge:APGD@eta0.11": {
+      "selection_obj": 0.8225702229008164,
+      "evaluated": false,
+      "eta": 0.11,
+      "displacement": 8.784191211411429,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.11,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.13": {
+      "selection_obj": 1.0338526328862994,
+      "evaluated": false,
+      "eta": 0.13,
+      "displacement": 8.939555177766648,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.13,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.15": {
+      "selection_obj": 1.3886416180069319,
+      "evaluated": false,
+      "eta": 0.15,
+      "displacement": 9.586771471030135,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.15,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.18": {
+      "selection_obj": 2.1299505119458053,
+      "evaluated": false,
+      "eta": 0.18,
+      "displacement": 11.317282150054337,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.18,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    }
+  },
+  "selected": "merge:APGD@eta0.09"
+}

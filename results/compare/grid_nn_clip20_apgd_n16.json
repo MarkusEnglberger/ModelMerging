@@ -1,0 +1,1245 @@
+{
+  "config": {
+    "base_model": "openai/clip-vit-base-patch32",
+    "experts": [
+      {
+        "name": "sun397",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "cars",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "resisc45",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "eurosat",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "svhn",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "gtsrb",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "mnist",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "dtd",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "cifar100",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "stl10",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "flowers102",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "pets",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "pcam",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "fer2013",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "emnist",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "cifar10",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "food101",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "fashion_mnist",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "kmnist",
+        "checkpoint": null,
+        "lam": 0.08
+      },
+      {
+        "name": "rendered_sst2",
+        "checkpoint": null,
+        "lam": 0.08
+      }
+    ],
+    "modality": "clip",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 16,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 8,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null,
+      "max_eval_by_task": null,
+      "eval0_cache": true
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/clip20_l008",
+    "tag": "clip20_l008"
+  },
+  "tasks": [
+    "sun397",
+    "cars",
+    "resisc45",
+    "eurosat",
+    "svhn",
+    "gtsrb",
+    "mnist",
+    "dtd",
+    "cifar100",
+    "stl10",
+    "flowers102",
+    "pets",
+    "pcam",
+    "fer2013",
+    "emnist",
+    "cifar10",
+    "food101",
+    "fashion_mnist",
+    "kmnist",
+    "rendered_sst2"
+  ],
+  "grids": {
+    "config": "configs/clip20_l008.yaml",
+    "n_probe": 16,
+    "n_select": 16,
+    "probe_seed": null,
+    "selection_seed": null,
+    "etas": [
+      0.0025,
+      0.005,
+      0.0075,
+      0.01,
+      0.015,
+      0.02,
+      0.025,
+      0.03,
+      0.05
+    ],
+    "iterations": 400,
+    "apgd_lr": 0.0001,
+    "keep_density": 0.3,
+    "subspace_divisor": 6,
+    "out": "results/compare/grid_nn_clip20_apgd_n16.json"
+  },
+  "selection_protocol": {
+    "rule": "held-out replay loss on a disjoint selection buffer",
+    "method_data_regime": "checkpoint-only; n affects selection only",
+    "n_probe_per_task": 16,
+    "n_select_per_task": 16,
+    "total_labels_per_task": 32,
+    "probe_seed": 0,
+    "selection_seed": 1,
+    "train_selection_overlap": 0,
+    "selection_ref_losses": {
+      "sun397": 1.162521243095398,
+      "cars": 1.739974021911621,
+      "resisc45": 1.077022910118103,
+      "eurosat": 1.5678735971450806,
+      "svhn": 1.8087477684020996,
+      "gtsrb": 1.8976024389266968,
+      "mnist": 0.947957456111908,
+      "dtd": 1.9664478302001953,
+      "cifar100": 0.999835729598999,
+      "stl10": 0.003739961190149188,
+      "flowers102": 1.7555538415908813,
+      "pets": 0.41617143154144287,
+      "pcam": 0.7972106337547302,
+      "fer2013": 0.890110969543457,
+      "emnist": 5.879240036010742,
+      "cifar10": 0.03480406105518341,
+      "food101": 1.1309620141983032,
+      "fashion_mnist": 0.5210533738136292,
+      "kmnist": 2.185256004333496,
+      "rendered_sst2": 0.6365340352058411
+    }
+  },
+  "base": {
+    "sun397": 0.6317380352644836,
+    "cars": 0.5966919537370974,
+    "resisc45": 0.5815873015873015,
+    "eurosat": 0.45037037037037037,
+    "svhn": 0.3151505838967425,
+    "gtsrb": 0.32478226444972286,
+    "mnist": 0.4825,
+    "dtd": 0.43882978723404253,
+    "cifar100": 0.6165,
+    "stl10": 0.97125,
+    "flowers102": 0.6644982924052691,
+    "pets": 0.8329245025892614,
+    "pcam": 0.5562744140625,
+    "fer2013": 0.3764279743661187,
+    "emnist": 0.10951923076923077,
+    "cifar10": 0.883,
+    "food101": 0.827089108910891,
+    "fashion_mnist": 0.661,
+    "kmnist": 0.0995,
+    "rendered_sst2": 0.585941790225151
+  },
+  "expert": {
+    "sun397": 0.7485642317380352,
+    "cars": 0.7828628280064669,
+    "resisc45": 0.9488888888888889,
+    "eurosat": 0.9907407407407407,
+    "svhn": 0.972380147510756,
+    "gtsrb": 0.9890736342042755,
+    "mnist": 0.9958,
+    "dtd": 0.7936170212765957,
+    "cifar100": 0.8825,
+    "stl10": 0.9755,
+    "flowers102": 0.8855098389982111,
+    "pets": 0.9242300354319978,
+    "pcam": 0.887481689453125,
+    "fer2013": 0.7105043187517415,
+    "emnist": 0.942451923076923,
+    "cifar10": 0.9748,
+    "food101": 0.8621782178217822,
+    "fashion_mnist": 0.948,
+    "kmnist": 0.9823,
+    "rendered_sst2": 0.7127951674903898
+  },
+  "methods": {
+    "merge:APGD@eta0.0025": {
+      "selection_obj": 6.152662085226061,
+      "evaluated": false,
+      "eta": 0.0025,
+      "displacement": 17.07151380445853,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.0025,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.005": {
+      "selection_obj": 6.948183933661033,
+      "evaluated": false,
+      "eta": 0.005,
+      "displacement": 19.321399038641488,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.005,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.0075": {
+      "selection_obj": 6.448306677680786,
+      "evaluated": false,
+      "eta": 0.0075,
+      "displacement": 19.813737590279022,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.0075,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.01": {
+      "selection_obj": 5.797792940478972,
+      "evaluated": false,
+      "eta": 0.01,
+      "displacement": 19.9084487204872,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.01,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.015": {
+      "selection_obj": 4.581950863128701,
+      "evaluated": false,
+      "eta": 0.015,
+      "displacement": 19.74342792554564,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.015,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.02": {
+      "selection_obj": 3.628139675830276,
+      "evaluated": false,
+      "eta": 0.02,
+      "displacement": 19.409234498240398,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.02,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.025": {
+      "selection_obj": 3.0281291241232866,
+      "evaluated": false,
+      "eta": 0.025,
+      "displacement": 19.0070172150567,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.025,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.03": {
+      "selection_obj": 2.73073613868572,
+      "evaluated": true,
+      "eta": 0.03,
+      "displacement": 18.580915677375504,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.03,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      },
+      "scores": {
+        "sun397": 0.27879093198992444,
+        "cars": 0.1603034448451685,
+        "resisc45": 0.38682539682539685,
+        "eurosat": 0.6055555555555555,
+        "svhn": 0.770820528580209,
+        "gtsrb": 0.7314330958036421,
+        "mnist": 0.9669,
+        "dtd": 0.32872340425531915,
+        "cifar100": 0.4088,
+        "stl10": 0.861125,
+        "flowers102": 0.2605301675069117,
+        "pets": 0.5213954756064323,
+        "pcam": 0.557098388671875,
+        "fer2013": 0.4073558094176651,
+        "emnist": 0.435625,
+        "cifar10": 0.7477,
+        "food101": 0.2072079207920792,
+        "fashion_mnist": 0.7341,
+        "kmnist": 0.3126,
+        "rendered_sst2": 0.6370126304228446
+      },
+      "normret": {
+        "sun397": -3.0211295387260826,
+        "cars": -2.3440212501785243,
+        "resisc45": -0.5302506337917932,
+        "eurosat": 0.2871829967416442,
+        "svhn": 0.6933192950794973,
+        "gtsrb": 0.6121573209397533,
+        "mnist": 0.9436976243191576,
+        "dtd": -0.3103448188388566,
+        "cifar100": -0.7808270383147735,
+        "stl10": -25.911703737167127,
+        "flowers102": -1.8278144868342066,
+        "pets": -3.4119399248236584,
+        "pcam": 0.0024877913189717627,
+        "fer2013": 0.09257714485188179,
+        "emnist": 0.3915151468147099,
+        "cifar10": -1.4738560485995589,
+        "food101": -17.665909186634217,
+        "fashion_mnist": 0.2547038238779154,
+        "kmnist": 0.24139102581115737,
+        "rendered_sst2": 0.4025973708601816
+      },
+      "aggregate": {
+        "mean_acc": 0.5159951375136511,
+        "worst_acc": 0.1603034448451685,
+        "mean_normret": -2.6678083561646964,
+        "worst_normret": -25.911703737167127,
+        "hmean_normret": 1.999913305902406e-06,
+        "mean_normret_nondeg": -0.5432530110829212,
+        "worst_normret_nondeg": -3.4119399248236584,
+        "degenerate_tasks": [
+          "food101",
+          "stl10"
+        ]
+      }
+    },
+    "merge:APGD@eta0.05": {
+      "selection_obj": 3.908359521635215,
+      "evaluated": false,
+      "eta": 0.05,
+      "displacement": 17.111718158168866,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "openai/clip-vit-base-patch32",
+        "modality": "clip",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "sun397",
+            "checkpoint": null
+          },
+          {
+            "name": "cars",
+            "checkpoint": null
+          },
+          {
+            "name": "resisc45",
+            "checkpoint": null
+          },
+          {
+            "name": "eurosat",
+            "checkpoint": null
+          },
+          {
+            "name": "svhn",
+            "checkpoint": null
+          },
+          {
+            "name": "gtsrb",
+            "checkpoint": null
+          },
+          {
+            "name": "mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "dtd",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar100",
+            "checkpoint": null
+          },
+          {
+            "name": "stl10",
+            "checkpoint": null
+          },
+          {
+            "name": "flowers102",
+            "checkpoint": null
+          },
+          {
+            "name": "pets",
+            "checkpoint": null
+          },
+          {
+            "name": "pcam",
+            "checkpoint": null
+          },
+          {
+            "name": "fer2013",
+            "checkpoint": null
+          },
+          {
+            "name": "emnist",
+            "checkpoint": null
+          },
+          {
+            "name": "cifar10",
+            "checkpoint": null
+          },
+          {
+            "name": "food101",
+            "checkpoint": null
+          },
+          {
+            "name": "fashion_mnist",
+            "checkpoint": null
+          },
+          {
+            "name": "kmnist",
+            "checkpoint": null
+          },
+          {
+            "name": "rendered_sst2",
+            "checkpoint": null
+          }
+        ],
+        "eta": 0.05,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    }
+  },
+  "selected": "merge:APGD@eta0.03"
+}
