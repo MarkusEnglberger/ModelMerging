@@ -19,7 +19,7 @@
 #
 # PASS =: job exits 0; report has selection_protocol non-null with
 # train_selection_overlap 0; every apr:/gd: cell records selection_obj;
-# eval'd cells are only the selected ones (no --eval_all_cells).
+# eval'd cells are only the selected ones.
 
 set -euo pipefail
 source slurm/common.sh

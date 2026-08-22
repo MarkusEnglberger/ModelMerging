@@ -70,43 +70,22 @@ def eval_merge(ctx, state):
     return scores, nr, aggregate_all(scores, nr_agg, ctx.base_scores, ctx.expert_scores)
 
 
-# Which aggregate drives best-per-family selection and the grid-edge warning.
-# Set from --select_by in main(); "mean_normret" preserves the pre-20-task
-# behaviour, "mean_acc" is the right choice when some task has a degenerate
-# expert-minus-base gap (see metrics.DEGENERATE_GAP).
+# Which aggregate orders evaluated winners in the final report.
 SELECT_BY = "mean_normret"
-# Set when --n_select is given: maps a candidate state to its loss on a
-# DISJOINT selection buffer (lower is better). When set, every family and
-# refinement cell is chosen by this instead of the evaluation split, so no
+# Maps a candidate state to its loss on a DISJOINT selection buffer (lower is
+# better). Every family and refinement cell is chosen by this, so no
 # test information enters hyperparameter selection.
 SELECT_OBJ = None
 
 
-def record(report, name, scores, nr, ag, disp, state=None, **extra):
-    entry = {"scores": scores, "normret": nr, "aggregate": ag,
-             "displacement": disp, **extra}
-    if SELECT_OBJ is not None and state is not None and "selection_obj" not in entry:
-        entry["selection_obj"] = SELECT_OBJ(state)
-    report["methods"][name] = entry
-    nd = (f" nr*={ag['mean_normret_nondeg']:.3f}"
-          if "mean_normret_nondeg" in ag else "")
-    _log(f"  -> {name}: acc={ag['mean_acc']:.4f}/{ag['worst_acc']:.4f} "
-         f"nr={ag['mean_normret']:.3f}/{ag['worst_normret']:.3f}{nd} "
-         f"disp={disp:.3f}")
-    return ag[SELECT_BY]
-
-
 class Best:
-    """Track the best-scoring cell of one family (by the SELECT_BY aggregate)."""
+    """Track the selection-buffer winner of one family."""
 
     def __init__(self, label):
         self.label, self.mean, self.name, self.state = label, None, None, None
 
-    def offer(self, mean, name, state, selection_obj=None):
-        # Under the n+n split, rank by held-out replay loss (negated: higher is
-        # better) rather than by the evaluation aggregate that `mean` carries.
-        score = (mean if SELECT_OBJ is None else
-                 -(selection_obj if selection_obj is not None else SELECT_OBJ(state)))
+    def offer(self, name, state, selection_obj):
+        score = -selection_obj
         if self.mean is None or score > self.mean:
             self.mean, self.name, self.state = score, name, state
 
@@ -185,7 +164,7 @@ def merge_cache_save(cfg, family, params, state, extra=None):
 
 
 def sweep_arm(ctx, cfg, report, start_state, steps_grid, lrs, make_cfg, name_of,
-              extra_of, fast, log_label):
+              extra_of, log_label):
     """Run one refinement arm over the (lr, S) grid.
 
     Two efficiencies, both only sound under the stated conditions:
@@ -195,12 +174,13 @@ def sweep_arm(ctx, cfg, report, start_state, steps_grid, lrs, make_cfg, name_of,
       one trajectory at max(steps_grid) with snapshots yields every horizon.
       Horizon-dependent schedules (cosine) cannot nest and fall back to
       separate runs.
-    * SELECTION-ONLY SCORING (``fast``). Under the n+n protocol the evaluation
-      split may not inform selection, so scoring every cell on it is pure waste
-      -- on the twenty-task suite it was ~99% of the runtime. In fast mode each
+    * SELECTION-ONLY SCORING. Under the n+n protocol the evaluation split may
+      not inform selection, so scoring every cell on it is pure waste -- on the
+      twenty-task suite it was ~99% of the runtime. Each
       cell is scored only on the disjoint selection buffer (a few hundred
       forward passes) and just the winner is evaluated. Weights are 351 MB
-      apiece for ViT-B/32, so only the running best is kept resident.
+      apiece for ViT-B/32, so only the running best is kept resident. There is
+      deliberately no full-grid evaluation fallback.
 
     Returns (best_name, best_state, best_sel) or (None, None, None).
     """
@@ -225,20 +205,14 @@ def sweep_arm(ctx, cfg, report, start_state, steps_grid, lrs, make_cfg, name_of,
                 produced.append((S, st))
         for S, st in produced:
             nm = name_of(lr, S)
-            sel = SELECT_OBJ(st) if SELECT_OBJ is not None else None
-            if fast:
-                entry = {"selection_obj": sel,
-                         "displacement": pd_global_norm(pd_sub(st, start_state))}
-                entry.update(extra_of(lr, S, history))
-                entry["evaluated"] = False
-                report["methods"][nm] = entry
-                _log(f"  -> {nm}: sel={sel:.4f} (not evaluated)")
-            else:
-                s, nr, ag = eval_merge(ctx, st)
-                record(report, nm, s, nr, ag,
-                       pd_global_norm(pd_sub(st, start_state)), state=st,
-                       **extra_of(lr, S, history))
-            rank = sel if sel is not None else -report["methods"][nm]["aggregate"][SELECT_BY]
+            sel = SELECT_OBJ(st)
+            entry = {"selection_obj": sel,
+                     "displacement": pd_global_norm(pd_sub(st, start_state))}
+            entry.update(extra_of(lr, S, history))
+            entry["evaluated"] = False
+            report["methods"][nm] = entry
+            _log(f"  -> {nm}: sel={sel:.4f} (not evaluated)")
+            rank = sel
             if rank < b_sel:
                 b_sel, b_name, b_state = rank, nm, st
     return b_name, b_state, b_sel
@@ -342,7 +316,7 @@ def main():
                          "between them.")
     ap.add_argument("--skip_families", nargs="*", default=[],
                     choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
-    ap.add_argument("--n_select", type=int, default=None,
+    ap.add_argument("--n_select", type=int, required=True,
                     help="n+n protocol: draw this many EXTRA labeled examples "
                          "per task, disjoint from the replay buffer, and select "
                          "every hyperparameter on them instead of on the "
@@ -351,20 +325,11 @@ def main():
     ap.add_argument("--selection_seed", type=int, default=None,
                     help="sampling seed for the selection buffer; must differ "
                          "from the probe seed (default: probe_seed + 1)")
-    ap.add_argument("--eval_all_cells", action="store_true",
-                    help="score EVERY grid cell on the evaluation split. Off by "
-                         "default under --n_select, where selection may not see "
-                         "that split and full scoring is ~99%% of the runtime; "
-                         "turn it on to measure the selection gap (the "
-                         "difference between the split-selected and the "
-                         "oracle-selected cell), which needs both numbers.")
     ap.add_argument("--select_by", choices=["mean_normret", "mean_acc"],
                     default="mean_normret",
-                    help="aggregate used to pick best-per-family / best APR lr. "
-                         "Use mean_acc when a task has a degenerate expert-base "
-                         "gap (20-task CLIP suite: stl10, food101).")
+                    help="aggregate used to order evaluated winners in output")
     ap.add_argument("--retention_tasks", nargs="*", default=None,
-                    help="restrict retention aggregates/selection to these tasks "
+                    help="restrict reported retention aggregates to these tasks "
                          "(excluded tasks keep raw scores in the report)")
     ap.add_argument("--out", default="results/compare/merge_baselines.json")
     args = ap.parse_args()
@@ -380,13 +345,8 @@ def main():
         cfg.data.probe_seed = args.probe_seed
     ctx = MergeContext.build(cfg)
     steps_grid = args.steps if args.steps else [cfg.refine.steps]
-    steps = steps_grid[0]   # reported as the nominal horizon
     names = cfg.task_names
-    if args.refine_from:
-        # Recorded per refine cell so hyperparameters can be selected without
-        # the test set (replay-honest selection, cf. replay_baselines).
-        objective, _ = make_replay_objective(ctx)
-    else:
+    if not args.refine_from:
         # no APR composition in this run -> the expert-anchor clones (one full
         # encoder copy per task; 4 x 12 GB fp32 at 3B) are never used. Freeing
         # them keeps the CPU-RAM request at the 1-GPU billing share. eval0 has
@@ -434,9 +394,8 @@ def main():
               "methods": {}}
     global SELECT_BY
     SELECT_BY = args.select_by
-    _log(f"[select] best-per-family by {SELECT_BY}")
+    _log(f"[report] evaluated winners ordered by {SELECT_BY}")
     skip = set(args.skip_families)
-    baseline_fast = (SELECT_OBJ is not None) and not args.eval_all_cells
 
     def offer_baseline(family, name, state, **extra):
         """Select merge cells without consulting the evaluation split.
@@ -444,22 +403,17 @@ def main():
         Under the n+n protocol, evaluating every checkpoint-only candidate is
         both unnecessary (selection is by held-out replay loss) and contrary to
         the promise that the evaluation split is read only for selected cells.
-        Mirror ``sweep_arm(..., fast=True)``: record selection-only metadata now
+        Record selection-only metadata now
         and defer the expensive benchmark evaluation until the family winner is
         known.
         """
         disp = pd_global_norm(pd_sub(state, ctx.merged0))
-        if baseline_fast:
-            sel = SELECT_OBJ(state)
-            report["methods"][name] = {
-                "selection_obj": sel, "displacement": disp,
-                "evaluated": False, **extra}
-            _log(f"  -> {name}: sel={sel:.4f} (not evaluated)")
-            family.offer(None, name, state, selection_obj=sel)
-            return
-        scores, nr, ag = eval_merge(ctx, state)
-        mean = record(report, name, scores, nr, ag, disp, state=state, **extra)
-        family.offer(mean, name, state)
+        sel = SELECT_OBJ(state)
+        report["methods"][name] = {
+            "selection_obj": sel, "displacement": disp,
+            "evaluated": False, **extra}
+        _log(f"  -> {name}: sel={sel:.4f} (not evaluated)")
+        family.offer(name, state, selection_obj=sel)
 
     # ---- task arithmetic, lambda swept (the other families tune theirs, so must this) ----
     ta = Best("TA")
@@ -581,16 +535,15 @@ def main():
     report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
     _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
 
-    if baseline_fast:
-        for key, family in fams.items():
-            if not family:
-                continue
-            scores, nr, ag = eval_merge(ctx, family.state)
-            entry = report["methods"][family.name]
-            entry.update({"scores": scores, "normret": nr, "aggregate": ag,
-                          "evaluated": True})
-            _log(f"  [winner] {family.name}: evaluated -> "
-                 f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
+    for key, family in fams.items():
+        if not family:
+            continue
+        scores, nr, ag = eval_merge(ctx, family.state)
+        entry = report["methods"][family.name]
+        entry.update({"scores": scores, "normret": nr, "aggregate": ag,
+                      "evaluated": True})
+        _log(f"  [winner] {family.name}: evaluated -> "
+             f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
 
     # every family that consumes task vectors has run by here; the refinement
     # anchors on the expert encoders (v = theta_i - theta), never on tau, so the
@@ -606,7 +559,6 @@ def main():
             _log(f"[apr] skip from={key} (family not run)")
             continue
         init_label = fam.name.split(":", 1)[1]
-        fast = (SELECT_OBJ is not None) and not args.eval_all_cells
         gate_modes = args.apr_gate_modes or [cfg.refine.gate_mode]
         for gmode in gate_modes:
          fracs = args.topk_fracs if gmode.startswith("topk") else [None]
@@ -636,16 +588,15 @@ def main():
                             gate_density=gdens)
             bn, bstate, _ = sweep_arm(
                 ctx, cfg, report, fam.state, steps_grid, args.apr_lrs, mk,
-                nm_of, ex_of, fast, f"APR from {init_label}")
+                nm_of, ex_of, f"APR from {init_label}")
             if bn is not None:
                 report[f"best_apr_from_{key}"] = bn
-                if fast:
-                    s, nr, ag = eval_merge(ctx, bstate)
-                    e = report["methods"][bn]
-                    e.update({"scores": s, "normret": nr, "aggregate": ag,
-                              "evaluated": True})
-                    _log(f"  [winner] {bn}: evaluated -> "
-                         f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
+                s, nr, ag = eval_merge(ctx, bstate)
+                e = report["methods"][bn]
+                e.update({"scores": s, "normret": nr, "aggregate": ag,
+                          "evaluated": True})
+                _log(f"  [winner] {bn}: evaluated -> "
+                     f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
                 del bstate
 
         # ---- controls from the SAME init: ungated anchor, and ordinary GD ----
@@ -667,16 +618,15 @@ def main():
                 return dict(init=init_label, lr=lr, steps=S)
             bn, bstate, _ = sweep_arm(
                 ctx, cfg, report, fam.state, steps_grid, lrs, mk, nm_of, ex_of,
-                fast, f"{arm} from {init_label}")
+                f"{arm} from {init_label}")
             if bn is not None:
                 report[f"best_{arm}_from_{key}"] = bn
-                if fast:
-                    s, nr, ag = eval_merge(ctx, bstate)
-                    e = report["methods"][bn]
-                    e.update({"scores": s, "normret": nr, "aggregate": ag,
-                              "evaluated": True})
-                    _log(f"  [winner] {bn}: evaluated -> "
-                         f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
+                s, nr, ag = eval_merge(ctx, bstate)
+                e = report["methods"][bn]
+                e.update({"scores": s, "normret": nr, "aggregate": ag,
+                          "evaluated": True})
+                _log(f"  [winner] {bn}: evaluated -> "
+                     f"{ag['mean_normret']:.4f}/{ag['mean_acc']:.4f}")
                 del bstate
         # a peak at the grid edge means the optimum was not bracketed
         if report.get(f"best_apr_from_{key}") and args.apr_lrs:

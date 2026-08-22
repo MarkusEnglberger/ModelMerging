@@ -117,6 +117,11 @@ def main():
     ap.add_argument("--arms", nargs="*", required=True,
                     help="arm:lr:steps, e.g. apr:8:50 (the split-selected "
                          "from-pretrained winners)")
+    ap.add_argument("--merges", nargs="*", default=[],
+                    help="split-selected merge baselines to probe alongside "
+                         "the config-lambda TA merge: ties:DENSITY:LAM | "
+                         "dareties:DROP:TRIM:LAM | bc:DENSITY:OUTLIER:LAM | "
+                         "ada:VARIANT (matched budget, reuses the merge cache)")
     ap.add_argument("--n_blocks", type=int, default=256)
     ap.add_argument("--block_len", type=int, default=128)
     ap.add_argument("--out", required=True)
@@ -167,6 +172,54 @@ def main():
 
     record("theta0", theta0)
     record(f"merge:TA@l{cfg.experts[0].lam:g}", ctx.merged0)
+
+    if args.merges:
+        from apr.merge_methods import (ties_merge, dare_ties_merge,
+                                       breadcrumbs_merge)
+        names = ctx.task_names
+        for spec in args.merges:
+            fam, *ps = spec.split(":")
+            if fam == "ties":
+                d, lam = float(ps[0]), float(ps[1])
+                state = ties_merge(ctx.base_encoder, ctx.task_vectors,
+                                   lam=lam, density=d)
+                nm = f"merge:TIES@d{d:g},l{lam:g}"
+            elif fam == "dareties":
+                dd, tr, lam = (float(x) for x in ps)
+                state = dare_ties_merge(ctx.base_encoder, ctx.task_vectors,
+                                        lam=lam, drop_density=dd,
+                                        trim_density=tr, seed=0)
+                nm = f"merge:DARETIES@dd{dd:g},t{tr:g},l{lam:g}"
+            elif fam == "bc":
+                d, o, lam = (float(x) for x in ps)
+                state = breadcrumbs_merge(ctx.base_encoder, ctx.task_vectors,
+                                          {n: lam for n in names},
+                                          density=d, outlier_frac=o)
+                nm = f"merge:BC@d{d:g},o{o:g},l{lam:g}"
+            elif fam == "ada":
+                variant = ps[0] if ps else "task"
+                # same params the grid runs used, so the cache key matches
+                # (grid_nn.sbatch: --ada_data probe_buffer, defaults elsewhere)
+                sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+                import merge_baselines as mb
+                params = {"variant": variant, "steps": 300, "lr": 1e-3,
+                          "bs": 16, "init_lam": 0.3, "seed": cfg.seed}
+                extra = {"data_key": "probe_buffer"}
+                state = mb.merge_cache_load(cfg, "ada", params, extra)
+                if state is None:
+                    from apr.adamerging import adamerging
+                    state, _ = adamerging(
+                        ctx.base_encoder, ctx.task_vectors, ctx.per_task,
+                        names, ctx.device, layerwise=(variant == "layer"),
+                        steps=300, lr=1e-3, batch_size=16, init_lam=0.3,
+                        seed=cfg.seed, data_key="probe_buffer",
+                        tv_on_gpu=(cfg.modality != "causal_lm"), logger=_log)
+                    mb.merge_cache_save(cfg, "ada", params, state, extra)
+                nm = f"merge:ADA-{variant}-matched"
+            else:
+                raise SystemExit(f"unknown merge family in --merges: {spec}")
+            record(nm, state)
+            del state
 
     for spec in args.arms:
         arm, lr, steps = spec.split(":")

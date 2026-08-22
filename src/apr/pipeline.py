@@ -9,7 +9,7 @@ Glues the modules together for one ExperimentConfig:
 
 The expensive setup (1-3) is factored into `MergeContext.build` so several
 refinement rules can be compared from the *same* merge point and replay buffers
-(see scripts/compare_baselines.py).
+(see scripts/merge_baselines.py).
 """
 
 from collections import OrderedDict
