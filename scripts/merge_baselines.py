@@ -50,6 +50,7 @@ from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ta_merge,
                                dare_ties_merge, della_merge, breadcrumbs_merge)
 from apr.taskvec import task_arithmetic_merge
 from apr.adamerging import adamerging
+from apr.regmean import regmean_merge
 from apr.replay_baselines import make_replay_objective
 from apr.data import sample_replay_buffer
 from apr.models import pd_sub, pd_global_norm
@@ -264,6 +265,12 @@ def main():
     # stripped), which is what the proposal's protocol actually asks for.
     ap.add_argument("--ada_data", nargs="*", default=["eval_ds"],
                     choices=["eval_ds", "probe_buffer"])
+    # --- RegMean (label-free, data-dependent) ---
+    ap.add_argument("--regmean_nondiag_scales", type=float, nargs="*",
+                    default=[0.9, 1.0],
+                    help="off-diagonal Gram shrinkage values")
+    ap.add_argument("--regmean_eps", type=float, default=1e-3)
+    ap.add_argument("--regmean_bs", type=int, default=16)
     # --- APR on top ---
     ap.add_argument("--apr_schedules", nargs="*", default=["constant"],
                     choices=["constant", "cosine", "linear"],
@@ -299,7 +306,8 @@ def main():
                     help="also run the UNGATED anchored control from each init")
     ap.add_argument("--refine_from", nargs="*",
                     default=["ta", "ties", "dareties", "della", "bc", "ls", "ada"],
-                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
+                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls",
+                             "ada", "regmean"])
     ap.add_argument("--apr_lrs", type=float, nargs="*", default=[2, 4, 8, 16])
     ap.add_argument("--control_gd_lrs", type=float, nargs="*", default=[],
                     help="also run ordinary replay GD from each refine_from init "
@@ -315,7 +323,8 @@ def main():
                          "improving at S=35), so pinning one S is not neutral "
                          "between them.")
     ap.add_argument("--skip_families", nargs="*", default=[],
-                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls", "ada"])
+                    choices=["ta", "ties", "dare", "dareties", "della", "bc", "ls",
+                             "ada", "regmean"])
     ap.add_argument("--n_select", type=int, required=True,
                     help="n+n protocol: draw this many EXTRA labeled examples "
                          "per task, disjoint from the replay buffer, and select "
@@ -530,8 +539,33 @@ def main():
                 nm = f"merge:ADA-{tag}"
                 offer_baseline(ada, nm, state, adamerging=info)
 
+    # ---- RegMean (label-free, Grams from the matched probe inputs) ----
+    regmean = Best("RegMean")
+    # Opt-in via --refine_from regmean so established grid recipes do not
+    # silently acquire this comparatively expensive merge family.
+    if "regmean" not in skip and "regmean" in args.refine_from:
+        for nd in args.regmean_nondiag_scales:
+            _log(f"\n[RegMean] matched probe buffers, nondiag_scale={nd:g}")
+            params = {"nondiag_scale": nd, "eps": args.regmean_eps,
+                      "batch_size": args.regmean_bs, "data_key": "probe_buffer"}
+            cached = merge_cache_load(cfg, "regmean", params)
+            if cached is not None:
+                state, info = cached, {"cached": True, **params}
+            else:
+                state, info = regmean_merge(
+                    ctx.base_encoder, ctx.per_task, names, ctx.device,
+                    buffer_key="probe_buffer", nondiag_scale=nd,
+                    eps=args.regmean_eps, batch_size=args.regmean_bs,
+                    logger=_log)
+                merge_cache_save(cfg, "regmean", params, state)
+            nm = f"merge:RegMean@nd{nd:g}"
+            # selection-only, like every other family: the winner is evaluated
+            # on the evaluation split once it is known (see offer_baseline)
+            offer_baseline(regmean, nm, state, regmean=info)
+
     fams = {"ta": ta, "ties": ties, "dare": dare, "dareties": dt,
-            "della": della, "bc": bc, "ls": ls, "ada": ada}
+            "della": della, "bc": bc, "ls": ls, "ada": ada,
+            "regmean": regmean}
     report["best_per_family"] = {k: v.name for k, v in fams.items() if v}
     _log("\n[best-per-family] " + json.dumps(report["best_per_family"], indent=2))
 

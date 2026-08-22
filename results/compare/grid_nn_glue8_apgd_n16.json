@@ -1,0 +1,401 @@
+{
+  "config": {
+    "base_model": "roberta-base",
+    "experts": [
+      {
+        "name": "cola",
+        "checkpoint": "JeremiahZ/roberta-base-cola",
+        "lam": 0.3
+      },
+      {
+        "name": "sst2",
+        "checkpoint": "JeremiahZ/roberta-base-sst2",
+        "lam": 0.3
+      },
+      {
+        "name": "mrpc",
+        "checkpoint": "JeremiahZ/roberta-base-mrpc",
+        "lam": 0.3
+      },
+      {
+        "name": "stsb",
+        "checkpoint": "JeremiahZ/roberta-base-stsb",
+        "lam": 0.3
+      },
+      {
+        "name": "qqp",
+        "checkpoint": "JeremiahZ/roberta-base-qqp",
+        "lam": 0.3
+      },
+      {
+        "name": "mnli",
+        "checkpoint": "JeremiahZ/roberta-base-mnli",
+        "lam": 0.3
+      },
+      {
+        "name": "qnli",
+        "checkpoint": "JeremiahZ/roberta-base-qnli",
+        "lam": 0.3
+      },
+      {
+        "name": "rte",
+        "checkpoint": "JeremiahZ/roberta-base-rte",
+        "lam": 0.3
+      }
+    ],
+    "modality": "glue",
+    "model_dtype": "float32",
+    "eval_dtype": null,
+    "refine": {
+      "steps": 5,
+      "lr": 16.0,
+      "clip_frac": 1.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 16,
+      "n_val": 0,
+      "max_length": 128,
+      "eval_batch_size": 128,
+      "grad_batch_size": null,
+      "eval_num_workers": 0,
+      "probe_seed": 0,
+      "class_balanced": true,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": null,
+      "max_eval_by_task": null,
+      "eval0_cache": true
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/glue8",
+    "tag": "glue8"
+  },
+  "tasks": [
+    "cola",
+    "sst2",
+    "mrpc",
+    "stsb",
+    "qqp",
+    "mnli",
+    "qnli",
+    "rte"
+  ],
+  "grids": {
+    "config": "configs/glue8.yaml",
+    "n_probe": 16,
+    "n_select": 16,
+    "probe_seed": null,
+    "selection_seed": null,
+    "etas": [
+      0.075,
+      0.1,
+      0.15,
+      0.2
+    ],
+    "iterations": 400,
+    "apgd_lr": 0.0001,
+    "keep_density": 0.3,
+    "subspace_divisor": 6,
+    "out": "results/compare/grid_nn_glue8_apgd_n16.json"
+  },
+  "selection_protocol": {
+    "rule": "held-out replay loss on a disjoint selection buffer",
+    "method_data_regime": "checkpoint-only; n affects selection only",
+    "n_probe_per_task": 16,
+    "n_select_per_task": 16,
+    "total_labels_per_task": 32,
+    "probe_seed": 0,
+    "selection_seed": 1,
+    "train_selection_overlap": 0,
+    "selection_ref_losses": {
+      "cola": 1.0839588642120361,
+      "sst2": 0.4025806486606598,
+      "mrpc": 0.5375753045082092,
+      "stsb": 6.491890907287598,
+      "qqp": 0.6521945595741272,
+      "mnli": 0.5397021770477295,
+      "qnli": 0.6238383054733276,
+      "rte": 0.6335273385047913
+    }
+  },
+  "base": {
+    "cola": 0.0,
+    "sst2": 0.5091743119266054,
+    "mrpc": 0.7480253018237863,
+    "stsb": -0.04678415673873923,
+    "qqp": 0.3159163987138264,
+    "mnli": 0.33632195618950583,
+    "qnli": 0.4946000366099213,
+    "rte": 0.4729241877256318
+  },
+  "expert": {
+    "cola": 0.6232164195970928,
+    "sst2": 0.9357798165137615,
+    "mrpc": 0.9157691245512289,
+    "stsb": 0.9089874275542191,
+    "qqp": 0.9010451939644981,
+    "mnli": 0.8728476821192053,
+    "qnli": 0.924400512538898,
+    "rte": 0.7978339350180506
+  },
+  "methods": {
+    "merge:APGD@eta0.075": {
+      "selection_obj": 1.4270101699144018,
+      "evaluated": false,
+      "eta": 0.075,
+      "displacement": 165.20919543455076,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "roberta-base",
+        "modality": "glue",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "cola",
+            "checkpoint": "JeremiahZ/roberta-base-cola"
+          },
+          {
+            "name": "sst2",
+            "checkpoint": "JeremiahZ/roberta-base-sst2"
+          },
+          {
+            "name": "mrpc",
+            "checkpoint": "JeremiahZ/roberta-base-mrpc"
+          },
+          {
+            "name": "stsb",
+            "checkpoint": "JeremiahZ/roberta-base-stsb"
+          },
+          {
+            "name": "qqp",
+            "checkpoint": "JeremiahZ/roberta-base-qqp"
+          },
+          {
+            "name": "mnli",
+            "checkpoint": "JeremiahZ/roberta-base-mnli"
+          },
+          {
+            "name": "qnli",
+            "checkpoint": "JeremiahZ/roberta-base-qnli"
+          },
+          {
+            "name": "rte",
+            "checkpoint": "JeremiahZ/roberta-base-rte"
+          }
+        ],
+        "eta": 0.075,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.1": {
+      "selection_obj": 1.4058983910458434,
+      "evaluated": true,
+      "eta": 0.1,
+      "displacement": 192.9175220416758,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "roberta-base",
+        "modality": "glue",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "cola",
+            "checkpoint": "JeremiahZ/roberta-base-cola"
+          },
+          {
+            "name": "sst2",
+            "checkpoint": "JeremiahZ/roberta-base-sst2"
+          },
+          {
+            "name": "mrpc",
+            "checkpoint": "JeremiahZ/roberta-base-mrpc"
+          },
+          {
+            "name": "stsb",
+            "checkpoint": "JeremiahZ/roberta-base-stsb"
+          },
+          {
+            "name": "qqp",
+            "checkpoint": "JeremiahZ/roberta-base-qqp"
+          },
+          {
+            "name": "mnli",
+            "checkpoint": "JeremiahZ/roberta-base-mnli"
+          },
+          {
+            "name": "qnli",
+            "checkpoint": "JeremiahZ/roberta-base-qnli"
+          },
+          {
+            "name": "rte",
+            "checkpoint": "JeremiahZ/roberta-base-rte"
+          }
+        ],
+        "eta": 0.1,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      },
+      "scores": {
+        "cola": 0.0,
+        "sst2": 0.5091743119266054,
+        "mrpc": 0.7480253018237863,
+        "stsb": 0.016002834103105247,
+        "qqp": 0.3159163987138264,
+        "mnli": 0.3544574630667346,
+        "qnli": 0.5053999633900788,
+        "rte": 0.4729241877256318
+      },
+      "normret": {
+        "cola": 0.0,
+        "sst2": 0.0,
+        "mrpc": 0.0,
+        "stsb": 0.0656924637818848,
+        "qqp": 0.0,
+        "mnli": 0.03380174642657783,
+        "qnli": 0.02512776772882037,
+        "rte": 0.0
+      },
+      "aggregate": {
+        "mean_acc": 0.36523755759372106,
+        "worst_acc": 0.0,
+        "mean_normret": 0.015577747242160375,
+        "worst_normret": 0.0,
+        "hmean_normret": 1.5999729273932622e-06,
+        "degenerate_tasks": []
+      }
+    },
+    "merge:APGD@eta0.15": {
+      "selection_obj": 1.4088581333831514,
+      "evaluated": false,
+      "eta": 0.15,
+      "displacement": 229.63595753666988,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "roberta-base",
+        "modality": "glue",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "cola",
+            "checkpoint": "JeremiahZ/roberta-base-cola"
+          },
+          {
+            "name": "sst2",
+            "checkpoint": "JeremiahZ/roberta-base-sst2"
+          },
+          {
+            "name": "mrpc",
+            "checkpoint": "JeremiahZ/roberta-base-mrpc"
+          },
+          {
+            "name": "stsb",
+            "checkpoint": "JeremiahZ/roberta-base-stsb"
+          },
+          {
+            "name": "qqp",
+            "checkpoint": "JeremiahZ/roberta-base-qqp"
+          },
+          {
+            "name": "mnli",
+            "checkpoint": "JeremiahZ/roberta-base-mnli"
+          },
+          {
+            "name": "qnli",
+            "checkpoint": "JeremiahZ/roberta-base-qnli"
+          },
+          {
+            "name": "rte",
+            "checkpoint": "JeremiahZ/roberta-base-rte"
+          }
+        ],
+        "eta": 0.15,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    },
+    "merge:APGD@eta0.2": {
+      "selection_obj": 1.4194924914026272,
+      "evaluated": false,
+      "eta": 0.2,
+      "displacement": 251.0198795365996,
+      "apgd": {
+        "cached": true,
+        "version": 3,
+        "method": "DOGE/APGD",
+        "base_model": "roberta-base",
+        "modality": "glue",
+        "model_dtype": "float32",
+        "experts": [
+          {
+            "name": "cola",
+            "checkpoint": "JeremiahZ/roberta-base-cola"
+          },
+          {
+            "name": "sst2",
+            "checkpoint": "JeremiahZ/roberta-base-sst2"
+          },
+          {
+            "name": "mrpc",
+            "checkpoint": "JeremiahZ/roberta-base-mrpc"
+          },
+          {
+            "name": "stsb",
+            "checkpoint": "JeremiahZ/roberta-base-stsb"
+          },
+          {
+            "name": "qqp",
+            "checkpoint": "JeremiahZ/roberta-base-qqp"
+          },
+          {
+            "name": "mnli",
+            "checkpoint": "JeremiahZ/roberta-base-mnli"
+          },
+          {
+            "name": "qnli",
+            "checkpoint": "JeremiahZ/roberta-base-qnli"
+          },
+          {
+            "name": "rte",
+            "checkpoint": "JeremiahZ/roberta-base-rte"
+          }
+        ],
+        "eta": 0.2,
+        "iterations": 400,
+        "lr": 0.0001,
+        "keep_density": 0.3,
+        "subspace_divisor": 6,
+        "linear_filter": "2D encoder non-layernorm weights"
+      }
+    }
+  },
+  "selected": "merge:APGD@eta0.1"
+}

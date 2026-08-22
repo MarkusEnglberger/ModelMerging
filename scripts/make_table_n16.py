@@ -16,7 +16,8 @@ MEAN = {"clip20": "mean_acc"}          # default mean_normret
 WORST = {"clip20": "worst_acc"}        # default worst_normret
 ROWS = [("pretrained", "Pretrained"), ("ta", "Task arithmetic"),
         ("bc", "Breadcrumbs"), ("dareties", "DARE-TIES"),
-        ("ties", "TIES"), ("ada", "AdaMerging"), ("regmean", "RegMean"),
+        ("ties", "TIES"), ("apgd", "DOGE/APGD"),
+        ("ada", "AdaMerging"), ("regmean", "RegMean"),
         ("fisher", "Fisher merging"), ("ls_learned", "Learned L\\&S")]
 ARMS = [("alone", "alone"), ("gd", "$+$GD"),
         ("nogate", "$+$ungated"), ("apr", "$+$APR")]
@@ -100,6 +101,29 @@ def collect(bench, n):
             if method in methods:
                 out[row] = {"alone": cell(methods[method], mkey, wkey)}
         meta["labeled"] = {"file": labeled_path, "S": None}
+    apgd_path = f"results/compare/grid_nn_{bench}_apgd_n{n}.json"
+    if os.path.exists(apgd_path):
+        with open(apgd_path) as f:
+            apgd = json.load(f)
+        selected = apgd.get("selected")
+        if selected in apgd.get("methods", {}):
+            out["apgd"] = {
+                "alone": cell(apgd["methods"][selected], mkey, wkey)}
+            meta["apgd"] = {"file": apgd_path, "S": None}
+    regmean_path = f"results/compare/grid_nn_{bench}_regmean_n{n}.json"
+    if os.path.exists(regmean_path):
+        with open(regmean_path) as f:
+            regmean = json.load(f)
+        m = regmean.get("methods", {})
+        name = (regmean.get("best_per_family") or {}).get("regmean")
+        r = {"alone": cell(m[name], mkey, wkey) if name in m else None}
+        for a in ("apr", "nogate", "gd"):
+            r[a] = pick(m, lambda k, a=a:
+                        k.startswith(f"{a}:from=regmean@"), mkey, wkey)
+        if any(r.values()):
+            out["regmean"] = r
+            meta["regmean"] = {"file": regmean_path,
+                               "S": regmean.get("steps")}
     return out, meta
 
 
@@ -146,7 +170,8 @@ def main():
     for i, (rk, rlabel) in enumerate(ROWS):
         if i:
             lines.append(r"\midrule")
-        row_arms = ARMS if rk not in {"fisher", "ls_learned"} else [("alone", "alone")]
+        row_arms = (ARMS if rk not in {"apgd", "fisher", "ls_learned"}
+                    else [("alone", "alone")])
         for j, (ak, alabel) in enumerate(row_arms):
             left = rlabel if j == 0 else ""
             cells = []
@@ -156,7 +181,8 @@ def main():
                 if rk == "pretrained" and ak == "alone" and b != "clip20" and c:
                     cells.append("$0$")
                     continue
-                src = "base" if rk == "pretrained" else "merges"
+                src = ("base" if rk == "pretrained" else
+                       "regmean" if rk == "regmean" else "merges")
                 sm = (data[b][1].get(src) or {}).get("S")
                 cells.append(fmt(c, best.get(b) == (rk, ak),
                                  max(sm) if sm and ak != "alone" else None))
@@ -173,14 +199,16 @@ def main():
     print("\n%%% selected cells + EDGE AUDIT (a cell at a grid edge is a lower bound)")
     GRIDKEY = {"apr": "apr_lrs", "nogate": "nogate_lrs", "gd": "control_gd_lrs"}
     for b in BENCH:
-        for src in ("base", "merges"):
+        for src in ("base", "merges", "regmean"):
             if src not in data[b][1]:
                 continue
             with open(data[b][1][src]["file"]) as f:
                 g = json.load(f)
             grids, S = g["grids"], g["steps"]
             for rk, r in data[b][0].items():
-                if (rk == "pretrained") != (src == "base"):
+                expected_src = ("base" if rk == "pretrained" else
+                                "regmean" if rk == "regmean" else "merges")
+                if src != expected_src:
                     continue
                 for ak, c in r.items():
                     if not c or not c.get("cell") or ak == "alone":
