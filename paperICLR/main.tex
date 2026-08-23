@@ -48,7 +48,7 @@ Paper under double-blind review}
 \maketitle
 
 \begin{abstract}
-We study model merging when only a small labeled replay buffer is available for each task. We introduce expert-anchored gradient descent, a replay refinement that can start from any merge or directly from the pretrained model. For each task, a first-order loss attribution selects coordinates where moving toward its expert is locally beneficial; updates are scaled by their distance to the expert and clipped to prevent overshoot. This yields equivalent attribution-patching and trust-region interpretations and is provably non-expansive toward the experts' box hull at any learning rate. We evaluate the method on multi-head GLUE-8, eight- and twenty-task CLIP suites, and a decoder-only MergeBench track, using at most sixteen labeled examples per task and tuning only on held-out buffers. From the pretrained model, the anchored update performs best on every benchmark; from merge initializations, it typically improves performance and reduces sensitivity to the initial merge. With eight examples per task, it still outperforms tuned task arithmetic while unconstrained replay descent often overfits. On tasks never merged or refined, it retains more of the pretrained model's zero-shot ability than any checkpoint-only merge or unconstrained replay descent.
+We study model merging when only a small labeled replay buffer is available for each task. We introduce expert-anchored gradient descent, a replay refinement that can start from any merge or directly from the pretrained model. For each task, a first-order loss attribution selects coordinates where moving toward its expert is locally beneficial; updates are scaled by their distance to the expert and clipped to prevent overshoot. This yields equivalent attribution-patching and trust-region interpretations and is provably non-expansive toward the experts' box hull at any learning rate. We evaluate the method on multi-head GLUE-8 and the eight- and twenty-task CLIP suites, using at most sixteen labeled examples per task and tuning only on held-out buffers. From the pretrained model, the anchored update performs best on every benchmark; from merge initializations, it typically improves performance and reduces sensitivity to the initial merge. With eight examples per task, it still outperforms tuned task arithmetic while unconstrained replay descent often overfits. On tasks never merged or refined, it retains more of the pretrained model's zero-shot ability than any checkpoint-only merge or unconstrained replay descent.
 \end{abstract}
 \section{Introduction}
 \label{sec:intro}
@@ -56,7 +56,7 @@ Merging fine-tuned variants of a shared pretrained model combines their skills i
 
 We refine the merged model with replay gradients \emph{anchored to the task experts}: each coordinate's step is kept only where moving toward the expert locally reduces that task's replay loss (an attribution-patching sign), weighted by the coordinate's distance to the expert, and clipped so it can never overshoot---applied task-sequentially, from \emph{any} initialization, including the pretrained model itself. The update is provably non-expansive toward the experts' box hull at any learning rate (Proposition~\ref{prop:box-nonexpansive}).
 
-Our contributions are: (i)~a replay-refinement method with two equivalent derivations---parameter-space attribution patching, and a trust-region view of the expert-anchored descent---and a divergence-safety guarantee; (ii)~a uniform evaluation across four benchmark families (multi-head GLUE-8, the eight- and twenty-task CLIP suites, and decoder-only LLM merging in the MergeBench setting) under a strict protocol in which every hyperparameter is chosen on a small held-out selection buffer and the evaluation split is never used for tuning, with matched data budgets and sanity controls; (iii)~evidence that from the pretrained model---the setting with no merge to inherit---the anchored update is the only one of the three replay families that turns a $16$-example buffer into multi-task ability, while from merge initializations it usually improves performance and makes the outcome markedly less sensitive to which merge was handed to it; (iv)~a characterization of where the anchor earns its keep: as the buffer shrinks to eight examples per task, unconstrained descent silently overfits---a quarter of its configurations lose test accuracy while their replay loss is still falling---whereas the dedicated safety audit finds no corresponding anchored overfitting signature, although selected composition rows can still decline; and (v)~a measurement of what the refinement costs the pretrained model on tasks never merged or refined, under a train/held-out split fixed by the literature rather than chosen by us: the anchored update dominates both unconstrained controls on accuracy and retention simultaneously, and retains more than every checkpoint-only merge.
+Our contributions are: (i)~a replay-refinement method with two equivalent derivations---parameter-space attribution patching, and a trust-region view of the expert-anchored descent---and a divergence-safety guarantee; (ii)~a uniform evaluation across three benchmark families (multi-head GLUE-8 and the eight- and twenty-task CLIP suites) under a strict protocol in which every hyperparameter is chosen on a small held-out selection buffer and the evaluation split is never used for tuning, with matched data budgets and sanity controls; (iii)~evidence that from the pretrained model---the setting with no merge to inherit---the anchored update is the only one of the three replay families that turns a $16$-example buffer into multi-task ability, while from merge initializations it usually improves performance and makes the outcome markedly less sensitive to which merge was handed to it; (iv)~a characterization of where the anchor earns its keep: as the buffer shrinks to eight examples per task, unconstrained descent silently overfits---a quarter of its configurations lose test accuracy while their replay loss is still falling---whereas the dedicated safety audit finds no corresponding anchored overfitting signature, although selected composition rows can still decline; and (v)~a measurement of what the refinement costs the pretrained model on tasks never merged or refined, under a train/held-out split fixed by the literature rather than chosen by us: the anchored update dominates both unconstrained controls on accuracy and retention simultaneously, and retains more than every checkpoint-only merge.
 
 \section{Related Work and Background}
 \label{sec:related}
@@ -166,15 +166,25 @@ The masked, distance-scaled step $-g_{i,r}|v_{i,r}|\,m_{i,r}$, scaled by $\eta$ 
 \section{Experimental Setup}
 \label{sec:protocol}
 
+% ---------------------------------------------------------------------------
+% RETIRED (2026-08-23): the decoder-only MergeBench track (Llama-3.2-3B;
+% math/coding/instruction/multilingual experts). Withheld for now: identical
+% refined weights re-decoded flip 4-5/300 items per task (~+-0.017 per-task,
+% ~+-0.011 mean), the same magnitude as the composition effects, so the column
+% is not quotable until per-task replay-CE logging and repeat-decoding error
+% bars exist. Results: results/compare/grid_nn_mb3b_* (s1235_random and
+% s2to12_random brackets). Full tables/text as of commit 826a045 -- restore
+% from git history, not from a wrapper block.
+% ---------------------------------------------------------------------------
 \paragraph{Settings.}
-We evaluate on four benchmark families. \emph{Multi-head} GLUE-8 (CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE) \citep{wang2018glue} with RoBERTa-base \citep{liu2019roberta} merges the shared encoder and evaluates with each task's own trained head---an intentionally \emph{oracle-task-id} setting. A \emph{CLIP/ViT-B/32} vision track uses the standard eight-task task-vector suite \citep{radford2021clip,ilharco2022taskarithmetic} and its twenty-task extension \citep{wang2024tall}, probing a different modality and---since more task vectors then compete for the same encoder weights---a substantially higher-interference regime (Section~\ref{sec:clip20}). A \emph{decoder-only LLM} track adopts the MergeBench setting \citep{he2025mergebench}: published full-parameter domain experts share a common pretrained checkpoint, so task vectors and merge-to-expert directions are well defined and no expert training is required on our side. We use Llama-3.2-3B with the mathematics, coding, instruction-following, and multilingual experts, scored by judge-free automatic metrics, and merge the full model including the LM head---so every task decodes through one shared output and no task identity is assumed at evaluation, the assumption the multi-head setting grants for free. Refinement uses $n\le16$ labeled replay examples per task ($n=8$ on MergeBench), class-balanced where possible and disjoint from both the selection buffer and evaluation; full details appear in Appendix~\ref{app:protocol}.
+We evaluate on three benchmark families. \emph{Multi-head} GLUE-8 (CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE) \citep{wang2018glue} with RoBERTa-base \citep{liu2019roberta} merges the shared encoder and evaluates with each task's own trained head---an intentionally \emph{oracle-task-id} setting. A \emph{CLIP/ViT-B/32} vision track uses the standard eight-task task-vector suite \citep{radford2021clip,ilharco2022taskarithmetic} and its twenty-task extension \citep{wang2024tall}, probing a different modality and---since more task vectors then compete for the same encoder weights---a substantially higher-interference regime (Section~\ref{sec:clip20}). Refinement uses $n\le16$ labeled replay examples per task, class-balanced where possible and disjoint from both the selection buffer and evaluation; full details appear in Appendix~\ref{app:protocol}.
 
 
 \paragraph{Baselines.}
 Baselines are grouped by data regime: \emph{checkpoint-only} (task arithmetic, TIES, DARE-TIES, Breadcrumbs, DOGE/APGD); \emph{data-dependent but label-free} (AdaMerging); \emph{labeled} (ordinary replay GD from the same initialization, and the ungated distance-scaled update---the two ablations that isolate the anchor and the gate); and \emph{sanity controls} (inverted and density-matched random gates). All three labeled families use the same replay examples, the same selection buffer, and the same hyperparameter search budget. Each merge baseline's own hyperparameters (coefficient, density, sparsity, or global APGD scale) are likewise selected on the selection buffer.
 
 \paragraph{Metrics.}
-Tasks are scored by their standard validation metrics: Matthews correlation for CoLA, correlation for STS-B, matched/mismatched accuracy for MNLI, accuracy or accuracy/F1 elsewhere on GLUE, and top-1 accuracy on the CLIP suites; the MergeBench tasks use judge-free automatic metrics (verifiable instruction constraints, exact match on grade-school mathematics, and functional-correctness pass rates on code). These are not commensurable across tasks, so the primary aggregate throughout is normalized retention,
+Tasks are scored by their standard validation metrics: Matthews correlation for CoLA, correlation for STS-B, matched/mismatched accuracy for MNLI, accuracy or accuracy/F1 elsewhere on GLUE, and top-1 accuracy on the CLIP suites. These are not commensurable across tasks, so the primary aggregate throughout is normalized retention,
 \begin{equation}
     \mathrm{NormRet}_t
     =
@@ -185,7 +195,7 @@ Tasks are scored by their standard validation metrics: Matthews correlation for 
     },
     \label{eq:normalized-retention}
 \end{equation}
-which places the pretrained model at $0$ and the task expert at $1$ ($\epsilon_{\mathrm{metric}}$ guards small denominators). Mean and worst-task values are always reported together---worst-task matters because a merge can improve the average while catastrophically harming a small task. Two benchmarks depart from this convention because their retention denominators degenerate: on the twenty-task CLIP suite several experts barely improve on the zero-shot backbone, and on MergeBench the multilingual expert finishes \emph{below} the pretrained model ($0.494$ vs.\ $0.495$), so a near-zero or negative denominator makes per-task retention explode or invert. Both benchmarks therefore report absolute mean and worst-task accuracy, quoting the pretrained floor and expert ceiling for scale (Section~\ref{sec:clip20}).
+which places the pretrained model at $0$ and the task expert at $1$ ($\epsilon_{\mathrm{metric}}$ guards small denominators). Mean and worst-task values are always reported together---worst-task matters because a merge can improve the average while catastrophically harming a small task. One benchmark departs from this convention because its retention denominators degenerate: on the twenty-task CLIP suite several experts barely improve on the zero-shot backbone, so a near-zero denominator makes per-task retention explode. That benchmark therefore reports absolute mean and worst-task accuracy, quoting the zero-shot floor and expert ceiling for scale (Section~\ref{sec:clip20}).
 
 \paragraph{Protocol.}
 Refinement runs $S$ sweeps from the given initialization at a constant learning rate, with the trust-region clip applied per-update (Eq.~\eqref{eq:clipped-update}).
@@ -251,45 +261,45 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{\textbf{The experiment grid under split selection at a $16{+}16$ budget}, instantiated identically on every encoder benchmark. Each task contributes $16$ labeled replay examples for the refinement sweeps and a \emph{disjoint} $16$-example selection buffer ($32$ labels per task in total). Every hyperparameter---merge coefficient, density, refinement learning rate, and the sweep count $S$---is chosen by minimizing held-out loss on the selection buffer, and the evaluation split is read \emph{only} at the selected cell, so the table reports what a practitioner obtains without ever touching test data. Entries are mean aggregate with worst-task in parentheses: normalized retention on GLUE-8 and CLIP-8, where the pretrained \emph{alone} row is the zero point, and absolute accuracy on MergeBench and twenty-task CLIP, whose retention denominators degenerate (Section~\ref{sec:protocol}). AdaMerging is given the matched budget---the same $16$ unlabeled inputs per task that APR sees labeled---rather than the standard transductive formulation that adapts on the evaluation split. DOGE/APGD is checkpoint-only: no replay labels construct its candidates, and the disjoint buffer selects only its global scale $\eta$; all three selected scales are interior to their benchmark-specific grids. The horizon grid is $S\in\{5,20,50\}$ on CLIP-20 and on the merge-initialized GLUE-8 rows, $S\in\{5,20,50,100,200\}$ on CLIP-8 and the from-pretrained GLUE-8 rows, and, on MergeBench (run from the pretrained model only at this budget, since generation-based scoring is the dominant cost there; its composition tier is reported at $8{+}8$ in Table~\ref{tab:main8}), $S\in\{1,2,3,5\}$ for GD and $S\in\{2,3,5,8,12\}$ for APR with the task order re-randomized each sweep---the APR grid was extended upward in both $\eta$ and $S$ after its first selection landed on the grid edge, and its selected cell is interior on both axes; on the encoder tracks every arm receives the same grid as the arms beside it, so no treatment is searched over a wider space than its controls. $^{\dagger}$: the selected $S$ is the longest its grid offered, so the cell is a lower bound rather than a verified interior optimum. Dashes: not run.}
+\caption{\textbf{The experiment grid under split selection at a $16{+}16$ budget}, instantiated identically on every encoder benchmark. Each task contributes $16$ labeled replay examples for the refinement sweeps and a \emph{disjoint} $16$-example selection buffer ($32$ labels per task in total). Every hyperparameter---merge coefficient, density, refinement learning rate, and the sweep count $S$---is chosen by minimizing held-out loss on the selection buffer, and the evaluation split is read \emph{only} at the selected cell, so the table reports what a practitioner obtains without ever touching test data. Entries are mean aggregate with worst-task in parentheses: normalized retention on GLUE-8 and CLIP-8, where the pretrained \emph{alone} row is the zero point, and absolute top-1 accuracy on twenty-task CLIP, whose retention denominator degenerates (Section~\ref{sec:protocol}). AdaMerging is given the matched budget---the same $16$ unlabeled inputs per task that APR sees labeled---rather than the standard transductive formulation that adapts on the evaluation split. DOGE/APGD is checkpoint-only: no replay labels construct its candidates, and the disjoint buffer selects only its global scale $\eta$; all three selected scales are interior to their benchmark-specific grids. The horizon grid is $S\in\{5,20,50\}$ on CLIP-20 and on the merge-initialized GLUE-8 rows, and $S\in\{5,20,50,100,200\}$ on CLIP-8 and the from-pretrained GLUE-8 rows; every arm receives the same grid as the arms beside it, so no treatment is searched over a wider space than its controls. $^{\dagger}$: the selected $S$ is the longest its grid offered, so the cell is a lower bound rather than a verified interior optimum. Dashes: not run.}
 \label{tab:main16}
 \renewcommand{\arraystretch}{0.95}
-\begin{tabular}{llcccc}
+\begin{tabular}{llccc}
 \toprule
-Initialization & Treatment & GLUE-8 & CLIP-8 & MergeBench & CLIP-20 \\
- & & \multicolumn{2}{c}{normalized retention} & \multicolumn{2}{c}{absolute accuracy} \\
+Initialization & Treatment & GLUE-8 & CLIP-8 & CLIP-20 \\
+ & & \multicolumn{2}{c}{normalized retention} & top-1 acc. \\
 \midrule
-Pretrained      & alone      & $0$ & $0$ & $0.289\ (.06)$ & $0.550\ (.10)$ \\
-                & $+$GD      & $0.209\ ({-}.18)$ & $0.046^{\dagger}\ ({-}.36)$ & $0.315\ (.11)$ & $0.583^{\dagger}\ (.12)$ \\
-                & $+$ungated & $-0.018\ ({-}.49)$ & $-0.036\ ({-}.59)$ & --- & $0.586\ (.11)$ \\
-                & $+$APR     & $0.315\ ({-}.12)$ & $0.432\ ({-}.16)$ & $0.372\ (.24)$ & $0.647\ (.22)$ \\
+Pretrained      & alone      & $0$ & $0$ & $0.550\ (.10)$ \\
+                & $+$GD      & $0.209\ ({-}.18)$ & $0.046^{\dagger}\ ({-}.36)$ & $0.583^{\dagger}\ (.12)$ \\
+                & $+$ungated & $-0.018\ ({-}.49)$ & $-0.036\ ({-}.59)$ & $0.586\ (.11)$ \\
+                & $+$APR     & $0.315\ ({-}.12)$ & $0.432\ ({-}.16)$ & $0.647\ (.22)$ \\
 \midrule
-Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & --- & $0.495\ (.15)$ \\
-                & $+$GD      & $0.574\ ({+}.06)$ & $0.420^{\dagger}\ ({-}.36)$ & --- & $0.555\ (.18)$ \\
-                & $+$ungated & $0.586\ ({-}.01)$ & $0.404^{\dagger}\ ({-}.49)$ & --- & $0.602\ (.17)$ \\
-                & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({+}.05)$ & --- & $0.667\ (.25)$ \\
+Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.495\ (.15)$ \\
+                & $+$GD      & $0.574\ ({+}.06)$ & $0.420^{\dagger}\ ({-}.36)$ & $0.555\ (.18)$ \\
+                & $+$ungated & $0.586\ ({-}.01)$ & $0.404^{\dagger}\ ({-}.49)$ & $0.602\ (.17)$ \\
+                & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({+}.05)$ & $0.667\ (.25)$ \\
 \midrule
-Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & --- & $0.603\ (.12)$ \\
-                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.04)$ & --- & $0.638^{\dagger}\ (.17)$ \\
-                & $+$ungated & $0.563\ ({+}.04)$ & $0.469\ ({-}.09)$ & --- & $0.650\ (.19)$ \\
-                & $+$APR     & $0.567\ ({+}.04)$ & $0.485^{\dagger}\ ({+}.00)$ & --- & $0.661\ (.20)$ \\
+Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.603\ (.12)$ \\
+                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.04)$ & $0.638^{\dagger}\ (.17)$ \\
+                & $+$ungated & $0.563\ ({+}.04)$ & $0.469\ ({-}.09)$ & $0.650\ (.19)$ \\
+                & $+$APR     & $0.567\ ({+}.04)$ & $0.485^{\dagger}\ ({+}.00)$ & $0.661\ (.20)$ \\
 \midrule
-DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & --- & $0.520\ (.20)$ \\
-                & $+$GD      & $0.521\ ({-}.08)$ & $0.523^{\dagger}\ ({-}.07)$ & --- & $0.594^{\dagger}\ (.28)$ \\
-                & $+$ungated & $0.574\ ({+}.09)$ & $0.291^{\dagger}\ ({-}1.85)$ & --- & $0.579\ (.09)$ \\
-                & $+$APR     & $0.586\ ({+}.11)$ & $0.527^{\dagger}\ ({-}.39)$ & --- & $0.664\ (.30)$ \\
+DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.520\ (.20)$ \\
+                & $+$GD      & $0.521\ ({-}.08)$ & $0.523^{\dagger}\ ({-}.07)$ & $0.594^{\dagger}\ (.28)$ \\
+                & $+$ungated & $0.574\ ({+}.09)$ & $0.291^{\dagger}\ ({-}1.85)$ & $0.579\ (.09)$ \\
+                & $+$APR     & $0.586\ ({+}.11)$ & $0.527^{\dagger}\ ({-}.39)$ & $0.664\ (.30)$ \\
 \midrule
-TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & --- & $0.619\ (.19)$ \\
-                & $+$GD      & $0.516\ ({-}.13)$ & $0.600^{\dagger}\ ({+}.18)$ & --- & $0.658^{\dagger}\ (.26)$ \\
-                & $+$ungated & $0.525\ ({-}.08)$ & $0.561\ ({-}.20)$ & --- & $0.672\ (.28)$ \\
-                & $+$APR     & $0.543\ ({-}.03)$ & $0.608^{\dagger}\ ({+}.11)$ & --- & $\mathbf{0.676}\ (.27)$ \\
+TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.619\ (.19)$ \\
+                & $+$GD      & $0.516\ ({-}.13)$ & $0.600^{\dagger}\ ({+}.18)$ & $0.658^{\dagger}\ (.26)$ \\
+                & $+$ungated & $0.525\ ({-}.08)$ & $0.561\ ({-}.20)$ & $0.672\ (.28)$ \\
+                & $+$APR     & $0.543\ ({-}.03)$ & $0.608^{\dagger}\ ({+}.11)$ & $\mathbf{0.676}\ (.27)$ \\
 \midrule
-DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & --- & $0.516\ (.16)$ \\
+DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & $0.516\ (.16)$ \\
 \midrule
-AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & --- & $0.597\ (.10)$ \\
-                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.14)$ & --- & $0.637^{\dagger}\ (.13)$ \\
-                & $+$ungated & $0.538\ ({-}.36)$ & $0.557^{\dagger}\ ({-}.04)$ & --- & $0.649\ (.16)$ \\
-                & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.638}^{\dagger}\ ({+}.32)$ & --- & $0.665\ (.20)$ \\
+AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & $0.597\ (.10)$ \\
+                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.14)$ & $0.637^{\dagger}\ (.13)$ \\
+                & $+$ungated & $0.538\ ({-}.36)$ & $0.557^{\dagger}\ ({-}.04)$ & $0.649\ (.16)$ \\
+                & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.638}^{\dagger}\ ({+}.32)$ & $0.665\ (.20)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -298,67 +308,67 @@ AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & --- & $0
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
-\caption{\textbf{The canonical grid under split selection at an $8{+}8$ budget.} Each task contributes eight labeled replay examples and a disjoint eight-example selection buffer. Every hyperparameter is selected on the selection buffer before the evaluation split is read; the encoder tracks use $S\in\{5,20,50\}$ with a fixed task order, and MergeBench uses $S\in\{1,2,3,5\}$ with the task order re-randomized each sweep, extended to $S\in\{2,3,5,8,12\}$ (with $\eta$ up to $8192$) for the from-pretrained and from-task-arithmetic APR cells, whose first selections had landed on the grid edge; every selected MergeBench cell is interior on both axes. DOGE/APGD remains checkpoint-only and uses this buffer only to select $\eta$. Entries follow Table~\ref{tab:main16}: mean normalized retention with worst-task retention in parentheses, except MergeBench and CLIP-20, which report absolute accuracy. The decoder-only MergeBench track uses Llama-3.2-3B with mathematics, coding, instruction-following, and multilingual experts; its pretrained floor is $0.289$ and expert ceiling $0.548$. $^{\dagger}$ marks a selected horizon at the longest value offered; dashes are configurations not run.}
+\caption{\textbf{The canonical grid under split selection at an $8{+}8$ budget.} Each task contributes eight labeled replay examples and a disjoint eight-example selection buffer. Every hyperparameter is selected on the selection buffer before the evaluation split is read; the encoder tracks use $S\in\{5,20,50\}$ with a fixed task order. DOGE/APGD remains checkpoint-only and uses this buffer only to select $\eta$. Entries follow Table~\ref{tab:main16}: mean normalized retention with worst-task retention in parentheses, except CLIP-20, which reports absolute accuracy. $^{\dagger}$ marks a selected horizon at the longest value offered; dashes are configurations not run.}
 \label{tab:main8}
 \renewcommand{\arraystretch}{0.95}
-\begin{tabular}{llcccc}
+\begin{tabular}{llccc}
 \toprule
-Initialization & Treatment & GLUE-8 & CLIP-8 & MergeBench & CLIP-20 \\
- & & \multicolumn{2}{c}{normalized retention} & \multicolumn{2}{c}{absolute accuracy} \\
+Initialization & Treatment & GLUE-8 & CLIP-8 & CLIP-20 \\
+ & & \multicolumn{2}{c}{normalized retention} & top-1 acc. \\
 \midrule
-Pretrained      & alone      & $0$ & $0$ & $0.289\ (.06)$ & $0.550\ (.10)$ \\
-                & $+$GD      & $-0.361\ ({-}3.52)$ & $-0.148\ ({-}1.04)$ & --- & $0.574^{\dagger}\ (.10)$ \\
-                & $+$ungated & $0.089^{\dagger}\ ({-}.31)$ & $-0.006\ ({-}.41)$ & --- & $0.568\ (.08)$ \\
-                & $+$APR     & $0.223^{\dagger}\ ({-}.33)$ & $0.295^{\dagger}\ ({-}.45)$ & $0.373\ (.28)$ & $0.645\ (.22)$ \\
+Pretrained      & alone      & $0$ & $0$ & $0.550\ (.10)$ \\
+                & $+$GD      & $-0.361\ ({-}3.52)$ & $-0.148\ ({-}1.04)$ & $0.574^{\dagger}\ (.10)$ \\
+                & $+$ungated & $0.089^{\dagger}\ ({-}.31)$ & $-0.006\ ({-}.41)$ & $0.568\ (.08)$ \\
+                & $+$APR     & $0.223^{\dagger}\ ({-}.33)$ & $0.295^{\dagger}\ ({-}.45)$ & $0.645\ (.22)$ \\
 \midrule
-Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.470\ (.33)$ & $0.495\ (.15)$ \\
-                & $+$GD      & $0.530\ ({+}.04)$ & $0.167^{\dagger}\ ({-}1.10)$ & --- & $0.545\ (.18)$ \\
-                & $+$ungated & $0.529\ ({+}.03)$ & $0.241^{\dagger}\ ({-}.79)$ & --- & $0.576\ (.23)$ \\
-                & $+$APR     & $0.498\ ({-}.18)$ & $0.462^{\dagger}\ ({-}.12)$ & $0.470\ (.35)$ & $0.648\ (.22)$ \\
+Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.495\ (.15)$ \\
+                & $+$GD      & $0.530\ ({+}.04)$ & $0.167^{\dagger}\ ({-}1.10)$ & $0.545\ (.18)$ \\
+                & $+$ungated & $0.529\ ({+}.03)$ & $0.241^{\dagger}\ ({-}.79)$ & $0.576\ (.23)$ \\
+                & $+$APR     & $0.498\ ({-}.18)$ & $0.462^{\dagger}\ ({-}.12)$ & $0.648\ (.22)$ \\
 \midrule
-Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.417\ (.25)$ & $0.602\ (.12)$ \\
-                & $+$GD      & $0.512\ ({-}.00)$ & $0.479^{\dagger}\ ({+}.04)$ & --- & $0.632^{\dagger}\ (.15)$ \\
-                & $+$ungated & $0.536\ ({+}.05)$ & $0.391^{\dagger}\ ({-}.40)$ & --- & $0.624\ (.17)$ \\
-                & $+$APR     & $0.528\ ({-}.06)$ & $0.339^{\dagger}\ ({-}.46)$ & $0.412\ (.30)$ & $0.652\ (.22)$ \\
+Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.602\ (.12)$ \\
+                & $+$GD      & $0.512\ ({-}.00)$ & $0.479^{\dagger}\ ({+}.04)$ & $0.632^{\dagger}\ (.15)$ \\
+                & $+$ungated & $0.536\ ({+}.05)$ & $0.391^{\dagger}\ ({-}.40)$ & $0.624\ (.17)$ \\
+                & $+$APR     & $0.528\ ({-}.06)$ & $0.339^{\dagger}\ ({-}.46)$ & $0.652\ (.22)$ \\
 \midrule
-DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.490\ (.35)$ & $0.520\ (.20)$ \\
-                & $+$GD      & $0.484\ ({-}.08)$ & $-1.273^{\dagger}\ ({-}4.87)$ & --- & $0.571^{\dagger}\ (.26)$ \\
-                & $+$ungated & $0.534\ ({+}.08)$ & $-0.578\ ({-}3.11)$ & --- & $0.499\ (.05)$ \\
-                & $+$APR     & $\mathbf{0.576}\ ({+}.19)$ & $0.498^{\dagger}\ ({-}.31)$ & $0.495\ (.37)$ & $0.649^{\dagger}\ (.27)$ \\
+DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.520\ (.20)$ \\
+                & $+$GD      & $0.484\ ({-}.08)$ & $-1.273^{\dagger}\ ({-}4.87)$ & $0.571^{\dagger}\ (.26)$ \\
+                & $+$ungated & $0.534\ ({+}.08)$ & $-0.578\ ({-}3.11)$ & $0.499\ (.05)$ \\
+                & $+$APR     & $\mathbf{0.576}\ ({+}.19)$ & $0.498^{\dagger}\ ({-}.31)$ & $0.649^{\dagger}\ (.27)$ \\
 \midrule
-TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.464\ (.36)$ & $0.619\ (.19)$ \\
-                & $+$GD      & $0.442\ ({-}.10)$ & $0.585^{\dagger}\ ({+}.18)$ & --- & $0.651^{\dagger}\ (.25)$ \\
-                & $+$ungated & $0.442\ ({-}.07)$ & $0.318^{\dagger}\ ({-}1.57)$ & --- & $0.622\ (.10)$ \\
-                & $+$APR     & $0.489^{\dagger}\ ({+}.01)$ & $0.566^{\dagger}\ ({-}.08)$ & $0.468\ (\mathbf{.38})$ & $0.665\ (.28)$ \\
+TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.619\ (.19)$ \\
+                & $+$GD      & $0.442\ ({-}.10)$ & $0.585^{\dagger}\ ({+}.18)$ & $0.651^{\dagger}\ (.25)$ \\
+                & $+$ungated & $0.442\ ({-}.07)$ & $0.318^{\dagger}\ ({-}1.57)$ & $0.622\ (.10)$ \\
+                & $+$APR     & $0.489^{\dagger}\ ({+}.01)$ & $0.566^{\dagger}\ ({-}.08)$ & $0.665\ (.28)$ \\
 \midrule
-DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & --- & $0.516\ (.16)$ \\
+DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & $0.516\ (.16)$ \\
 \midrule
-AdaMerging      & alone      & $0.028\ ({-}3.01)$ & $0.463\ ({-}.04)$ & $\mathbf{0.496}\ (.36)$ & $0.592\ (.10)$ \\
-                & $+$GD      & $0.016\ ({-}2.95)$ & $0.502^{\dagger}\ ({-}.06)$ & --- & $0.623^{\dagger}\ (.11)$ \\
-                & $+$ungated & $0.466\ ({-}.10)$ & $0.285^{\dagger}\ ({-}1.41)$ & --- & $0.563^{\dagger}\ (.18)$ \\
-                & $+$APR     & $0.543\ ({+}.02)$ & $0.554^{\dagger}\ ({+}.15)$ & $0.495\ (.37)$ & $0.640\ (.19)$ \\
+AdaMerging      & alone      & $0.028\ ({-}3.01)$ & $0.463\ ({-}.04)$ & $0.592\ (.10)$ \\
+                & $+$GD      & $0.016\ ({-}2.95)$ & $0.502^{\dagger}\ ({-}.06)$ & $0.623^{\dagger}\ (.11)$ \\
+                & $+$ungated & $0.466\ ({-}.10)$ & $0.285^{\dagger}\ ({-}1.41)$ & $0.563^{\dagger}\ (.18)$ \\
+                & $+$APR     & $0.543\ ({+}.02)$ & $0.554^{\dagger}\ ({+}.15)$ & $0.640\ (.19)$ \\
 \midrule
-RegMean         & alone      & $0.477\ ({+}.06)$ & $0.627\ ({+}.32)$ & --- & $0.697\ (.21)$ \\
-                & $+$GD      & $0.480\ ({+}.06)$ & $0.611^{\dagger}\ ({+}.29)$ & --- & $0.707^{\dagger}\ (.23)$ \\
-                & $+$ungated & $0.462\ ({+}.07)$ & $0.622^{\dagger}\ ({+}.28)$ & --- & $\mathbf{0.709}\ (.24)$ \\
-                & $+$APR     & $0.517\ ({+}.10)$ & $\mathbf{0.632}^{\dagger}\ ({+}.31)$ & --- & $0.709\ (.24)$ \\
+RegMean         & alone      & $0.477\ ({+}.06)$ & $0.627\ ({+}.32)$ & $0.697\ (.21)$ \\
+                & $+$GD      & $0.480\ ({+}.06)$ & $0.611^{\dagger}\ ({+}.29)$ & $0.707^{\dagger}\ (.23)$ \\
+                & $+$ungated & $0.462\ ({+}.07)$ & $0.622^{\dagger}\ ({+}.28)$ & $\mathbf{0.709}\ (.24)$ \\
+                & $+$APR     & $0.517\ ({+}.10)$ & $\mathbf{0.632}^{\dagger}\ ({+}.31)$ & $0.709\ (.24)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The underlying task-level evaluation scores for the three benchmarks at the
+The underlying task-level evaluation scores for the two eight-task encoder benchmarks at the
 $8{+}8$ budget are reported in Appendix
-Tables~\ref{tab:glue8-n8-pertask}--\ref{tab:mergebench-n8-pertask}.
+Tables~\ref{tab:glue8-n8-pertask} and~\ref{tab:clip8-n8-pertask}.
 
 \paragraph{Reading the grid.}
 \label{sec:clip20}
-Table~\ref{tab:main16} reports the three encoder benchmarks, and the from-pretrained cells of MergeBench, at a labeled budget of $16$ refinement and $16$ selection examples per task; Table~\ref{tab:main8} repeats the three encoder benchmarks at half that budget and reports the full MergeBench grid at its $8{+}8$ budget. Two conventions matter for reading the CLIP-20 column. First, it is scored in absolute top-1 accuracy (zero-shot floor $0.550$, expert ceiling $0.896$), for the degeneracy reason declared in Section~\ref{sec:protocol}; on that scale interference is visibly dominant---the best checkpoint-only merge (TIES) recovers only a fifth of the floor-to-ceiling gap, against roughly half of the expert--base gap at eight tasks ($0.525$)---which Appendix~\ref{app:clip20} traces to the geometry of the twenty-expert compromise. Second, its task-arithmetic row carries a protocol artifact: the coefficient grid offered to selection is the standard eight-task one ($\lambda\in\{0.2,\ldots,0.5\}$), whose optimum at twenty tasks lies \emph{outside} the grid ($\lambda\approx0.05$--$0.08$, accuracy $0.604$; Appendix~\ref{app:clip20}), so the selected $\lambda=0.2$ is a boundary pick and that merge lands below the zero-shot floor ($0.495$).
+Table~\ref{tab:main16} reports the three encoder benchmarks at a labeled budget of $16$ refinement and $16$ selection examples per task; Table~\ref{tab:main8} repeats them at half that budget. Two conventions matter for reading the CLIP-20 column. First, it is scored in absolute top-1 accuracy (zero-shot floor $0.550$, expert ceiling $0.896$), for the degeneracy reason declared in Section~\ref{sec:protocol}; on that scale interference is visibly dominant---the best checkpoint-only merge (TIES) recovers only a fifth of the floor-to-ceiling gap, against roughly half of the expert--base gap at eight tasks ($0.525$)---which Appendix~\ref{app:clip20} traces to the geometry of the twenty-expert compromise. Second, its task-arithmetic row carries a protocol artifact: the coefficient grid offered to selection is the standard eight-task one ($\lambda\in\{0.2,\ldots,0.5\}$), whose optimum at twenty tasks lies \emph{outside} the grid ($\lambda\approx0.05$--$0.08$, accuracy $0.604$; Appendix~\ref{app:clip20}), so the selected $\lambda=0.2$ is a boundary pick and that merge lands below the zero-shot floor ($0.495$).
 
 \paragraph{Cold start: refining from the pretrained model.}
-Refining \emph{from the pretrained model}---the setting with no merge to inherit, and the one where the refinement must supply all of the multi-task ability itself---is an unambiguous win for the gated, expert-anchored update: APR is the best cold-start treatment on all four benchmarks. On the three encoder tracks it is ahead of the better of the two unconstrained baselines by $0.06$ (CLIP-20), $0.11$ (GLUE-8), and $0.39$ (CLIP-8), and neither unconstrained baseline is viable at this budget: ordinary descent recovers between a twentieth and a fifth of the expert--base gap on the two retention benchmarks ($0.046$ on CLIP-8, $0.209$ on GLUE-8), and the ungated update fails to improve on the pretrained model at all ($-0.018$ on GLUE-8, $-0.036$ on CLIP-8), so distance scaling without the gate is not merely weaker than APR but useless from this initialization. On the decoder track, both labeled arms improve the pretrained Llama-3.2-3B at sixteen labels per task---mean accuracy $0.289\to0.315$ (GD) and $\to0.372$ (APR) against an expert ceiling of $0.548$ (Table~\ref{tab:main16})---and APR's margin is widest where the pretrained model is weakest: mathematics rises from $0.063$ to $0.317$ under APR against $0.107$ under GD, and APR's worst task ($0.240$) is more than twice GD's ($0.107$). At eight labels per task (Table~\ref{tab:main8}) APR reaches $0.373$ with a worst task of $0.283$, so the decoder result does not hinge on the larger budget. Only the gated, distance-scaled update turns a small replay buffer into multi-task ability with no merge to build on.
+Refining \emph{from the pretrained model}---the setting with no merge to inherit, and the one where the refinement must supply all of the multi-task ability itself---is an unambiguous win for the gated, expert-anchored update: APR is the best cold-start treatment on all three benchmarks, ahead of the better of the two unconstrained baselines by $0.06$ (CLIP-20), $0.11$ (GLUE-8), and $0.39$ (CLIP-8). Neither unconstrained baseline is viable at this budget: ordinary descent recovers between a twentieth and a fifth of the expert--base gap on the two retention benchmarks ($0.046$ on CLIP-8, $0.209$ on GLUE-8), and the ungated update fails to improve on the pretrained model at all ($-0.018$ on GLUE-8, $-0.036$ on CLIP-8), so distance scaling without the gate is not merely weaker than APR but useless from this initialization. Only the gated, distance-scaled update turns a small replay buffer into multi-task ability with no merge to build on.
 
 \paragraph{Composition: refining from a merge.}
-From merge initializations the refinement is a complement to merging rather than a replacement. At the $16{+}16$ budget it improves every initialization on all three encoder benchmarks, and APR is the strongest of the three arms in every row on GLUE-8 and CLIP-20; on CLIP-8 it leads four of the five merge rows (ordinary descent edges it from Breadcrumbs, $0.513$ vs.\ $0.485$). Refinement also makes the outcome far less sensitive to which merge it was handed: on CLIP-20 the unrefined merges span $0.495$--$0.619$ while the $+$APR rows span $0.661$--$0.676$, and on GLUE-8 a spread of $0.029$--$0.320$ closes to $0.543$--$0.608$. At the halved budget of Table~\ref{tab:main8} the ordering is less uniform---an unconstrained arm edges APR in a few rows (TIES and Breadcrumbs on CLIP-8, task arithmetic and Breadcrumbs on GLUE-8)---but the unconstrained arms now carry a tail risk the anchored update never exhibits: from DARE-TIES on CLIP-8, descent collapses to $-1.27$ mean retention ($-4.87$ worst-task) and the ungated update to $-0.58$, while APR improves the same initialization to $0.498$. On the decoder track, composition is substantially stronger than cold start ($0.41$--$0.50$ against $0.37$), and what refinement adds to a merge there is worst-task repair rather than mean accuracy: from every launch point the weakest task (instruction following) rises---task arithmetic $0.333\to0.350$, DARE-TIES $0.350\to0.367$, TIES $0.357\to0.377$, AdaMerging $0.357\to0.373$, Breadcrumbs $0.253\to0.303$---while the mean moves by at most $0.005$ (DARE-TIES, $0.490\to0.495$) and is flat or nominally lower from task arithmetic ($0.470\to0.470$), AdaMerging ($0.496\to0.495$), and Breadcrumbs ($0.417\to0.412$). All five decoder composition cells select short horizons ($S\le2$, except $S=5$ from task arithmetic); the mean changes are within the resolution of $300$-item generation evaluations, and the worst-task repair is the consistent signal.
+From merge initializations the refinement is a complement to merging rather than a replacement. At the $16{+}16$ budget it improves every initialization on all three encoder benchmarks, and APR is the strongest of the three arms in every row on GLUE-8 and CLIP-20; on CLIP-8 it leads four of the five merge rows (ordinary descent edges it from Breadcrumbs, $0.513$ vs.\ $0.485$). Refinement also makes the outcome far less sensitive to which merge it was handed: on CLIP-20 the unrefined merges span $0.495$--$0.619$ while the $+$APR rows span $0.661$--$0.676$, and on GLUE-8 a spread of $0.029$--$0.320$ closes to $0.543$--$0.608$. At the halved budget of Table~\ref{tab:main8} the ordering is less uniform---an unconstrained arm edges APR in a few rows (TIES and Breadcrumbs on CLIP-8, task arithmetic and Breadcrumbs on GLUE-8)---but the unconstrained arms now carry a tail risk the anchored update never exhibits: from DARE-TIES on CLIP-8, descent collapses to $-1.27$ mean retention ($-4.87$ worst-task) and the ungated update to $-0.58$, while APR improves the same initialization to $0.498$.
 
 \paragraph{Further baselines: DOGE/APGD, RegMean, and transductive AdaMerging.}
 The added DOGE/APGD row is the closest checkpoint-only optimization comparison and uses neither replay buffer to construct its checkpoint: $n$ affects only held-out selection of $\eta$. Both budgets select the same interior scale on every benchmark, so their evaluated checkpoints and scores coincide. Under this strict selection rule DOGE/APGD is not competitive here: mean retention is $0.016$ on GLUE-8 and $0.138$ on CLIP-8 (worst-task retention $-1.93$), while mean accuracy is $0.516$ on CLIP-20. We report the selected cells rather than substituting the published fixed scale after seeing evaluation results: on CLIP-8, for example, held-out loss selects $\eta=0.09$ even though the resulting aggregate is weak. This makes visible a practical mismatch between tiny-buffer cross-entropy selection and the final multi-task aggregate rather than tuning the baseline on test accuracy.
@@ -582,7 +592,7 @@ RegMean                               & $386$  & $0.675$ & $0.743\ (-0.059)$ \\
 \fi
 
 \paragraph{Summary.}
-Five claims survive the campaign at $n\le16$: (i)~the refinement is broadly compositional, improving most initializations---on MergeBench chiefly in the worst task---while the small-buffer Breadcrumbs rows delimit any universal improvement claim; (ii)~the anchored, distance-scaled, clipped step is the load-bearing ingredient, the gate contributing worst-task repair, small-budget stability, and held-out retention rather than mean accuracy; (iii)~in the dedicated safety audit, anchored runs avoid the overfitting signature that appears in a quarter of unconstrained descent's small-buffer configurations, although selected composition rows can still decline; (iv)~eight labels per task suffice to beat the tuned task-arithmetic merge starting from the pretrained model alone; and (v)~on held-out tasks never merged or refined, the anchored update dominates both unconstrained controls on accuracy and retention at once and retains more than every checkpoint-only merge, though where interference is mild the strongest label-free merge retains more still (Table~\ref{tab:heldout8}).
+Five claims survive the campaign at $n\le16$: (i)~the refinement is broadly compositional, improving most initializations, while the small-buffer Breadcrumbs rows delimit any universal improvement claim; (ii)~the anchored, distance-scaled, clipped step is the load-bearing ingredient, the gate contributing worst-task repair, small-budget stability, and held-out retention rather than mean accuracy; (iii)~in the dedicated safety audit, anchored runs avoid the overfitting signature that appears in a quarter of unconstrained descent's small-buffer configurations, although selected composition rows can still decline; (iv)~eight labels per task suffice to beat the tuned task-arithmetic merge starting from the pretrained model alone; and (v)~on held-out tasks never merged or refined, the anchored update dominates both unconstrained controls on accuracy and retention at once and retains more than every checkpoint-only merge, though where interference is mild the strongest label-free merge retains more still (Table~\ref{tab:heldout8}).
 
 \section{Discussion}
 \label{sec:contribution}
@@ -1052,11 +1062,10 @@ Because the clip is applied \emph{after} the learning-rate scaling, the per-coor
 This appendix expands the protocol of Section~\ref{sec:protocol}: benchmark positioning, secondary tracks, replay sampling, and the full baseline roster.
 
 \paragraph{Benchmark settings.}
-The multi-head GLUE-8 benchmark (CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE, excluding WNLI as is common) \citep{wang2018glue} uses RoBERTa-base as the encoder backbone \citep{liu2019roberta}: the shared encoder is merged and evaluated with each task's own trained head. This multi-head setup is convenient and common, but it assumes oracle task identity at evaluation time and should not be the only evidence for the method. The recent merging literature evaluates on three benchmark families---CLIP/ViT vision task-vector suites, GLUE and text-to-text NLP, and decoder-only LLM merging, the last standardized by MergeBench with released full-parameter Llama/Gemma experts \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench,wang2019superglue,yu2023dare,he2025mergebench}---and we position the proposal against all three.
+The multi-head GLUE-8 benchmark (CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE, excluding WNLI as is common) \citep{wang2018glue} uses RoBERTa-base as the encoder backbone \citep{liu2019roberta}: the shared encoder is merged and evaluated with each task's own trained head. This multi-head setup is convenient and common, but it assumes oracle task identity at evaluation time and should not be the only evidence for the method. The recent merging literature evaluates on three benchmark families---CLIP/ViT vision task-vector suites, GLUE and text-to-text NLP, and decoder-only LLM merging, the last standardized by MergeBench with released full-parameter Llama/Gemma experts \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench,wang2019superglue,yu2023dare,he2025mergebench}---and we position the proposal against the first two; the decoder-only family is deferred until the variance of its generation-based evaluations is tightly controlled.
 
 \paragraph{Secondary benchmark settings.}
-Two secondary tracks address the limitations of multi-head GLUE. A CLIP/ViT vision track evaluates the standard task-vector image-classification suite---SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB, MNIST, DTD---testing a different modality, different loss geometry, and stronger domain shifts \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}, together with its twenty-task extension \citep{wang2024tall} (adding CIFAR-10/100, STL10, Flowers102, Oxford Pets, PCAM, FER2013, EMNIST, Food101, FashionMNIST, KMNIST, RenderedSST2), which probes the regime in which merging degrades most: with twenty task vectors competing for the same encoder weights, cross-task conflicts dominate and each vector must be down-weighted heavily to coexist (results in Section~\ref{sec:clip20}). A decoder-only LLM track adopts the MergeBench setting \citep{he2025mergebench}, whose published full-parameter domain experts share a common pretrained checkpoint, so task vectors and merge-to-expert directions are well defined and no expert training is required on our side. We work at a full-fine-tuning-feasible scale (Llama-3.2-3B) with the mathematics, coding, instruction-following, and multilingual experts, merging the full model including the LM head; evaluation uses judge-free automatic metrics and subsampled evaluation sets, since generation-based scoring is the dominant cost. This track removes the oracle-task-identity assumption of multi-head GLUE at a scale and modality the vision suites do not reach.
-
+Two secondary tracks address the limitations of multi-head GLUE. A CLIP/ViT vision track evaluates the standard task-vector image-classification suite---SUN397, Cars, RESISC45, EuroSAT, SVHN, GTSRB, MNIST, DTD---testing a different modality, different loss geometry, and stronger domain shifts \citep{radford2021clip,ilharco2022taskarithmetic,tang2024fusionbench}, together with its twenty-task extension \citep{wang2024tall} (adding CIFAR-10/100, STL10, Flowers102, Oxford Pets, PCAM, FER2013, EMNIST, Food101, FashionMNIST, KMNIST, RenderedSST2), which probes the regime in which merging degrades most: with twenty task vectors competing for the same encoder weights, cross-task conflicts dominate and each vector must be down-weighted heavily to coexist (results in Section~\ref{sec:clip20}).
 \paragraph{Replay data.}
 For refinement, we use $n \in \{8,16\}$ replay examples per task in the main grids (the twenty-task budget study extends to $n=32$; Appendix~\ref{app:clip20}), sampled from training data or from a held-out split separated from the final validation split, and class-balanced whenever possible. Sensitivity to the replay-budget size and to the buffer draw is reported for each track, rather than only the best tuned replay size.
 
@@ -1068,15 +1077,14 @@ For DOGE/APGD we port the authors' released \texttt{DOGE\_TA} implementation: tw
 \section{Per-Task Results at the 8+8 Budget}
 \label{app:n8-pertask}
 
-Tables~\ref{tab:glue8-n8-pertask}--\ref{tab:mergebench-n8-pertask}
-give the task-level scores underlying the GLUE-8, CLIP-8, and MergeBench
+Tables~\ref{tab:glue8-n8-pertask} and~\ref{tab:clip8-n8-pertask}
+give the task-level scores underlying the GLUE-8 and CLIP-8
 columns of Table~\ref{tab:main8}. Each row is the cell selected using the
 disjoint eight-example selection buffer; the evaluation scores below did not
 participate in selection. For GLUE-8, ``score'' denotes the benchmark metric
 used in the aggregate: Matthews correlation for CoLA, correlation for STS-B,
 and accuracy or accuracy/F1 for the remaining tasks. CLIP-8 reports top-1
-accuracy, and MergeBench reports the judge-free automatic task scores described
-in Section~\ref{sec:protocol}.
+accuracy.
 
 \begin{table}[p]
 \centering
@@ -1170,6 +1178,11 @@ AdaMerging & alone & $0.627$ & $0.652$ & $0.661$ & $0.849$ & $0.834$ & $0.760$ &
 \end{tabular}
 \end{table}
 
+% ---------------------------------------------------------------------------
+% RETIRED with the MergeBench track (see the note above the Settings
+% paragraph). Restore by deleting the \iffalse ... \fi wrapper.
+% ---------------------------------------------------------------------------
+\iffalse
 \begin{table}[p]
 \centering
 \scriptsize
@@ -1203,6 +1216,7 @@ AdaMerging & alone & $0.680$ & $0.457$ & $0.357$ & $0.491$ & $0.496$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+\fi
 
 
 % ===========================================================================
@@ -1657,7 +1671,7 @@ AdaMerging (\,$0.665\ (0.101)$\,)   & $+$\,APR & $0.683\ (0.207)$ & $0.688\ (0.2
 Four claims survive the campaign, each with its evidence. (i)~\emph{The anchored refinement improves every initialization it is given}, including the pretrained model itself, with the gain shrinking as the initialization improves but never vanishing (Table~\ref{tab:clip20nbudget}, and the CLIP-20 column of Table~\ref{tab:main16}). (ii)~\emph{The load-bearing ingredient is the anchored, distance-scaled, clipped step, not the attribution gate}: the gate is neutral on mean accuracy at this scale, and its thresholded variants cannot help, because the gradient's coordinate-level selection carries no transferable structure (the held-out audit above). (iii)~\emph{Safety is the method's clearest practical advantage}: across every learning rate, horizon, and budget tested, no anchored-refinement run fell below its initialization or the zero-shot floor, and none showed the overfitting signature, while unconstrained descent deteriorates on a quarter of its small-buffer cells. (iv)~\emph{The method works in the small-data regime}: eight labeled examples per task suffice to beat the tuned task-arithmetic merge from the pretrained model alone, by $+0.053\pm0.006$ over ordinary descent across five buffer draws, with the budget's cost concentrated in worst-task accuracy.
 
 \paragraph{Limitations.}
-Four gaps remain. The budget grid of Table~\ref{tab:clip20nbudget} is single-seed, with five-seed replication only at its from-pretrained $n=8$ cell, and the cells of Table~\ref{tab:main16} are single-draw throughout, as are the held-out retention study of Table~\ref{tab:heldout8} and the drift probe of Table~\ref{tab:drift}. On the twenty-task suite, the coefficient grid offered to split selection for task arithmetic ends at $\lambda=0.2$, above that benchmark's optimum, so the selected merge is a boundary pick that lands below the zero-shot floor, and the from-task-arithmetic refinement rows of Table~\ref{tab:main16} inherit that starting point; a selection grid extended below $\lambda=0.2$ would need those cells re-run. The predicted functional-anchor fix for the RegMean initialization is untested. On MergeBench, the five checkpoint-only/label-free baselines and the APR composition rows are included, but the ungated and ordinary-GD composition arms are absent; the decoder track therefore supports composition but not the gate-versus-anchor decomposition away from the pretrained initialization. Its composition gains are also small in the mean everywhere (at most $+0.005$) and concentrated in the worst task; task arithmetic, AdaMerging, and Breadcrumbs are mean-neutral ($0.000$, $-0.001$, and $-0.005$). The held-out retention study is single-seed, at one budget, on one split, and that split is a comparatively low-interference regime---eight training tasks, where merging has less to repair and the strongest label-free merge is correspondingly hard to beat; whether the ordering against AdaMerging changes as interference grows is untested here. RegMean's retention is likewise budget-dependent: worst in the table at an eight-input Gram budget, it behaves quite differently at larger ones. A further limitation is one of scope rather than execution: the results reported here are confined to budgets of at most $32$ labeled examples per task, so we make no claim about how the ordering between the anchored and unconstrained families behaves when labeled data is plentiful.
+Four gaps remain. The budget grid of Table~\ref{tab:clip20nbudget} is single-seed, with five-seed replication only at its from-pretrained $n=8$ cell, and the cells of Table~\ref{tab:main16} are single-draw throughout, as are the held-out retention study of Table~\ref{tab:heldout8} and the drift probe of Table~\ref{tab:drift}. On the twenty-task suite, the coefficient grid offered to split selection for task arithmetic ends at $\lambda=0.2$, above that benchmark's optimum, so the selected merge is a boundary pick that lands below the zero-shot floor, and the from-task-arithmetic refinement rows of Table~\ref{tab:main16} inherit that starting point; a selection grid extended below $\lambda=0.2$ would need those cells re-run. The predicted functional-anchor fix for the RegMean initialization is untested. The held-out retention study is single-seed, at one budget, on one split, and that split is a comparatively low-interference regime---eight training tasks, where merging has less to repair and the strongest label-free merge is correspondingly hard to beat; whether the ordering against AdaMerging changes as interference grows is untested here. RegMean's retention is likewise budget-dependent: worst in the table at an eight-input Gram budget, it behaves quite differently at larger ones. A further limitation is one of scope rather than execution: the results reported here are confined to budgets of at most $32$ labeled examples per task, so we make no claim about how the ordering between the anchored and unconstrained families behaves when labeled data is plentiful.
 
 
 \end{document}
