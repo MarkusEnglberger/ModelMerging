@@ -239,6 +239,34 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 # merge candidates (scored on the FULL budget)
 # ---------------------------------------------------------------------------
 
+def merge_boundaries(best, args):
+    """Which selected merge hyperparameters sit on their grid's edge."""
+    import re
+    out = {}
+    def edge(val, grid, tag):
+        g = sorted(grid)
+        return ([f"{tag}_low"] if len(g) > 1 and val == g[0] else []) + \
+               ([f"{tag}_high"] if len(g) > 1 and val == g[-1] else [])
+    for fam, (_, nm, _) in best.items():
+        nums = {k: float(v) for k, v in re.findall(r"([a-z]+)([0-9.]+)", nm.split("@")[1])}
+        e = []
+        if fam == "TA":
+            e += ["low" if nums["l"] == min(args.ta_lams) and len(args.ta_lams) > 1 else None,
+                  "high" if nums["l"] == max(args.ta_lams) and len(args.ta_lams) > 1 else None]
+            e = [x for x in e if x]
+        elif fam == "TIES":
+            e += edge(nums["d"], args.ties_densities, "density") + edge(nums["l"], args.ties_lams, "lam")
+        elif fam == "DARETIES":
+            e += edge(nums["dd"], args.dt_drops, "drop") + edge(nums["t"], args.dt_trims, "trim") + \
+                 edge(nums["l"], args.dt_lams, "lam")
+        elif fam == "BC":
+            e += edge(nums["d"], args.bc_densities, "density") + edge(nums["o"], args.bc_outliers, "outlier") + \
+                 edge(nums["l"], args.bc_lams, "lam")
+        if e:
+            out[fam] = e
+    return out
+
+
 def merge_candidates(ctx, args):
     """(name, state) for every checkpoint-only candidate the grids offer."""
     out = []
@@ -366,18 +394,34 @@ def main():
         if not args.skip_merges:
             set_score_buffer(ctx, budget_bufs)
             ref = replay_losses(ctx, ctx.base_encoder, buffer_key="cv_buffer")
-            best = {}
-            for nm, state in merge_candidates(ctx, args):
-                agg, _ = scored(ctx, state, ref)
-                fam = nm.split("@")[0]
-                if fam not in best or agg < best[fam][0]:
-                    best[fam] = (agg, nm, state)
-                _log(f"[{tag}][merge] {nm:32s} obj={agg:.4f}")
+            best, boundary = {}, {}
+            for attempt in range(args.max_extensions + 1):
+                for nm, state in merge_candidates(ctx, args):
+                    agg, _ = scored(ctx, state, ref)
+                    fam = nm.split("@")[0]
+                    if fam not in best or agg < best[fam][0]:
+                        best[fam] = (agg, nm, state)
+                    _log(f"[{tag}][merge] {nm:32s} obj={agg:.4f}")
+                # interiority for the merge grids. Task arithmetic's lambda is
+                # 1-D and cheap, so it is auto-extended like eta; the other
+                # families' edges are recorded so the caption can say so.
+                boundary = merge_boundaries(best, args)
+                ta_edge = boundary.get("TA")
+                if not ta_edge or attempt == args.max_extensions:
+                    break
+                lams = sorted(args.ta_lams)
+                if "low" in ta_edge:
+                    args.ta_lams = [lams[0] / 2] + lams
+                if "high" in ta_edge:
+                    args.ta_lams = lams + [lams[-1] * 1.5]
+                _log(f"[{tag}][merge] TA lambda on grid edge {ta_edge}; "
+                     f"extending to {sorted(args.ta_lams)}")
             for fam, (agg, nm, state) in best.items():
                 scores, nr, ag = eval_and_record(ctx, state)
                 entry["methods"][f"merge:{fam}"] = {
                     "selected": nm, "selection_obj": agg, "scores": scores,
                     "normret": nr, "aggregate": ag,
+                    "grid_boundary": boundary.get(fam, []),
                     "tier": "checkpoint-only construction"}
                 _log(f"[{tag}][merge] WINNER {nm}: "
                      f"mean_nr={ag['mean_normret']:.4f} mean_acc={ag['mean_acc']:.4f}")
