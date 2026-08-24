@@ -215,7 +215,13 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         if "lr_high" in edges:
             lrs = extend_lrs(lrs, "high")
         if "S_high" in edges:
+            # a longer horizon changes max_S for EVERY lr: the existing
+            # trajectories stop short of it, so they must all be re-run and
+            # the per-cell objectives rebuilt (they are deterministic, so the
+            # old cells are reproduced exactly alongside the new S).
             steps = sorted(steps) + [max(steps) * 2]
+            tried.clear()
+            cells.clear()
 
     # ---- refit on the FULL budget at the selected cell ----
     set_construction_buffer(ctx, budget_bufs)
