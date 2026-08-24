@@ -8,10 +8,10 @@ WHAT THIS FIXES relative to scripts/merge_baselines.py's n+n split protocol.
    which under-resourced their selection. Here:
      * merges (checkpoint-only and unlabeled construction) score every candidate
        on all B examples;
-     * labeled methods (APR, GD, ungated) choose (eta, S) by K-fold CV WITHIN B
-       -- construct on K-1 folds, score on the held-out fold, rotate -- and are
-       then REFIT ONCE on all B at the selected cell. That refit model is what
-       gets evaluated.
+     * labeled methods (APR, GD, ungated) split B in two: construct on one half,
+       choose (eta, S) on the other, and are then REFIT ONCE on all B at the
+       selected cell. That refit model is what gets evaluated. (--rotate turns
+       the split into full K-fold CV at K times the cost; off by default.)
    Select-then-refit is the standard pattern (cf. sklearn GridSearchCV
    refit=True). Its known caveat applies: the hyperparameters are selected at
    construction size B(K-1)/K and applied at size B.
@@ -167,8 +167,10 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 
     for attempt in range(args.max_extensions + 1):
         max_S = max(steps)
+        # default: ONE 2-way split -- construct on all folds but the first,
+        # select on the first. --rotate turns this into full K-fold CV.
         for lr in lrs:
-            for k in range(K):
+            for k in (range(K) if args.rotate else [0]):
                 if (lr, k) in tried:
                     continue
                 tried.add((lr, k))
@@ -196,7 +198,8 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                     }
                 del states
 
-        mean_obj = {c: sum(v) / len(v) for c, v in cells.items() if len(v) == K}
+        n_needed = K if args.rotate else 1
+        mean_obj = {c: sum(v) / len(v) for c, v in cells.items() if len(v) == n_needed}
         (sel_lr, sel_S) = min(mean_obj, key=mean_obj.get)
         # S=0 reference on fold 0 for the interiority test
         set_score_buffer(ctx, {n: folds[n][0] for n in names})
@@ -273,7 +276,13 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--budget", type=int, required=True,
                     help="B: total labeled examples per task, for EVERY method")
-    ap.add_argument("--folds", type=int, default=4)
+    ap.add_argument("--folds", type=int, default=2,
+                    help="split the budget into this many parts; by default "
+                         "labeled arms construct on all but the first part and "
+                         "select on the first (a single 2-way split at K=2)")
+    ap.add_argument("--rotate", action="store_true",
+                    help="rotate the held-out part over all K folds (full "
+                         "K-fold CV, K times the cost); off by default")
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
@@ -323,9 +332,11 @@ def main():
 
     report = {
         "protocol": {
-            "name": "equal-budget k-fold select-then-refit",
+            "name": ("equal-budget k-fold select-then-refit" if args.rotate
+                     else "equal-budget split select-then-refit"),
             "budget_per_task": args.budget,
             "folds": args.folds,
+            "rotate": args.rotate,
             "draws": args.draws,
             "construction_per_fold": args.budget - args.budget // args.folds,
             "refit_on": args.budget,

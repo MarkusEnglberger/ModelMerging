@@ -27,7 +27,7 @@ source slurm/common.sh
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 : "${BUDGET:=32}"
-: "${FOLDS:=4}"
+: "${FOLDS:=2}"
 : "${DRAWS:=3}"
 : "${INIT:=pretrained}"
 
