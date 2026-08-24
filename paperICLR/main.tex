@@ -56,7 +56,7 @@ For each task, a first-order loss attribution selects coordinates where moving t
 \label{sec:intro}
 Merging fine-tuned variants of a shared pretrained model combines their skills in weight space, without retraining, ensembling, or routing. But merges degrade under task interference, and the data-free repairs---sparsification, sign election, learned coefficients---plateau well below the experts. In many practical settings a small \emph{labeled} replay buffer per task is available.
 
-We refine the merged model with replay gradients \emph{anchored to the task experts}: each coordinate's step is kept only where moving toward the expert locally reduces that task's replay loss (an attribution-patching sign), weighted by the coordinate's distance to the expert, and clipped so it can never overshoot---applied task-sequentially, from \emph{any} initialization, including the pretrained model itself. The update is provably non-expansive toward the experts' box hull at any learning rate (Proposition~\ref{prop:box-nonexpansive}).
+We refine the merged model with replay gradients \emph{anchored to the task experts}: each coordinate moves toward its expert only where a first-order attribution score predicts that the move reduces the task's replay loss, by an amount proportional to that predicted saving, and never past the expert---applied task-sequentially, from \emph{any} initialization, including the pretrained model itself. The update is provably non-expansive toward the experts' box hull at any learning rate (Proposition~\ref{prop:box-nonexpansive}).
 
 Our contributions are: (i)~a replay-refinement method with two equivalent derivations---expert-anchored gradient descent and parameter-space attribution patching---and a divergence-safety guarantee; (ii)~a uniform evaluation across three benchmark families (multi-head GLUE-8 and the eight- and twenty-task CLIP suites) where every hyperparameter is chosen on a small held-out selection buffer, with matched data budgets; (iii)~evidence that from the pretrained model---the setting with no merge to inherit---the anchored update is the only one of the three replay families that turns a $16$-example buffer into multi-task ability, while from merge initializations it usually improves performance; (iv)~a measurement of what the refinement costs the pretrained model on tasks never merged or refined, under a train/held-out split: the anchored update dominates both unconstrained controls on accuracy and retention simultaneously, and retains more than every checkpoint-only merge.
 
@@ -110,7 +110,7 @@ The update moves each coordinate that passes the gate a capped fraction of its r
     \end{cases}
     \label{eq:clipped-update}
 \end{equation}
-the model is updated immediately, $\theta^{(s,k)}=\theta^{(s,k-1)}+u_i^{(s,k)}$, with $\theta^{(s+1)}=\theta^{(s,T)}$ after all $T$ tasks in the sweep have been processed. Equation~\eqref{eq:clipped-update} is the weight--gate--clip step of the previous paragraph written in one line: on gated coordinates the sign condition makes $-g_{i,r}^{(s,k)}$ and $v_{i,r}^{(s,k)}$ agree, so the distance-weighted descent step $-\eta\,g_{i,r}^{(s,k)}|v_{i,r}^{(s,k)}|$ equals $\eta\,|g_{i,r}^{(s,k)}|\,v_{i,r}^{(s,k)}$, and the expert-distance cap limits the step fraction to one. The gate condition $g_{i,r}^{(s,k)}v_{i,r}^{(s,k)}<0$ keeps only the coordinates whose replay step also moves the current model toward expert $i$, and is exactly the attribution-patching sign that Section~\ref{sec:ap-view} derives in Equation~\eqref{eq:ap-gate}: the two perspectives agree coordinate by coordinate.
+the model is updated immediately, $\theta^{(s,k)}=\theta^{(s,k-1)}+u_i^{(s,k)}$, with $\theta^{(s+1)}=\theta^{(s,T)}$ after all $T$ tasks in the sweep have been processed. Equation~\eqref{eq:clipped-update} is the weight--gate--clip step of the previous paragraph written in one line: on gated coordinates the sign condition makes $-g_{i,r}^{(s,k)}$ and $v_{i,r}^{(s,k)}$ agree, so the distance-weighted descent step $-\eta\,g_{i,r}^{(s,k)}|v_{i,r}^{(s,k)}|$ equals $\eta\,|g_{i,r}^{(s,k)}|\,v_{i,r}^{(s,k)}$, and the expert-distance cap limits the step fraction to one. The gate condition $g_{i,r}^{(s,k)}v_{i,r}^{(s,k)}<0$ keeps only the coordinates whose replay step also moves the current model toward expert $i$, and is exactly the sign of the attribution-patching score of Section~\ref{sec:ap-view} (Equation~\eqref{eq:ap-score}): the two perspectives agree coordinate by coordinate.
 
 Because the step fraction $\min(\eta\,|g_{i,r}^{(s,k)}|,1)$ never exceeds one, per-coordinate movement is bounded by $|v_{i,r}^{(s,k)}|$ for any $\eta$: the learning rate controls how many coordinates reach the cap, never the maximum step. Optionally, $u_i^{(s,k)}$ is RMS-normalized tensor-wise. Algorithm~\ref{alg:expert-gated-refinement} summarizes the procedure.
 
@@ -158,14 +158,24 @@ Every gated, clipped step moves each coordinate between its current value and th
 
 \subsection{A Second Perspective: Attribution Patching in Parameter Space}
 \label{sec:ap-view}
-The same per-coordinate update arises from an interpretability-style argument that treats each move toward a task expert as a parameter-space intervention. Let $\vartheta$ denote the current encoder, $v_i(\vartheta)=\theta_i-\vartheta$ the merge-to-expert direction, and $g_i(\vartheta)$ the task gradient under task $i$'s head. The first-order attribution-patching estimate of the loss change from moving $\vartheta$ toward expert $i$ is $\Delta_i^{\mathrm{AP}}(\vartheta)=\langle g_i(\vartheta),v_i(\vartheta)\rangle$, whose coordinate-wise contribution $g_{i,r}v_{i,r}$ is negative exactly when moving coordinate $r$ toward the expert is locally predicted to reduce task $i$'s loss. The loss-decreasing expert gate is therefore
+In mechanistic interpretability, activation patching measures the effect of an intervention---replacing one internal quantity by its value from a reference run---by executing that intervention; attribution patching replaces the execution with a first-order estimate, the inner product of the local loss gradient with the proposed change, so that a single forward--backward pass scores every candidate patch at once \citep{syed2024attributionpatching,kramar2024atpstar}.
+
+The update of Section~\ref{sec:replay-refinement} is this construction transported to parameter space. Let $\vartheta$ be the current encoder, $v_i(\vartheta)=\theta_i-\vartheta$, and $g_i(\vartheta)$ the replay gradient under task $i$'s head, and take as candidate interventions the $d$ single-coordinate patches that set $\vartheta_r$ to the expert value $\theta_{i,r}$. Executing them would cost $d$ evaluations of task $i$'s replay loss; attribution patching instead scores patch $r$ by the $r$-th term of the directional derivative $\langle g_i(\vartheta),v_i(\vartheta)\rangle$,
 \begin{equation}
-    m_{i,r}(\vartheta)
+    a_{i,r}(\vartheta)
     =
-    \ind\!\left\{ g_{i,r}(\vartheta)\,v_{i,r}(\vartheta) < 0 \right\}.
-    \label{eq:ap-gate}
+    g_{i,r}(\vartheta)\,v_{i,r}(\vartheta),
+    \label{eq:ap-score}
 \end{equation}
-The masked, distance-scaled step $-g_{i,r}|v_{i,r}|\,m_{i,r}$, scaled by $\eta$ and capped at the expert distance, recovers exactly the update of Equation~\eqref{eq:clipped-update}: whenever the gate is on, $-g_{i,r}$ and $v_{i,r}$ share a sign, so the update points toward the expert, with a step that shrinks as the coordinate approaches it. The gate certifies only a local first-order effect for task $i$; cross-task interference must be measured experimentally. After this reading, we abbreviate the update as \emph{APR} (attribution-patching-guided replay) throughout the experiments.
+so one backward pass on the replay buffer prices all $d$ candidates; the score is negative exactly when patching coordinate $r$ toward the expert is predicted to reduce task $i$'s loss.
+
+The score determines every ingredient of Equation~\eqref{eq:clipped-update}, not only its gate: on gated coordinates the applied step satisfies
+\[
+    |u_{i,r}^{(s,k)}|
+    =
+    \min\!\bigl(\eta\,\lvert a_{i,r}(\vartheta)\rvert,\;\lvert v_{i,r}(\vartheta)\rvert\bigr),
+\]
+so the update is a \emph{partial patch}: it moves exactly the coordinates whose predicted effect is a loss reduction ($a_{i,r}<0$), each by an amount proportional to its predicted saving $|a_{i,r}|$, and never past the full patch---beyond the expert value, the score no longer describes the intervention it priced, which is the attribution-patching reading of the expert-distance cap. The score certifies only a local first-order effect for task $i$; cross-task interference must be measured experimentally. After this reading, we abbreviate the update as \emph{APR} (attribution-patching-guided replay) throughout the experiments.
 
 \section{Experimental Setup}
 \label{sec:protocol}
