@@ -195,7 +195,7 @@ We evaluate on three benchmark families. \emph{Multi-head} GLUE-8 (CoLA, SST-2, 
 
 
 \paragraph{Baselines.}
-Baselines are grouped by the data they consume, mirroring Section~\ref{sec:related}: \emph{checkpoint-only} (task arithmetic, TIES, DARE-TIES, Breadcrumbs, DOGE/APGD); \emph{data-dependent but label-free} (AdaMerging, RegMean); and \emph{labeled}, the regime APR itself occupies. The labeled tier contains two kinds of comparison. The first are APR's ablations---ordinary replay GD from the same initialization (no anchor, no gate) and the ungated distance-scaled update (anchor without gate)---which attribute its behavior to its ingredients; all three arms consume identical data (the same replay examples, the same selection buffer, the same hyperparameter search budget) and appear in every grid. Replay GD is simultaneously the rehearsal baseline of the continual-learning literature---fine-tuning on the stored buffer with nothing tying the model to the experts---with optimizer and schedule matched to APR's so that differences are attributable to the anchor and the gate rather than to optimizer choices. The second kind are alternative ways to spend the same labels---per-task coefficient tuning, loss-weighted merging, Fisher merging with a replay-estimated Fisher, Localize-and-Stitch with masks learned on the buffer, and head-only recalibration (Appendix~\ref{app:protocol})---re-run under the same split-selection protocol at the $16{+}16$ budget and reported in the labeled-alternatives block of Table~\ref{tab:main16}. No arm fine-tunes the heads: the CLIP suites keep their frozen zero-shot heads and multi-head GLUE its per-task trained heads, following the benchmarks' convention; head-only recalibration is the deliberate exception that spends the labels on the head alone. Sanity controls (the inverted and density-matched random gates) complete the roster. Each merge baseline's own hyperparameters (coefficient, density, sparsity, or global APGD scale) are likewise selected on the selection buffer.
+Under split selection every method, in every tier, chooses its hyperparameters on the same labeled selection buffer, so the tiers are defined by what data \emph{constructs} the candidates being chosen among, mirroring Section~\ref{sec:related}: \emph{checkpoint-only construction} (task arithmetic, TIES, DARE-TIES, Breadcrumbs, DOGE/APGD), whose candidates are built from the checkpoints alone, so the labels influence nothing beyond the choice among a handful of them; \emph{unlabeled construction} (AdaMerging, RegMean), whose candidates are fitted on the same $n$ unlabeled inputs per task that APR sees labeled; and \emph{labeled construction}, the tier APR itself occupies, in which the replay buffer's labels enter the construction of the model. The labeled tier contains two kinds of comparison. The first are APR's ablations---ordinary replay GD from the same initialization (no anchor, no gate) and the ungated distance-scaled update (anchor without gate)---which attribute its behavior to its ingredients; all three arms consume identical data (the same replay examples, the same selection buffer, the same hyperparameter search budget) and appear in every grid. Replay GD is simultaneously the rehearsal baseline of the continual-learning literature---fine-tuning on the stored buffer with nothing tying the model to the experts---with optimizer and schedule matched to APR's so that differences are attributable to the anchor and the gate rather than to optimizer choices. The second kind are alternative ways to spend the same labels---per-task coefficient tuning, loss-weighted merging, Fisher merging with a replay-estimated Fisher, Localize-and-Stitch with masks learned on the buffer, and head-only recalibration (Appendix~\ref{app:protocol})---re-run under the same split-selection protocol at the $16{+}16$ budget and reported in the labeled-alternatives block of Table~\ref{tab:main16}. No arm fine-tunes the heads: the CLIP suites keep their frozen zero-shot heads and multi-head GLUE its per-task trained heads, following the benchmarks' convention; head-only recalibration is the deliberate exception that spends the labels on the head alone. Sanity controls (the inverted and density-matched random gates) complete the roster. Each merge baseline's own hyperparameters (coefficient, density, sparsity, or global APGD scale) are likewise selected on the selection buffer.
 
 \paragraph{Metrics.}
 Tasks are scored by their standard validation metrics: top-1 accuracy on the CLIP suites and the conventional per-task GLUE metrics (enumerated in Appendix~\ref{app:protocol}). These are not commensurable across tasks---a Matthews correlation and an accuracy do not average meaningfully---so the primary aggregate throughout is normalized retention,
@@ -315,14 +315,18 @@ AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & $0.597\ 
                 & $+$ungated & $0.538\ ({-}.36)$ & $0.557^{\dagger}\ ({-}.04)$ & $0.649\ (.16)$ \\
                 & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.638}^{\dagger}\ ({+}.32)$ & $0.665\ (.20)$ \\
 \midrule
-% TODO(authors): the labeled-alternatives block is partial -- coefficient
-% tuning, loss weighting, and head-only recalibration are still to be run
-% under split selection (extend scripts/labeled_baselines_n16.py --baselines
-% and fill from grid_nn_{glue8,clip8,clip20}_labeled_n16.json). Replay
-% fine-tuning is NOT a separate row: the GD ablation is that baseline.
+% TODO(authors): the labeled-alternatives block is partial -- per-task
+% coefficients, loss weighting, and head-only recalibration are still to be
+% run under split selection (extend scripts/labeled_baselines_n16.py
+% --baselines and fill from grid_nn_{glue8,clip8,clip20}_labeled_n16.json).
+% Replay fine-tuning is NOT a separate row (the GD ablation is that baseline),
+% and neither is GLOBAL coefficient tuning: under split selection it coincides
+% with the task-arithmetic row, whose lambda is already selected on the
+% buffer. The row here is per-task lambda_i by coordinate descent on the
+% replay buffer.
 Labeled alt.    & Fisher (replay)   & $-0.053\ ({-}2.84)$ & $0.069\ ({-}.49)$ & $0.585\ (.11)$ \\
                 & L\&S (learned)    & $0.230\ ({-}.47)$ & $0.295\ ({-}.15)$ & $0.600\ (.14)$ \\
-                & coefficient tuning & --- & --- & --- \\
+                & per-task coefficients & --- & --- & --- \\
                 & loss weighting     & --- & --- & --- \\
                 & head-only recalibration & --- & --- & --- \\
 \bottomrule
