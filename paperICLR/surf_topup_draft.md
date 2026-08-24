@@ -1,91 +1,79 @@
-# SURF Small Compute application (NWO) — Snellius GPU
+SURF Small Compute application (NWO) — Snellius GPU
+====================================================
 
-Form: servicedesk.surf.nl → "Small Compute applications (NWO)". New project (the current
-work runs on the remaining budget of another project, EINF-16966, which is nearly
-exhausted). Items in [brackets] need your input.
+Form: servicedesk.surf.nl -> "Small Compute applications (NWO)". New project. Plain text
+only. Items in [brackets] need your input.
 
-**Requested:** 500,000 SBU on Snellius GPU nodes (`gpu_h100`, `gpu_a100`), 1 year,
-2 TB project space, default support.
+Requested: 800,000 SBU on Snellius GPU nodes (gpu_h100 / gpu_a100), 1 year, default
+storage and support.
 
----
 
-## Applicant
-
+APPLICANT
+---------
 Markus Englberger, Eindhoven University of Technology, [department/group].
-[Temporary appointment → digital signature by supervisor with permanent appointment:
-name, e-mail.] Project title: *Expert-anchored gradient descent for model merging with
-small labeled replay buffers*.
+[Temporary appointment -> digital signature by supervisor with permanent appointment:
+name, e-mail.]
+Project title: Expert-anchored gradient descent for model merging with small labeled
+replay buffers.
 
-## Scientific purpose
 
+SCIENTIFIC PURPOSE
+------------------
 Model merging combines several fine-tuned experts of one pretrained model into a single
-model by weight-space arithmetic, but merges degrade under task interference. We study
-the setting where a small labeled replay buffer (8–16 examples per task) is available and
-propose expert-anchored gradient descent: a replay refinement whose per-task updates are
-gated by a first-order loss attribution, scaled by the distance to the expert and clipped
-to a trust region (provably non-expansive toward the experts' box hull). The method is
-evaluated on GLUE-8 (RoBERTa), two CLIP/ViT suites and a decoder-only LLM track following
-MergeBench (Llama-3.2-3B with published math, coding, instruction-following and
-multilingual experts).
+model by merging, but merges degrade under task interference. We propose
+a method that repairs a merged model using only 8-16 labeled examples per task: a few
+gradient steps that move the merged model toward each expert, but only in the parameters
+that a first-order attribution identifies as responsible for that task's loss, and never
+beyond the expert itself. The method has been validated on encoder benchmarks (GLUE-8 with
+RoBERTa, two CLIP/ViT suites).
 
-The compute is needed for the LLM track, by far the most expensive part: evaluation is
-generation-based (GSM8K, MBPP, IFEval, multilingual MC), so every hyperparameter cell
-must be scored by decoding, and all hyperparameters are selected on a disjoint buffer.
-Concretely: (i) complete the MergeBench grid (ordinary-GD and ungated-ablation
-composition arms, DOGE/APGD and RegMean baselines — currently ~16 missing cells);
-(ii) replicate it over five replay-buffer seeds as done on the other benchmarks;
-(iii) score the selected cells on the full (non-subsampled) evaluation sets; (iv) add the
-held-out-task retention and pretraining-drift probes to the LLM track; (v) verify that
-the conclusions hold at the next model scale (MergeBench Llama-3.1-8B experts); and
-(vi) revision/rebuttal experiments.
+The requested compute is for the decoder-only LLM track of the study, following the
+MergeBench protocol with published full-parameter experts (math, coding,
+instruction-following, multilingual) at two model scales, Llama-3.2-3B and Llama-3.1-8B.
+For each scale we run the full grid of checkpoint-only and data-dependent merge baselines,
+the proposed refinement and its ablations from every initialization, hyperparameter
+selection on a disjoint buffer, replication over five replay-buffer seeds, and held-out
+retention and pretraining-drift probes. This is by far the most expensive part of the
+study because evaluation is generation-based.
 
-## SBU justification
 
-All jobs are single-GPU (¼ node). H100 = 192 SBU/GPU-h, A100 = 128 SBU/GPU-h. Per-run
-costs are measured on our current Snellius project: one 3B MergeBench grid run
-(learning-rate × sweep grid for one initialization, selection, evaluation of the
-selected cell) ≈ 5 H100-h; full-eval scoring of one 3B model ≈ 2 H100-h; an 8B grid run
-≈ 3× the 3B cost.
+SBU JUSTIFICATION
+-----------------
+All jobs are single-GPU. H100 = 192 SBU/GPU-hour, A100 = 128 SBU/GPU-hour. Costs are
+extrapolated from our pilot runs on Snellius: one 3B grid run (learning-rate x sweep grid
+for one initialization, selection, evaluation of the selected configuration) takes about
+5 H100-hours, one 8B grid run about 15 H100-hours.
 
-| Work package | Runs × GPU-h × SBU/h | SBU |
-|---|---|---|
-| Missing 3B MergeBench cells (two budgets) | 32 × 5 × 192 | 31,000 |
-| 5-seed replication, 3B (6 inits × 3 methods × 4 seeds) | 72 × 2 × 192 | 28,000 |
-| Full-evaluation-set scoring of selected 3B cells | 40 × 2 × 192 | 15,000 |
-| Held-out retention + drift probes, 3B | 40 × 1.5 × 192 | 12,000 |
-| 8B-scale check: pretrained + 5 merges × 3 methods, 1 budget, + 5-seed replication of the headline cells | 18 × 15 × 192 + 20 × 6 × 192 | 75,000 |
-| Re-bracketing of boundary selections (≈25 % of grids) and failed/timed-out jobs (≈15 %) | — | 40,000 |
-| Encoder-track revision experiments (extra seeds, extended coefficient grids), A100 | 150 × 3 × 128 | 58,000 |
-| Reserve for reviewer-requested experiments (≈ 100 grid runs) | 100 × 6 × 192 | 115,000 |
-| **Total** | | **≈ 375,000** |
+Each scale requires about 150 grid runs (baselines, refinement and ablations from 6
+initializations, 2 data budgets, 5 seeds, probes, re-runs of boundary selections).
 
-We request **500,000 SBU**: the itemized plan plus a ~30 % margin, because the
-generation-based evaluation cost varies with the selected sweep horizon and decoding
-length, and because only one small application per year is permitted.
+- LLM track, 3B: 150 x 5 h x 192 = 145,000 SBU
+- LLM track, 8B: 150 x 15 h x 192 = 430,000 SBU
+- Encoder-track revision experiments (A100): 250 x 3 h x 128 = 95,000 SBU
 
-## Memory
+Total about 670,000 SBU. We request 800,000 SBU, because the
+cost of generation-based evaluation varies with the selected sweep horizon and decoding
+length.
 
-Standard GPU nodes; ¼ H100 node (16 cores, 180 GB) per job. The 8B track keeps base,
-experts, task vectors and merge in bf16 in host memory (≈ 160 GB), still within a ¼–½
-node. No fat nodes.
 
-## Storage
+MEMORY
+------
+Standard GPU nodes: one GPU with 16 cores and up to 180 GB host memory per job.
 
-Inputs: public checkpoints (3B + 8B MergeBench experts ≈ 120 GB, encoder checkpoints
-≈ 30 GB) and datasets (< 20 GB); outputs are small JSON score files. Merged models are
-not stored. Request **2 TB project space** (no backup needed) for the checkpoint/dataset
-cache and the Python environment; home quota is too small and `/scratch-shared` is purged
-after 14 days.
 
-## Parallelisation and job duration
+STORAGE
+-------
+Default storage is sufficient: public checkpoints (about 150 GB) and datasets are cached
+on /scratch-shared.
 
-Single-GPU PyTorch jobs, run as SLURM arrays of 20–50 independent cells. Typical
-duration 2–8 h, maximum ≈ 14 h (3B) / ≈ 40 h (8B grids); intermediate per-cell results
-and a deterministic eval cache allow resumption. No multi-node jobs, no restart
-workflow needed.
 
-## Software
+PARALLELISATION AND JOB DURATION
+--------------------------------
+Single-GPU PyTorch jobs run as SLURM arrays of 20-50 independent configurations.
+Typical duration 2-8 hours, maximum about 40 hours; per-configuration results are cached
+so interrupted grids resume. No multi-node jobs necessary.
 
-Own venv on `module load 2024 Python/3.12.3`: torch 2.4.1 (CUDA 12.1), transformers,
-datasets, accelerate. Public HuggingFace checkpoints (MergeBench, FusionBench,
-meta-llama under accepted license). No installation support needed.
+
+SOFTWARE
+--------
+HuggingFace transformers/datasets; public HuggingFace checkpoints. No installation support needed.
