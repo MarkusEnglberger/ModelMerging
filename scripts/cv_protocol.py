@@ -61,7 +61,7 @@ from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
 from apr.gradients import make_grad_fn
 from apr.data import sample_replay_buffer
-from apr.replay_baselines import replay_losses
+from apr.replay_baselines import replay_losses, fisher_merge_matena
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
@@ -274,7 +274,11 @@ def merge_boundaries(best, args):
 
 
 def merge_candidates(ctx, args):
-    """(name, state) for every checkpoint-only candidate the grids offer."""
+    """(name, state) for every checkpoint-only candidate the grids offer.
+
+    Fisher merging is NOT here: its candidates depend on the draw's inputs, so
+    they are built in main() once the budget buffers exist (see fisher_merge_matena).
+    """
     out = []
     for lam in args.ta_lams:
         out.append((f"TA@l{lam:g}",
@@ -342,6 +346,11 @@ def main():
     ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01, 0.05])
     ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.4])
     ap.add_argument("--skip_merges", action="store_true")
+    ap.add_argument("--fisher", action="store_true",
+                    help="include Fisher merging (expected label-free Fisher, "
+                         "per-model simplex coefficients) among the candidates")
+    ap.add_argument("--fisher_points", type=int, default=50,
+                    help="simplex search points, as in Matena & Raffel")
     ap.add_argument("--save_winners", default=None,
                     help="directory to persist the refit winners' weights")
     ap.add_argument("--out", required=True)
@@ -400,7 +409,22 @@ def main():
         if not args.skip_merges:
             set_score_buffer(ctx, budget_bufs)
             ref = replay_losses(ctx, ctx.base_encoder, buffer_key="cv_buffer")
-            best, boundary = {}, {}
+            best, boundary, meta = {}, {}, {}
+            if args.fisher:
+                # Fisher merging (Matena & Raffel): the expected Fisher is
+                # label-free but depends on this draw's inputs, so its candidates
+                # are built here rather than in merge_candidates -- and built
+                # ONCE, outside the grid-extension loop, since they are costly.
+                _log(f"[{tag}][merge] expected Fishers + "
+                     f"{args.fisher_points}-point simplex search")
+                for nm, state, mt in fisher_merge_matena(
+                        ctx, budget_bufs, None, n_points=args.fisher_points,
+                        seed=seed, logger=_log):
+                    agg, _ = scored(ctx, state, ref)
+                    if "FISHER" not in best or agg < best["FISHER"][0]:
+                        best["FISHER"] = (agg, nm, state)
+                        meta["FISHER"] = mt
+                    _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
             for attempt in range(args.max_extensions + 1):
                 for nm, state in merge_candidates(ctx, args):
                     agg, _ = scored(ctx, state, ref)
@@ -428,7 +452,9 @@ def main():
                     "selected": nm, "selection_obj": agg, "scores": scores,
                     "normret": nr, "aggregate": ag,
                     "grid_boundary": boundary.get(fam, []),
-                    "tier": "checkpoint-only construction"}
+                    "tier": ("unlabeled construction" if fam == "FISHER"
+                             else "checkpoint-only construction"),
+                    **({"meta": meta[fam]} if fam in meta else {})}
                 _log(f"[{tag}][merge] WINNER {nm}: "
                      f"mean_nr={ag['mean_normret']:.4f} mean_acc={ag['mean_acc']:.4f}")
                 if args.init != "pretrained" and fam.lower().startswith(args.init[:2]):

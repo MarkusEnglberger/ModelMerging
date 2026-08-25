@@ -206,6 +206,140 @@ def _diag_fisher(model, buffer, collator, device: str, enc_names: List[str],
     return F
 
 
+def _expected_fisher(model, buffer, collator, device: str, enc_names: List[str],
+                     is_regression: bool = False, exact_max_classes: int = 64,
+                     n_samples: int = 16, seed: int = 0,
+                     move_model: bool = True) -> ParamDict:
+    """Diagonal EXPECTED Fisher of \\citet{matena2022fisher}, eq. (3):
+
+        F[r] = (1/N) sum_i E_{y ~ p_theta(y|x_i)} ( d log p_theta(y|x_i) / d theta_r )^2
+
+    The expectation is over labels drawn from the MODEL's own predictive
+    distribution, so this consumes the buffer's inputs and never its labels --
+    unlike ``_diag_fisher`` above, which squares the gradient of the loss at the
+    ground-truth label (the "empirical Fisher", a different estimator).
+
+    Following the paper, the expectation is computed exactly when the number of
+    classes is small and estimated by sampling from p_theta otherwise. For a
+    regression head the unit-variance Gaussian likelihood gives F = (d mu)^2.
+    """
+    model.eval()
+    if move_model:
+        model.to(device)
+    keep = set(enc_names)
+    named = [(n, p) for n, p in model.named_parameters()
+             if n in keep and p.requires_grad]
+    plist = [p for _, p in named]
+    F = OrderedDict((n, torch.zeros_like(p, device="cpu")) for n, p in named)
+    gen = torch.Generator(); gen.manual_seed(seed)
+    count = 0
+
+    for batch in batches_from_buffer(buffer, collator, 1, device):
+        inputs = {k: v for k, v in batch.items() if k != "labels"}   # LABEL-FREE
+        logits = model(**inputs).logits.squeeze(0)
+        if is_regression:
+            targets, weights = [logits.squeeze()], [1.0]
+        else:
+            logp = torch.log_softmax(logits, dim=-1)
+            probs = logp.exp().detach()
+            n_cls = logp.shape[-1]
+            if n_cls <= exact_max_classes:
+                targets = [logp[c] for c in range(n_cls)]
+                weights = [float(probs[c]) for c in range(n_cls)]
+            else:
+                draw = torch.multinomial(probs.float().cpu(), n_samples,
+                                         replacement=True, generator=gen)
+                targets = [logp[int(c)] for c in draw]
+                weights = [1.0 / n_samples] * len(draw)
+        for j, (t, w) in enumerate(zip(targets, weights)):
+            if w == 0.0:
+                continue
+            grads = torch.autograd.grad(t, plist, retain_graph=(j < len(targets) - 1),
+                                        allow_unused=True)
+            for (n, _), g in zip(named, grads):
+                if g is not None:
+                    F[n].add_((g.detach() ** 2).cpu(), alpha=w)
+        count += 1
+
+    model.zero_grad(set_to_none=True)
+    if move_model:
+        model.to("cpu")
+    if device.startswith("cuda") and move_model:
+        torch.cuda.empty_cache()
+    for n in F:
+        F[n].div_(max(count, 1))
+    return F
+
+
+def fisher_lambda_candidates(task_names: List[str], n_points: int = 50,
+                             seed: int = 0):
+    """The simplex search of \\citet{matena2022fisher}: per-model coefficients
+    with lambda_i >= 0 and sum_i lambda_i = 1. Point 0 is the uniform weighting;
+    the rest are Dirichlet(1) draws, i.e. uniform over the simplex."""
+    T = len(task_names)
+    out = [("uniform", {n: 1.0 / T for n in task_names})]
+    rng = torch.Generator(); rng.manual_seed(seed)
+    for i in range(max(0, n_points - 1)):
+        w = torch.distributions.Dirichlet(torch.ones(T)).sample()
+        out.append((f"dir{i}", {n: float(w[j]) for j, n in enumerate(task_names)}))
+    return out
+
+
+def fisher_merge_matena(ctx, buffers, objective, n_points: int = 50,
+                        eps: float = 1e-12, seed: int = 0, logger=None):
+    """Fisher merging as specified by \\citet{matena2022fisher}:
+
+        theta* = sum_i lambda_i F_i theta_i / sum_i lambda_i F_i
+
+    with the diagonal EXPECTED Fisher of each expert (label-free; computed on
+    that expert's own inputs) and per-model coefficients on the simplex. Where
+    every F_i vanishes the ratio is undefined and we default to theta_0, the
+    analogue of the paper's "privileged target model".
+
+    Note the structural difference from ``fisher_merge``: there a single global
+    lambda scales one Fisher-weighted average, which can push the result outside
+    the experts' hull; here the lambda_i sit inside both sums, so the result is
+    a convex combination of the experts coordinate by coordinate.
+
+    Returns (best_state, info, all_candidates) where all_candidates is a list of
+    (name, state, meta) for the caller to score under its own protocol.
+    """
+    keys = list(ctx.base_encoder.keys())
+    fishers, tau_fishers = {}, {}
+    for n in ctx.task_names:
+        info = ctx.per_task[n]
+        load_encoder_state(info["model"], info["expert_encoder"])   # Fisher AT the expert
+        F = _expected_fisher(info["model"], buffers[n], info["collator"],
+                             ctx.device, keys,
+                             is_regression=info["spec"].is_regression,
+                             seed=seed, move_model=not ctx.keep_model_on_device)
+        tau = ctx.task_vectors[n]
+        fishers[n] = F
+        tau_fishers[n] = OrderedDict((k, F[k] * tau[k]) for k in keys)
+        if logger:
+            nz = sum(float((F[k] > 0).float().sum()) for k in keys)
+            tot = sum(F[k].numel() for k in keys)
+            logger(f"  [fisher-expected] {n}: nonzero coords {nz/tot:.3f}")
+
+    cands = []
+    for label, lam in fisher_lambda_candidates(ctx.task_names, n_points, seed):
+        num = OrderedDict((k, torch.zeros_like(ctx.base_encoder[k])) for k in keys)
+        den = OrderedDict((k, torch.zeros_like(ctx.base_encoder[k])) for k in keys)
+        for n in ctx.task_names:
+            w = lam[n]
+            if w == 0.0:
+                continue
+            for k in keys:
+                num[k].add_(tau_fishers[n][k], alpha=w)
+                den[k].add_(fishers[n][k], alpha=w)
+        state = pd_clone(ctx.base_encoder)
+        for k in keys:
+            state[k].add_(num[k] / (den[k] + eps))
+        cands.append((f"FISHER@{label}", state, {"lambdas": lam}))
+        del num, den
+    return cands
+
+
 def fisher_merge(ctx, lams: List[float], objective, eps: float = 1e-12,
                  logger=None) -> Tuple[ParamDict, dict]:
     """theta = theta_0 + lam * sum_i F_i tau_i / (sum_i F_i + eps).
