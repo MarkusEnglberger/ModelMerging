@@ -210,7 +210,7 @@ We evaluate on three benchmark families. \emph{Multi-head} GLUE-8 (CoLA, SST-2, 
 Every method receives the same $B$ labeled examples per task and never sees a label outside them. Merge baselines choose their hyperparameters (coefficient, density, scale) by replay loss on all $B$ examples. APR and its ablations split the budget in half: they refine on one half, choose the learning rate $\eta$ and sweep count $S$ by replay loss on the other, and are then refit once on all $B$ examples at the chosen cell. Grids are extended until the selected cell is interior, the evaluation split is read only for selected cells, and every cell is repeated over $D$ independent buffer draws and reported as mean $\pm$ standard deviation. Appendix~\ref{app:protocol} gives the grids and the remaining details.
 
 \paragraph{Baselines.}
-We compare against checkpoint-only merges (task arithmetic, TIES, DARE-TIES, Breadcrumbs, DOGE/APGD), merges fitted on unlabeled inputs (AdaMerging, RegMean; given the same $B$ inputs per task that APR sees labeled), and other ways of spending the same labels (per-task coefficients, loss-weighted merging, replay-Fisher merging, learned Localize-and-Stitch masks, head-only recalibration; Appendix~\ref{app:protocol}). APR's two ablations---ordinary replay gradient descent (GD; no anchor, no gate) and the ungated distance-scaled update (anchor without gate)---share APR's optimizer, schedule, and grid, and are run from the pretrained model, where they isolate what each ingredient contributes; from merge initializations only APR is run.
+We compare against checkpoint-only merges (task arithmetic, TIES, DARE-TIES, Breadcrumbs, DOGE/APGD), merges fitted on unlabeled inputs (AdaMerging, RegMean; given the same $B$ inputs per task that APR sees labeled), and two other ways of spending the same labels: Fisher merging with a Fisher estimated on the replay buffer, and Localize-and-Stitch with masks learned on it (Appendix~\ref{app:protocol}). APR's two ablations---ordinary replay gradient descent (GD; no anchor, no gate) and the ungated distance-scaled update (anchor without gate)---share APR's optimizer, schedule, and grid, and are run from the pretrained model, where they isolate what each ingredient contributes; from merge initializations only APR is run.
 
 \paragraph{Metrics.}
 Both CLIP suites report mean and worst-task top-1 accuracy, with the zero-shot floor and the expert ceiling quoted for scale. The GLUE-8 tasks use metrics that do not average meaningfully (Matthews correlation, correlations, accuracies), so GLUE-8 reports \emph{normalized retention}: each task's metric is rescaled to place the pretrained model at $0$ and the task expert at $1$ before averaging (Appendix~\ref{app:protocol}). Worst-task values accompany every mean, since a merge can raise the average while harming one task badly.
@@ -328,20 +328,8 @@ DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & $0.516\ 
 AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & $0.597\ (.10)$ \\
                 & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.638}^{\dagger}\ ({+}.32)$ & $0.665\ (.20)$ \\
 \midrule
-% TODO(authors): the labeled-alternatives block is partial -- per-task
-% coefficients, loss weighting, and head-only recalibration are still to be
-% run under split selection (extend scripts/labeled_baselines_n16.py
-% --baselines and fill from grid_nn_{glue8,clip8,clip20}_labeled_n16.json).
-% Replay fine-tuning is NOT a separate row (the GD ablation is that baseline),
-% and neither is GLOBAL coefficient tuning: under split selection it coincides
-% with the task-arithmetic row, whose lambda is already selected on the
-% buffer. The row here is per-task lambda_i by coordinate descent on the
-% replay buffer.
 Labeled alt.    & Fisher (replay)   & $-0.053\ ({-}2.84)$ & $0.069\ ({-}.49)$ & $0.585\ (.11)$ \\
                 & L\&S (learned)    & $0.230\ ({-}.47)$ & $0.295\ ({-}.15)$ & $0.600\ (.14)$ \\
-                & per-task coefficients & --- & --- & --- \\
-                & loss weighting     & --- & --- & --- \\
-                & head-only recalibration & --- & --- & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1144,7 +1132,7 @@ which places the pretrained model at $0$ and the task expert at $1$ ($\epsilon_{
 CoLA is scored by Matthews correlation, STS-B by Pearson/Spearman correlation, MNLI by matched/mismatched accuracy, MRPC and QQP by accuracy/F1, and the remaining GLUE tasks by accuracy; every CLIP task is scored by top-1 accuracy.
 
 \paragraph{Baselines.}
-Because the proposed method uses labeled replay buffers, baselines are grouped by the data that constructs them---hyperparameter selection is common to every method and uses the labeled selection buffer (Section~\ref{sec:protocol}): \emph{checkpoint-only construction} (pretrained encoder, single-task experts, uniform averaging, task arithmetic, TIES, DARE, DELLA-style sampling, Model Breadcrumbs, magnitude-based Localize-and-Stitch, DOGE/APGD); \emph{unlabeled construction} (RegMean, AdaMerging, APL); \emph{labeled construction} (ordinary replay gradient descent from the same initialization, distance-scaled descent without the gate, head-only calibration, encoder and encoder-plus-head replay fine-tuning, multitask replay fine-tuning from the pretrained checkpoint and from the merge, Fisher merging with an empirical diagonal Fisher estimated from per-example labeled-loss gradients on the replay buffer, and Localize-and-Stitch with masks learned on the replay buffer); and \emph{sanity controls} (inverted gate, density-matched random gate, wrong-expert directions, shuffled labels). All labeled-replay baselines use the same replay examples, the same number of gradient evaluations where possible, and the same hyperparameter search budget.
+Because the proposed method uses labeled replay buffers, baselines are grouped by the data that constructs them---hyperparameter selection is common to every method and uses the labeled selection buffer (Section~\ref{sec:protocol}): \emph{checkpoint-only construction} (pretrained encoder, single-task experts, uniform averaging, task arithmetic, TIES, DARE, DELLA-style sampling, Model Breadcrumbs, magnitude-based Localize-and-Stitch, DOGE/APGD); \emph{unlabeled construction} (RegMean, AdaMerging, APL); \emph{labeled construction} (ordinary replay gradient descent from the same initialization, distance-scaled descent without the gate, Fisher merging with an empirical diagonal Fisher estimated from per-example labeled-loss gradients on the replay buffer, and Localize-and-Stitch with masks learned on the replay buffer); and \emph{sanity controls} (inverted gate, density-matched random gate, wrong-expert directions, shuffled labels). All labeled-replay baselines use the same replay examples, the same number of gradient evaluations where possible, and the same hyperparameter search budget.
 
 For DOGE/APGD we port the authors' released \texttt{DOGE\_TA} implementation: two-dimensional encoder weights only; per-layer $\lambda_i^l=\eta/\lVert\tau_i^l\rVert$; task and shared SVD ranks $\min(d_l)/T$ and $\min(d_l)/6$; 400 Adam iterations at learning rate $10^{-4}$ with gradients projected orthogonally to the shared basis; and the released inclusive global top-$30\%$ task-vector mask applied to each adjusted vector. We sweep $\eta\in\{0.075,0.10,0.15,0.20\}$ on GLUE-8, $\{0.03,0.05,0.07,0.09,0.11,0.13,0.15,0.18\}$ on CLIP-8, and $\{0.0025,0.005,0.0075,0.01,0.015,0.02,0.025,0.03,0.05\}$ on CLIP-20. The last grid is an audited extension after the initial $\{0.03,\ldots,0.18\}$ grid hit its lower boundary; the boundary run was stopped before evaluation, and only the winner of the expanded grid was evaluated.
 
