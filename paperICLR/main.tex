@@ -49,25 +49,33 @@ Paper under double-blind review}
 
 \begin{abstract}
 We study model merging when only a small labeled replay buffer is available for each task.
-We introduce expert-anchored gradient descent, which can start from any merge or directly from the pretrained model. 
-For each task, a first-order loss attribution selects coordinates where moving toward its expert is locally beneficial; updates are scaled by their distance to the expert and clipped to prevent overshoot. This yields an equivalent attribution-patching interpretation, and the update provably can never overshoot the experts at any learning rate. We evaluate the method on multi-head GLUE-8 and the eight- and twenty-task CLIP suites, with every method given the same budget of at most 32 labeled examples per task and every hyperparameter selected inside that budget. From the pretrained model, the anchored update performs best on every benchmark; from merge initializations, it typically improves performance. With eight examples per task, it still outperforms tuned task arithmetic while unconstrained replay descent often overfits. On tasks never merged or refined, it retains more of the pretrained model's zero-shot ability than any checkpoint-only merge.
+We introduce expert-anchored gradient descent, which can start from any initial merge or directly from the pretrained model. 
+For each task, a first-order loss attribution selects coordinates where moving toward its expert is locally beneficial; updates are scaled by their distance to the expert and clipped to prevent overshoot. This yields an equivalent attribution-patching interpretation. We evaluate the method on multi-head GLUE-8 and the eight- and twenty-task CLIP suites, with every method given the same budget of at most 32 labeled examples. From the pretrained model, the anchored update performs best on every benchmark; from merge initializations, it typically improves performance. We further observe that it is good at retaining the pretrained model's ability.
 \end{abstract}
 \section{Introduction}
 \label{sec:intro}
-Merging fine-tuned variants of a shared pretrained model combines their skills in weight space, without retraining, ensembling, or routing. But merges degrade under task interference, and the data-free repairs---sparsification, sign election, learned coefficients---plateau well below the experts. In many practical settings a small \emph{labeled} replay buffer per task is available.
+Merging fine-tuned variants of a shared pretrained model combines their skills in weight space, without extensive retraining, ensembling, or routing. But merges degrade under task interference. In many practical settings a small \emph{labeled} replay buffer per task is available.
 
-We refine the merged model with replay gradients \emph{anchored to the task experts}: each coordinate moves toward its expert only where a first-order attribution score predicts that the move reduces the task's replay loss, by an amount proportional to that predicted saving, and never past the expert---applied task-sequentially, from \emph{any} initialization, including the pretrained model itself. The update is provably non-expansive toward the experts' box hull at any learning rate (Proposition~\ref{prop:box-nonexpansive}).
+A naive way of using such small buffer is to simply do gradient descent, either on the pretrained model or an initial merge, but ordinary gradient descent can be risky when only a few examples are available. 
 
-Our contributions are: (i)~a replay-refinement method with two equivalent derivations---expert-anchored gradient descent and parameter-space attribution patching---and a divergence-safety guarantee; (ii)~a uniform evaluation across three benchmark families (multi-head GLUE-8 and the eight- and twenty-task CLIP suites) under a protocol that gives every method the same labeled budget, selects every hyperparameter on a held-out part of it, and reports every cell over independent buffer draws; (iii)~evidence that from the pretrained model---the setting with no merge to inherit---the anchored update is the only one of the three replay families that turns a $16$-example buffer into multi-task ability, while from merge initializations it usually improves performance; (iv)~a measurement of what the refinement costs the pretrained model on tasks never merged or refined, under a train/held-out split: the anchored update dominates both unconstrained controls on accuracy and retention simultaneously, and retains more than every checkpoint-only merge.
+We propose a refinement that exploits the position of the task experts called \emph{anchored to the task experts}: each coordinate moves toward its expert only where a first-order attribution score predicts that the move reduces the task's replay loss, by an amount proportional to that predicted saving, and never past the expert, from \emph{any} initialization, including the pretrained model itself. The update is provably non-expansive toward the experts' box hull at any learning rate (Proposition~\ref{prop:box-nonexpansive}).
+
+Our contributions are:
+(i)~a replay-refinement method with two equivalent derivations---expert-anchored gradient descent and parameter-space attribution patching---and a divergence-safety guarantee;
+(ii)~a uniform evaluation across three benchmark families (multi-head GLUE-8 and the eight- and twenty-task CLIP suites);
+(iii)~a measurement of what the refinement costs the pretrained model on tasks never merged or refined: the anchored update retains more than every checkpoint-only merge.
 
 \section{Related Work and Background}
 \label{sec:related}
 
-\paragraph{Merging with checkpoints alone.}
-Model merging combines fine-tuned variants of a shared pretrained model into a single model in weight space, avoiding ensembling overhead. The basic operations use nothing but the checkpoints: model soups average compatible ones \citep{wortsman2022modelsoups}, and task arithmetic represents fine-tuning as a \emph{task vector} $\taskvec_t=\theta_t-\thetab$ and merges as $\thetab+\sum_t\lambda_t\taskvec_t$ \citep{ilharco2022taskarithmetic}. Interference between task vectors---over-counted directions, sign and magnitude conflicts---is the central failure mode, and the checkpoint-only repairs differ mainly in the rule that suppresses it: TIES-Merging trims small-magnitude updates and merges only sign-consistent components \citep{yadav2023ties}; DARE randomly drops most delta parameters and rescales the rest \citep{yu2023dare}, generalized by DELLA \citep{deep2024della}; Model Breadcrumbs removes negligible and outlier perturbations \citep{davari2023breadcrumbs}; magnitude-based Localize-and-Stitch stitches sparse task-relevant regions back into the pretrained model \citep{he2024localize}; and, closest in optimization form to our update, DOGE models merging as adaptive projective gradient descent (APGD), learning a shared modification to the task vectors under a data-free Taylor objective with gradients projected orthogonally to an SVD-derived shared subspace \citep{wei2025apgd}.
+\paragraph{Merging from checkpoints.}
+Model merging combines fine-tuned variants of a shared pretrained model into a single model in weight space. Model soups average compatible checkpoints \citep{wortsman2022modelsoups}, and task arithmetic represents fine-tuning as a \emph{task vector} $\taskvec_t=\theta_t-\thetab$ and merges as $\thetab+\sum_t\lambda_t\taskvec_t$ \citep{ilharco2022taskarithmetic}. Interference between task vectors---over-counted directions, sign and magnitude conflicts---is the central failure mode, and one family of repairs constructs the merge from the checkpoints alone, differing in the rule that suppresses it: TIES-Merging trims small-magnitude updates and merges only sign-consistent components \citep{yadav2023ties}; DARE randomly drops most delta parameters and rescales the rest \citep{yu2023dare}, generalized by DELLA \citep{deep2024della}; Model Breadcrumbs removes negligible and outlier perturbations \citep{davari2023breadcrumbs}; the magnitude variant of Localize-and-Stitch stitches sparse task-relevant regions back into the pretrained model \citep{he2024localize}; and, closest in optimization form to our update, DOGE models merging as adaptive projective gradient descent (APGD), learning a shared modification to the task vectors under a data-free Taylor objective with gradients projected orthogonally to an SVD-derived shared subspace \citep{wei2025apgd}. ``From checkpoints'' describes the construction, not the reported numbers: each method carries a few hyperparameters---a scaling coefficient, a trim density---that are conventionally chosen on held-out validation data \citep{ilharco2022taskarithmetic,yadav2023ties}, a cost MergeBench finds to dominate that of merging itself \citep{he2025mergebench}; TIES is the exception that also reports a fixed default recipe for the no-validation case.
 
-\paragraph{Data-dependent merging.}
-A second line spends a small amount of data---usually unlabeled inputs or model outputs, not labels---to shape the merge: Fisher merging weights parameters by Fisher information \citep{matena2022fisher}; RegMean solves each linear layer by regression on its inputs \citep{jin2023regmean}; AdaMerging learns merge coefficients by entropy minimization \citep{yang2024adamerging}; APL scores task vectors by a data-dependent contrast \citep{kong2024apl}; and Task Arithmetic in Trust Region (TATR) uses task-loss gradients at the pretrained model to identify low-interference dimensions in which to merge \citep{sun2025tatr}. Twin-Merging, Task Vector Bases, and FusionBench extend and standardize this space \citep{lu2024twin,zeng2025taskvectorbases,tang2024fusionbench}. Common to both lines, whatever data is used shapes coefficients, regressions, or masks that are fixed at merge time, and nothing corrects the merged model afterwards. The present work operates one regime further: it asks whether a small \emph{labeled} replay buffer can repair an initial merge---or build multi-task ability directly from the pretrained model---while staying close to the known experts, evaluating labeled task gradients at the \emph{evolving} model and taking sequential, coordinate-wise steps toward the experts sized by per-coordinate attribution scores, rather than introducing another pruning rule.
+\paragraph{Merging with unlabeled data.}
+A second family fits the merge on unlabeled inputs or model outputs: Fisher merging weights parameters by a Fisher information estimated from the models' outputs on a data sample \citep{matena2022fisher}; RegMean solves each linear layer by regression on its input activations \citep{jin2023regmean}; AdaMerging learns merge coefficients by entropy minimization, in its standard form on the unlabeled evaluation inputs \citep{yang2024adamerging}; APL scores task vectors by a data-dependent contrast \citep{kong2024apl}; and Task Arithmetic in Trust Region (TATR) uses task-loss gradients at the pretrained model to identify low-interference dimensions in which to merge \citep{sun2025tatr}. Twin-Merging, Task Vector Bases, FusionBench, and MergeBench extend and standardize this space \citep{lu2024twin,zeng2025taskvectorbases,tang2024fusionbench,he2025mergebench}.
+
+\paragraph{Repair with labeled data.}
+When a few labels per task are available, prior work spends them on low-dimensional objects fixed at merge time: LM-Cocktail sets merging weights from each model's loss on a small labeled sample \citep{xiao2024lmcocktail}; the learned variant of Localize-and-Stitch trains its sparse masks on labeled data \citep{he2024localize}; task-arithmetic coefficients can be tuned per task on the labels instead of on a validation split \citep{ilharco2022taskarithmetic}; and Fisher weights can be estimated from labeled-loss gradients \citep{matena2022fisher}. Two further uses come from outside the merging literature and serve here as baselines: refitting only the classifier head on the labeled sample, i.e.\ linear probing on the frozen merged encoder \citep{alain2016probes,kumar2022lpft}, and rehearsal---fine-tuning the whole model on a stored buffer of examples \citep{robins1995rehearsal,chaudhry2019tiny}---which in our grids appears as ordinary replay gradient descent. Common to all of these, the labels either shape a handful of coefficients, masks, or head weights, or drive unconstrained descent with nothing tying the model to the experts. The present work sits between the two: it asks whether a small labeled replay buffer can repair an initial merge---or build multi-task ability directly from the pretrained model---while staying close to the known experts, evaluating labeled task gradients at the \emph{evolving} model and taking sequential, coordinate-wise steps toward the experts sized by per-coordinate attribution scores. Section~\ref{sec:protocol} orders all of these baselines by how much label information can reach the reported weights.
 
 \paragraph{Attribution patching.}
 Attribution patching approximates the effect of an intervention by a first-order Taylor expansion, replacing many explicit interventions with gradient-based scores \citep{syed2024attributionpatching,kramar2024atpstar}; in parameter space the analogue is a directional derivative of the task loss along a chosen displacement---here, the movement from the current merged model toward a task expert. Extended positioning against the benchmark families of the merging literature is given in Appendix~\ref{app:protocol}.
@@ -633,6 +641,16 @@ produced with the aid of generative AI.
 
 \begin{thebibliography}{99}
 
+\bibitem[Alain and Bengio(2016)]{alain2016probes}
+Guillaume Alain and Yoshua Bengio.
+\newblock Understanding intermediate layers using linear classifier probes.
+\newblock \emph{arXiv preprint arXiv:1610.01644}, 2016.
+
+\bibitem[Chaudhry et~al.(2019)]{chaudhry2019tiny}
+Arslan Chaudhry, Marcus Rohrbach, Mohamed Elhoseiny, Thalaiyasingam Ajanthan, Puneet K. Dokania, Philip H. S. Torr, and Marc'Aurelio Ranzato.
+\newblock On tiny episodic memories in continual learning.
+\newblock \emph{arXiv preprint arXiv:1902.10486}, 2019.
+
 \bibitem[Davari and Belilovsky(2023)]{davari2023breadcrumbs}
 Mohammad Davari and Eugene Belilovsky.
 \newblock Model Breadcrumbs: Scaling multi-task model merging with sparse masks.
@@ -673,6 +691,11 @@ Janos Kramar, Tom Lieberum, Rohin Shah, and Neel Nanda.
 \newblock AtP*: An efficient and scalable method for localizing language model behavior to components.
 \newblock \emph{arXiv preprint arXiv:2403.00745}, 2024.
 
+\bibitem[Kumar et~al.(2022)]{kumar2022lpft}
+Ananya Kumar, Aditi Raghunathan, Robbie Jones, Tengyu Ma, and Percy Liang.
+\newblock Fine-tuning can distort pretrained features and underperform out-of-distribution.
+\newblock In \emph{International Conference on Learning Representations}, 2022.
+
 \bibitem[Liu et~al.(2019)]{liu2019roberta}
 Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov.
 \newblock RoBERTa: A robustly optimized BERT pretraining approach.
@@ -698,6 +721,11 @@ Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini
 % Colin Raffel, Noam Shazeer, Adam Roberts, Katherine Lee, Sharan Narang, Michael Matena, Yanqi Zhou, Wei Li, and Peter J. Liu.
 % \newblock Exploring the limits of transfer learning with a unified text-to-text transformer.
 % \newblock \emph{Journal of Machine Learning Research}, 21(140):1--67, 2020.
+
+\bibitem[Robins(1995)]{robins1995rehearsal}
+Anthony Robins.
+\newblock Catastrophic forgetting, rehearsal and pseudorehearsal.
+\newblock \emph{Connection Science}, 7(2):123--146, 1995.
 
 \bibitem[Sun et~al.(2025)]{sun2025tatr}
 Wenju Sun, Qingyong Li, Wen Wang, Yangli-ao Geng, and Boyang Li.
@@ -739,11 +767,10 @@ Mitchell Wortsman, Gabriel Ilharco, Samir Yitzhak Gadre, Rebecca Roelofs, Raphae
 \newblock Model soups: Averaging weights of multiple fine-tuned models improves accuracy without increasing inference time.
 \newblock In \emph{International Conference on Machine Learning}, 2022.
 
-% Cited only by the retired matched-budget comparison; restore alongside it.
-% \bibitem[Xiao et~al.(2024)]{xiao2024lmcocktail}
-% Shitao Xiao, Zheng Liu, Peitian Zhang, and Xingrun Xing.
-% \newblock LM-Cocktail: Resilient tuning of language models via model merging.
-% \newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2024}, 2024.
+\bibitem[Xiao et~al.(2024)]{xiao2024lmcocktail}
+Shitao Xiao, Zheng Liu, Peitian Zhang, and Xingrun Xing.
+\newblock LM-Cocktail: Resilient tuning of language models via model merging.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2024}, 2024.
 
 \bibitem[Yadav et~al.(2023)]{yadav2023ties}
 Prateek Yadav, Derek Tam, Leshem Choshen, Colin Raffel, and Mohit Bansal.

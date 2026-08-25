@@ -11,7 +11,7 @@ score, and its x is measured from a different point), so two points at the same
 that cloud. Only the from-pretrained arms share an origin, so only they are
 plotted; the composition results live in the grid table, where they are legible.
 
-Merge baselines appear as gray reference squares at their own theta_0-distance,
+Merge baselines appear as purple reference squares at their own theta_0-distance,
 showing where the merge cloud sits relative to the refinement. Their distances
 come from measure scripts/merge_distances.py, because the grid runs record merge
 displacement relative to the config-lambda merge rather than to theta_0, and
@@ -51,6 +51,7 @@ ROWS = ["ta", "ties", "dareties", "bc", "ada"]
 ARM = {"apr":    dict(color="#0072B2", marker="o", label="APR"),
        "gd":     dict(color="#E69F00", marker="^", label="GD"),
        "nogate": dict(color="#009E73", marker="D", label="ungated")}
+MERGE_COLOR = "#CC79A7"
 
 
 # Explicit file pins. The default discovery order picks up the older S<=50
@@ -154,13 +155,13 @@ def main():
 
     print(f"{'bench':9s}{'what':13s}{'dist0':>10s}{'score':>8s}")
     for ax, (bench, title, metric, ylab) in zip(axes.flat, BENCH):
-        # merge cloud first, recessive, behind the refinement points
+        # Merge baselines use a full-strength color and remain shape-distinct.
         for lbl, d, sc in merge_refs(bench, metric):
-            ax.scatter(d, sc, c="#8a8a8a", marker="s", s=34, zorder=3,
+            ax.scatter(d, sc, c=MERGE_COLOR, marker="s", s=34, zorder=3,
                        edgecolors="white", linewidths=0.6)
             ax.annotate(lbl, (d, sc), textcoords="offset points",
                         xytext=(-4, 5), ha="right", fontsize=6.2,
-                        color="#555555")
+                        color=MERGE_COLOR)
             print(f"{bench:9s}{('merge ' + lbl):13s}{d:>10.3f}{sc:>8.3f}")
         for arm, d, sc in collect(bench, metric):
             a = ARM[arm]
@@ -187,7 +188,7 @@ def main():
 
     handles = [Line2D([], [], color=a["color"], marker=a["marker"], ls="",
                       markersize=6, label=a["label"]) for a in ARM.values()]
-    handles.append(Line2D([], [], color="#8a8a8a", marker="s", ls="",
+    handles.append(Line2D([], [], color=MERGE_COLOR, marker="s", ls="",
                           markersize=6, label="merge baselines"))
     fig.legend(handles=handles, ncol=4, loc="lower center",
                bbox_to_anchor=(0.5, -0.02), frameon=False, fontsize=8)

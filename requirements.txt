@@ -12,3 +12,8 @@ accelerate==0.34.2
 pandas
 # MaTS/T0 P3 benchmark templates (optional unless modality=t5_mats).
 promptsource==0.2.3
+# IFEval strict scoring on the MergeBench decoder track (src/apr/ifeval).
+# nltk also needs punkt/punkt_tab data; NLTK_DATA is set in slurm/common.sh.
+langdetect
+immutabledict
+nltk

@@ -40,7 +40,8 @@ EVAL0_CACHE_DIR = "results/eval0_cache"
 # bump when eval SEMANTICS change (prompt templates, scoring rules, eval-set
 # construction) in a way the config key below cannot see. Forgetting to bump
 # reuses stale scores silently -- when in doubt, bump.
-EVAL0_CACHE_VERSION = 1
+# v2: KV cache forced on for MergeBench experts (different decode kernel path).
+EVAL0_CACHE_VERSION = 2
 
 
 def _eval0_cache_key(cfg: ExperimentConfig) -> dict:
@@ -248,6 +249,14 @@ def _make_backend(cfg: ExperimentConfig, device: str):
                  f"(prompt_style={prompt_style}, dtype={cfg.model_dtype})")
             model = AutoModelForCausalLM.from_pretrained(
                 ckpt, cache_dir=cache, torch_dtype=dtype)
+            # MergeBench experts were saved from gradient-checkpointed SFT and ship
+            # use_cache=False in config.json AND generation_config.json; generate()
+            # inherits it and recomputes the full sequence every decode step
+            # (measured 6.6x slower at 256 new tokens, worse at 1024). Force the
+            # KV cache on; greedy outputs can differ in bf16 near-ties, so eval0
+            # cache entries from before this change must not be mixed with new ones.
+            model.config.use_cache = True
+            model.generation_config.use_cache = True
             # some MergeBench experts pad the embedding matrix beyond the base vocab
             # (e.g. Llama-3.2-3B_math: 128320 vs 128256); the shared base tokenizer
             # never produces ids >= len(tokenizer), so truncating back is lossless

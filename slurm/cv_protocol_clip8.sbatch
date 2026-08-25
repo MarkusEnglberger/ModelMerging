@@ -4,7 +4,11 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
-#SBATCH --time=20:00:00
+#SBATCH --time=10:00:00
+# 10h, not 20: the identical B=32 / 3-draw run took 7h08m, and walltime
+# does not enter the priority formula but does gate backfill -- a 20h
+# request only fits a >=20h gap, nearly unschedulable while the partition
+# is saturated on GPUs.
 #SBATCH --output=logs/cv_protocol_clip8-%j.out
 #SBATCH --error=logs/cv_protocol_clip8-%j.out
 #
