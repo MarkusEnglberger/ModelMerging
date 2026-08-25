@@ -70,6 +70,17 @@ def _sample_indices(train_ds, spec: TaskSpec, n: int, seed: int,
             y = labels[i]
             by_label.setdefault(int(y), []).append(i)
         classes = sorted(by_label)
+        if len(classes) > n:
+            # Fine-grained task whose class count exceeds the budget (Cars has
+            # 196 classes, SUN397 has 397). One example per class then yields
+            # more indices than the budget, and the trim below would keep the
+            # LOWEST class ids -- deterministically, for every seed, since the
+            # shuffles here only pick which example within a class and reorder
+            # the result. Choose WHICH classes at random instead, so the covered
+            # subset varies with the buffer seed. Buffers for tasks with at most
+            # n classes are unaffected: this branch does not run for them, so
+            # their random stream is untouched.
+            classes = sorted(rng.sample(classes, n))
         per = max(1, n // len(classes))
         idx: List[int] = []
         for c in classes:
