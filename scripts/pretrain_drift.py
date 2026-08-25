@@ -114,9 +114,15 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--n_probe", type=int, required=True)
     ap.add_argument("--probe_seed", type=int, default=0)
-    ap.add_argument("--arms", nargs="*", required=True,
-                    help="arm:lr:steps, e.g. apr:8:50 (the split-selected "
-                         "from-pretrained winners)")
+    ap.add_argument("--arms", nargs="*", default=[],
+                    help="arm:lr:steps, e.g. apr:8:50 -- re-derives the cell "
+                         "from the replay buffer (legacy path; prefer "
+                         "--state_files for protocol-v2 runs)")
+    ap.add_argument("--state_files", nargs="*", default=[],
+                    help="label=path.pt pairs: probe saved encoder states "
+                         "directly (cv_protocol.py --save_winners output), so "
+                         "the probed model IS the reported one and nothing is "
+                         "re-derived or re-trained")
     ap.add_argument("--merges", nargs="*", default=[],
                     help="split-selected merge baselines to probe alongside "
                          "the config-lambda TA merge: ties:DENSITY:LAM | "
@@ -220,6 +226,12 @@ def main():
                 raise SystemExit(f"unknown merge family in --merges: {spec}")
             record(nm, state)
             del state
+
+    for spec in args.state_files:
+        label, path = spec.split("=", 1)
+        st = torch.load(path, map_location="cpu")
+        record(label, st, {"state_file": path})
+        del st
 
     for spec in args.arms:
         arm, lr, steps = spec.split(":")
