@@ -29,7 +29,6 @@
     "refine": {
       "steps": 5,
       "lr": 8.0,
-      "clip_frac": 1.0,
       "gate_eps": 0.0,
       "order": "fixed",
       "aggregated": false,
@@ -78,7 +77,7 @@
   ],
   "base": {
     "math": 0.125,
-    "coding": 0.25,
+    "coding": 0.375,
     "instruction": 0.16666666666666666,
     "multilingual": 0.465
   },
@@ -164,10 +163,17 @@
     "ada_data": [
       "eval_ds"
     ],
+    "regmean_nondiag_scales": [
+      0.9,
+      1.0
+    ],
+    "regmean_eps": 0.001,
+    "regmean_bs": 16,
     "apr_schedules": [
       "constant"
     ],
     "apr_order": "random",
+    "apr_constant_order": null,
     "apr_gate_modes": [],
     "topk_fracs": [
       0.05
@@ -205,7 +211,6 @@
     ],
     "n_select": 8,
     "selection_seed": null,
-    "eval_all_cells": false,
     "select_by": "mean_acc",
     "retention_tasks": null,
     "out": "results/compare/mb3b_n8_smoke.json"
@@ -227,9 +232,13 @@
   },
   "methods": {
     "merge:TA@l0": {
+      "selection_obj": 1.2351723052571715,
+      "displacement": 9.17119498001439,
+      "evaluated": true,
+      "lam": 0.0,
       "scores": {
         "math": 0.125,
-        "coding": 0.25,
+        "coding": 0.375,
         "instruction": 0.16666666666666666,
         "multilingual": 0.465
       },
@@ -240,7 +249,7 @@
         "multilingual": 0.0
       },
       "aggregate": {
-        "mean_acc": 0.25166666666666665,
+        "mean_acc": 0.28291666666666665,
         "worst_acc": 0.125,
         "mean_normret": 0.0,
         "worst_normret": 0.0,
@@ -248,57 +257,58 @@
         "mean_normret_nondeg": 0.0,
         "worst_normret_nondeg": 0.0,
         "degenerate_tasks": [
+          "coding",
           "multilingual"
         ]
-      },
-      "displacement": 9.17119498001439,
-      "lam": 0.0,
-      "selection_obj": 1.2351723052571715
+      }
     },
     "apr:from=ta@lr128,S2": {
-      "selection_obj": 1.19446324979409,
-      "displacement": 0.27215881148152987,
+      "selection_obj": 1.194281275652488,
+      "displacement": 0.2720909483853255,
       "init": "TA@l0",
       "lr": 128.0,
       "steps": 2,
       "schedule": "constant",
+      "order": "fixed",
       "gate_mode": "coordinate",
       "topk_frac": null,
-      "gate_density": 0.35529256875931586,
+      "gate_density": 0.3552823193229128,
       "evaluated": false
     },
     "apr:from=ta@lr128,S4": {
-      "selection_obj": 1.1827131778169817,
-      "displacement": 0.3956084309947077,
+      "selection_obj": 1.1825037503962839,
+      "displacement": 0.39559956209833996,
       "init": "TA@l0",
       "lr": 128.0,
       "steps": 4,
       "schedule": "constant",
+      "order": "fixed",
       "gate_mode": "coordinate",
       "topk_frac": null,
-      "gate_density": 0.35529256875931586,
+      "gate_density": 0.3552823193229128,
       "evaluated": true,
       "scores": {
-        "math": 0.125,
+        "math": 0.25,
         "coding": 0.375,
         "instruction": 0.3333333333333333,
-        "multilingual": 0.475
+        "multilingual": 0.485
       },
       "normret": {
-        "math": 0.0,
-        "coding": 0.9999999200000065,
+        "math": 0.24999999500000009,
+        "coding": 0.0,
         "instruction": 0.9999999400000036,
-        "multilingual": 999999.9999999953
+        "multilingual": 1999999.9999999963
       },
       "aggregate": {
-        "mean_acc": 0.3270833333333333,
-        "worst_acc": 0.125,
-        "mean_normret": 250000.49999996382,
+        "mean_acc": 0.36083333333333334,
+        "worst_acc": 0.25,
+        "mean_normret": 500000.3124999828,
         "worst_normret": 0.0,
-        "hmean_normret": 3.9999920000114405e-06,
-        "mean_normret_nondeg": 0.6666666200000034,
-        "worst_normret_nondeg": 0.0,
+        "hmean_normret": 3.999980000097439e-06,
+        "mean_normret_nondeg": 0.6249999675000019,
+        "worst_normret_nondeg": 0.24999999500000009,
         "degenerate_tasks": [
+          "coding",
           "multilingual"
         ]
       }
@@ -310,34 +320,36 @@
       "lr": 1024.0,
       "steps": 2,
       "schedule": "constant",
+      "order": "fixed",
       "gate_mode": "coordinate",
       "topk_frac": null,
-      "gate_density": 0.3612861823473249,
+      "gate_density": 0.36131663206107767,
       "evaluated": false
     },
     "apr:from=ta@lr1024,S4": {
-      "selection_obj": 1.21184117668616,
-      "displacement": 2.3554741174018545,
+      "selection_obj": 1.2118111209538482,
+      "displacement": 2.3554793722620926,
       "init": "TA@l0",
       "lr": 1024.0,
       "steps": 4,
       "schedule": "constant",
+      "order": "fixed",
       "gate_mode": "coordinate",
       "topk_frac": null,
-      "gate_density": 0.3612861823473249,
+      "gate_density": 0.36131663206107767,
       "evaluated": false
     },
     "gd:from=ta@lr0.0001,S2": {
-      "selection_obj": 1.2322377741288226,
-      "displacement": 0.0022366466638288457,
+      "selection_obj": 1.2323406989976684,
+      "displacement": 0.0022391010163843057,
       "init": "TA@l0",
       "lr": 0.0001,
       "steps": 2,
       "evaluated": false
     },
     "gd:from=ta@lr0.0001,S4": {
-      "selection_obj": 1.2303274497459762,
-      "displacement": 0.004375238824085569,
+      "selection_obj": 1.2305303294857701,
+      "displacement": 0.004368414936363619,
       "init": "TA@l0",
       "lr": 0.0001,
       "steps": 4,
@@ -345,24 +357,25 @@
       "scores": {
         "math": 0.125,
         "coding": 0.375,
-        "instruction": 0.16666666666666666,
-        "multilingual": 0.455
+        "instruction": 0.0,
+        "multilingual": 0.47
       },
       "normret": {
         "math": 0.0,
-        "coding": 0.9999999200000065,
-        "instruction": 0.0,
-        "multilingual": -1000000.0000000008
+        "coding": 0.0,
+        "instruction": -0.9999999400000036,
+        "multilingual": 499999.9999999949
       },
       "aggregate": {
-        "mean_acc": 0.28041666666666665,
-        "worst_acc": 0.125,
-        "mean_normret": -249999.7500000202,
-        "worst_normret": -1000000.0000000008,
-        "hmean_normret": 1.3333328888890014e-06,
-        "mean_normret_nondeg": 0.3333333066666688,
-        "worst_normret_nondeg": 0.0,
+        "mean_acc": 0.2425,
+        "worst_acc": 0.0,
+        "mean_normret": 124999.75000001372,
+        "worst_normret": -0.9999999400000036,
+        "hmean_normret": 1.3333333333324445e-06,
+        "mean_normret_nondeg": -0.4999999700000018,
+        "worst_normret_nondeg": -0.9999999400000036,
         "degenerate_tasks": [
+          "coding",
           "multilingual"
         ]
       }
