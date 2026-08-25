@@ -11,11 +11,14 @@ merges) are cached and never recomputed. Sampling nvidia-smi during a generation
 an H100 shows 98-100% utilization at 660-695 W of the 700 W limit. Your question also
 prompted us to profile the evaluation more carefully, and we found that the published
 MergeBench expert checkpoints ship with the KV cache disabled in their generation
-config, which our evaluation had inherited; with the cache enabled, decoding is 6.5x
-faster at 256 generated tokens (2,230 vs. 340 tokens/s) and more at longer outputs.
-Since generation was about 85% of a run, the per-run cost in our estimate is
-conservative by a factor of roughly 3, which makes the reduced budget below
-comfortable.
+config, which our evaluation had inherited. We have fixed this; decoding is now about
+3.5x faster end-to-end (6.5x in isolation at 256 generated tokens: 2,230 vs. 340
+tokens/s). Since generation was about 85% of a run, this roughly halves the per-run
+cost behind our estimate. We intend to use that margin to evaluate every selected
+configuration on the full evaluation sets (1,319 GSM8K, 378 MBPP+, 541 IFEval items)
+instead of the 300-item subsamples the estimate assumed, which costs 3-4x more decoding
+per evaluation and brings the totals back to roughly the figures below. Given the
+throughput with the cache enabled, we do not see a need for vLLM.
 
 2. Breakdown of the ~150 runs per model scale. One "grid run" covers one
 initialization x one method, including its hyperparameter sweep, selection and final

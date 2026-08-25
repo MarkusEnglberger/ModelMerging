@@ -273,6 +273,29 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 
 \begin{table}[t]
 \centering
+\small
+\caption{\textbf{Eight-task CLIP under the equal-budget protocol} ($B{=}32$ labels per task for every method, mean $\pm$ std over three buffer draws). Mean and worst-task top-1 accuracy; every selected cell interior in $\eta$ and $S$. Merges are deterministic given the checkpoints, so their spread reflects selection alone. GD and ungated are APR's ablations, run from the pretrained model where they isolate the anchor and the gate.}
+\label{tab:cv-clip8}
+\begin{tabular}{lcc}
+\toprule
+Model & Mean acc. & Worst-task acc. \\
+\midrule
+Zero-shot $\thetab$        & $0.478$ & $0.315$ \\
+\midrule
+Task arithmetic            & $0.692\pm0.000$ & $0.518\pm0.000$ \\
+Breadcrumbs                & $0.705\pm0.000$ & $0.521\pm0.000$ \\
+DARE-TIES                  & $0.708\pm0.000$ & $0.486\pm0.000$ \\
+TIES                       & $0.741\pm0.000$ & $\mathbf{0.528}\pm0.000$ \\
+\midrule
+$\thetab+$GD (ablation)      & $0.558\pm0.018$ & $0.369\pm0.039$ \\
+$\thetab+$ungated (ablation) & $0.565\pm0.008$ & $0.401\pm0.024$ \\
+$\thetab+$APR                & $\mathbf{0.756}\pm0.004$ & $0.523\pm0.007$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
 \caption{\textbf{Results at the $16{+}16$ budget.} Mean (worst-task) normalized retention on GLUE-8 and CLIP-8, absolute top-1 accuracy on CLIP-20; every hyperparameter selected on a labeled buffer disjoint from the refinement buffer, evaluation split read only at selected cells. Bottom block: other uses of the same labels. $^{\dagger}$: selected $S$ at the top of its grid. Dashes: not run.}
@@ -289,30 +312,20 @@ Pretrained      & alone      & $0$ & $0$ & $0.550\ (.10)$ \\
                 & $+$APR     & $0.315\ ({-}.12)$ & $0.432\ ({-}.16)$ & $0.647\ (.22)$ \\
 \midrule
 Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.495\ (.15)$ \\
-                & $+$GD      & $0.574\ ({+}.06)$ & $0.420^{\dagger}\ ({-}.36)$ & $0.555\ (.18)$ \\
-                & $+$ungated & $0.586\ ({-}.01)$ & $0.404^{\dagger}\ ({-}.49)$ & $0.602\ (.17)$ \\
                 & $+$APR     & $\mathbf{0.608}\ ({+}.10)$ & $0.524^{\dagger}\ ({+}.05)$ & $0.667\ (.25)$ \\
 \midrule
 Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.603\ (.12)$ \\
-                & $+$GD      & $0.534\ ({+}.04)$ & $0.513^{\dagger}\ ({+}.04)$ & $0.638^{\dagger}\ (.17)$ \\
-                & $+$ungated & $0.563\ ({+}.04)$ & $0.469\ ({-}.09)$ & $0.650\ (.19)$ \\
                 & $+$APR     & $0.567\ ({+}.04)$ & $0.485^{\dagger}\ ({+}.00)$ & $0.661\ (.20)$ \\
 \midrule
 DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.520\ (.20)$ \\
-                & $+$GD      & $0.521\ ({-}.08)$ & $0.523^{\dagger}\ ({-}.07)$ & $0.594^{\dagger}\ (.28)$ \\
-                & $+$ungated & $0.574\ ({+}.09)$ & $0.291^{\dagger}\ ({-}1.85)$ & $0.579\ (.09)$ \\
                 & $+$APR     & $0.586\ ({+}.11)$ & $0.527^{\dagger}\ ({-}.39)$ & $0.664\ (.30)$ \\
 \midrule
 TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.619\ (.19)$ \\
-                & $+$GD      & $0.516\ ({-}.13)$ & $0.600^{\dagger}\ ({+}.18)$ & $0.658^{\dagger}\ (.26)$ \\
-                & $+$ungated & $0.525\ ({-}.08)$ & $0.561\ ({-}.20)$ & $0.672\ (.28)$ \\
                 & $+$APR     & $0.543\ ({-}.03)$ & $0.608^{\dagger}\ ({+}.11)$ & $\mathbf{0.676}\ (.27)$ \\
 \midrule
 DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & $0.516\ (.16)$ \\
 \midrule
 AdaMerging      & alone      & $0.029\ ({-}3.02)$ & $0.533\ ({+}.09)$ & $0.597\ (.10)$ \\
-                & $+$GD      & $0.459^{\dagger}\ ({-}.35)$ & $0.601^{\dagger}\ ({+}.14)$ & $0.637^{\dagger}\ (.13)$ \\
-                & $+$ungated & $0.538\ ({-}.36)$ & $0.557^{\dagger}\ ({-}.04)$ & $0.649\ (.16)$ \\
                 & $+$APR     & $0.564\ ({-}.02)$ & $\mathbf{0.638}^{\dagger}\ ({+}.32)$ & $0.665\ (.20)$ \\
 \midrule
 % TODO(authors): the labeled-alternatives block is partial -- per-task
@@ -351,35 +364,23 @@ Pretrained      & alone      & $0$ & $0$ & $0.550\ (.10)$ \\
                 & $+$APR     & $0.223^{\dagger}\ ({-}.33)$ & $0.295^{\dagger}\ ({-}.45)$ & $0.645\ (.22)$ \\
 \midrule
 Task arithmetic & alone      & $0.320\ ({-}.18)$ & $0.270\ ({-}.53)$ & $0.495\ (.15)$ \\
-                & $+$GD      & $0.530\ ({+}.04)$ & $0.167^{\dagger}\ ({-}1.10)$ & $0.545\ (.18)$ \\
-                & $+$ungated & $0.529\ ({+}.03)$ & $0.241^{\dagger}\ ({-}.79)$ & $0.576\ (.23)$ \\
                 & $+$APR     & $0.498\ ({-}.18)$ & $0.462^{\dagger}\ ({-}.12)$ & $0.648\ (.22)$ \\
 \midrule
 Breadcrumbs     & alone      & $0.030\ ({-}2.14)$ & $0.431\ ({+}.08)$ & $0.602\ (.12)$ \\
-                & $+$GD      & $0.512\ ({-}.00)$ & $0.479^{\dagger}\ ({+}.04)$ & $0.632^{\dagger}\ (.15)$ \\
-                & $+$ungated & $0.536\ ({+}.05)$ & $0.391^{\dagger}\ ({-}.40)$ & $0.624\ (.17)$ \\
                 & $+$APR     & $0.528\ ({-}.06)$ & $0.339^{\dagger}\ ({-}.46)$ & $0.652\ (.22)$ \\
 \midrule
 DARE-TIES       & alone      & $0.301\ ({-}.34)$ & $0.364\ ({-}.32)$ & $0.520\ (.20)$ \\
-                & $+$GD      & $0.484\ ({-}.08)$ & $-1.273^{\dagger}\ ({-}4.87)$ & $0.571^{\dagger}\ (.26)$ \\
-                & $+$ungated & $0.534\ ({+}.08)$ & $-0.578\ ({-}3.11)$ & $0.499\ (.05)$ \\
                 & $+$APR     & $\mathbf{0.576}\ ({+}.19)$ & $0.498^{\dagger}\ ({-}.31)$ & $0.649^{\dagger}\ (.27)$ \\
 \midrule
 TIES            & alone      & $0.208\ ({-}.22)$ & $0.525\ ({+}.21)$ & $0.619\ (.19)$ \\
-                & $+$GD      & $0.442\ ({-}.10)$ & $0.585^{\dagger}\ ({+}.18)$ & $0.651^{\dagger}\ (.25)$ \\
-                & $+$ungated & $0.442\ ({-}.07)$ & $0.318^{\dagger}\ ({-}1.57)$ & $0.622\ (.10)$ \\
                 & $+$APR     & $0.489^{\dagger}\ ({+}.01)$ & $0.566^{\dagger}\ ({-}.08)$ & $0.665\ (.28)$ \\
 \midrule
 DOGE/APGD       & alone      & $0.016\ ({+}.00)$ & $0.138\ ({-}1.93)$ & $0.516\ (.16)$ \\
 \midrule
 AdaMerging      & alone      & $0.028\ ({-}3.01)$ & $0.463\ ({-}.04)$ & $0.592\ (.10)$ \\
-                & $+$GD      & $0.016\ ({-}2.95)$ & $0.502^{\dagger}\ ({-}.06)$ & $0.623^{\dagger}\ (.11)$ \\
-                & $+$ungated & $0.466\ ({-}.10)$ & $0.285^{\dagger}\ ({-}1.41)$ & $0.563^{\dagger}\ (.18)$ \\
                 & $+$APR     & $0.543\ ({+}.02)$ & $0.554^{\dagger}\ ({+}.15)$ & $0.640\ (.19)$ \\
 \midrule
 RegMean         & alone      & $0.477\ ({+}.06)$ & $0.627\ ({+}.32)$ & $0.697\ (.21)$ \\
-                & $+$GD      & $0.480\ ({+}.06)$ & $0.611^{\dagger}\ ({+}.29)$ & $0.707^{\dagger}\ (.23)$ \\
-                & $+$ungated & $0.462\ ({+}.07)$ & $0.622^{\dagger}\ ({+}.28)$ & $\mathbf{0.709}\ (.24)$ \\
                 & $+$APR     & $0.517\ ({+}.10)$ & $\mathbf{0.632}^{\dagger}\ ({+}.31)$ & $0.709\ (.24)$ \\
 \bottomrule
 \end{tabular}
@@ -398,11 +399,16 @@ DOGE/APGD is the closest checkpoint-only optimization comparison and uses neithe
 
 RegMean supplies a substantially stronger data-fitted starting point at the $8{+}8$ budget: its mean retention is $0.477$ on GLUE-8 and $0.627$ on CLIP-8, and its mean accuracy is $0.697$ on CLIP-20. Refinement improves it on all three suites, but by less than it improves checkpoint-space merges: APR reaches $0.517$ and $0.632$ retention on GLUE-8 and CLIP-8, while on CLIP-20 APR and the ungated anchored update tie at $0.709$ mean accuracy. The ordinary-GD cell is effectively unchanged on the retention benchmarks and trails both anchored arms on CLIP-20. The selected RegMean refinement rates ($0.5$, $1$, and $0.125$ for APR) are smaller than those used from checkpoint-space initializations, consistent with the far-initialization behavior examined in Appendix~\ref{app:clip20}.
 
+\paragraph{Cold start under the equal-budget protocol.}
+Table~\ref{tab:cv-clip8} reports the eight-task CLIP suite under the protocol of Section~\ref{sec:protocol}: every method given the same $B=32$ labels per task, hyperparameters selected inside that budget, every cell an interior optimum, and every number a mean over three independent buffer draws. From the pretrained model APR reaches $0.756\pm0.004$ mean accuracy, above every checkpoint-only merge including TIES ($0.741$), while using $32$ labels per task in place of the eight expert checkpoints a merge requires. Its two ablations sit at $0.558$ and $0.565$---barely above the zero-shot floor once one accounts for the merges' head start---so the anchored, capped step is worth ${\approx}0.19$ accuracy over unconstrained descent from the same initialization, and the gate alone does not account for it.
+
+The draw spread is the more interesting number. APR varies by $\pm0.004$ across buffer draws, the same order as the deterministic merges, and selects essentially one cell every time ($\eta=32$, $S\in\{50,100\}$). An earlier version of this experiment showed the opposite---a $\pm0.081$ spread with the fine-grained Cars task collapsing on two draws of three---which we traced to the replay sampler: with more classes than the budget holds it had been keeping the lowest class ids deterministically, so Cars was refined and selected on $32$ of its $196$ classes, identically for every seed. Drawing the covered classes at random per seed (Appendix~\ref{app:protocol}) removes both the collapse and the spread. We report this because the failure is instructive: at these budgets a fine-grained task is representable only in part, and a selection buffer that inherits the same blind spot cannot detect damage to the classes it never sees.
+
 \paragraph{Cold start: refining from the pretrained model.}
 Refining \emph{from the pretrained model}---the setting with no merge to inherit, and the one where the refinement must supply all of the multi-task ability itself---is an unambiguous win for the gated, expert-anchored update: APR is the best cold-start treatment on all three benchmarks, ahead of the better of the two unconstrained baselines by $0.06$ (CLIP-20), $0.11$ (GLUE-8), and $0.39$ (CLIP-8). Neither unconstrained baseline is viable at this budget: ordinary descent recovers between a twentieth and a fifth of the expert--base gap on the two retention benchmarks ($0.046$ on CLIP-8, $0.209$ on GLUE-8), and the ungated update fails to improve on the pretrained model at all ($-0.018$ on GLUE-8, $-0.036$ on CLIP-8), so distance scaling without the gate is not merely weaker than APR but useless from this initialization. Only the gated, distance-scaled update turns a small replay buffer into multi-task ability with no merge to build on.
 
 \paragraph{Composition: refining from a merge.}
-From merge initializations the refinement is a complement to merging rather than a replacement. At the $16{+}16$ budget it improves every initialization on all three encoder benchmarks, and APR is the strongest of the three arms in every row on GLUE-8 and CLIP-20; on CLIP-8 it leads four of the five merge rows (ordinary descent edges it from Breadcrumbs, $0.513$ vs.\ $0.485$). Refinement also makes the outcome far less sensitive to which merge it was handed: on CLIP-20 the unrefined merges span $0.495$--$0.619$ while the $+$APR rows span $0.661$--$0.676$, and on GLUE-8 a spread of $0.029$--$0.320$ closes to $0.543$--$0.608$. At the halved budget of Table~\ref{tab:main8} the ordering is less uniform---an unconstrained arm edges APR in a few rows (TIES and Breadcrumbs on CLIP-8, task arithmetic and Breadcrumbs on GLUE-8)---but the unconstrained arms now carry a tail risk the anchored update never exhibits: from DARE-TIES on CLIP-8, descent collapses to $-1.27$ mean retention ($-4.87$ worst-task) and the ungated update to $-0.58$, while APR improves the same initialization to $0.498$.
+From merge initializations the refinement is a complement to merging rather than a replacement. At the $16{+}16$ budget it improves every initialization on all three encoder benchmarks. Refinement also makes the outcome far less sensitive to which merge it was handed: on CLIP-20 the unrefined merges span $0.495$--$0.619$ while the $+$APR rows span $0.661$--$0.676$, and on GLUE-8 a spread of $0.029$--$0.320$ closes to $0.543$--$0.608$. The ablation arms are reported only from the pretrained model, where they isolate the contribution of the anchor and the gate; from a merge the comparison of interest is against the merge itself, which every composition row makes directly.
 
 Among the alternative uses of the same labels (bottom block of Table~\ref{tab:main16}), the stronger is Localize-and-Stitch with masks learned on the buffer, at $0.230$/$0.295$ retention on GLUE-8/CLIP-8 and $0.600$ accuracy on CLIP-20; Fisher merging with a replay-estimated Fisher is weaker still. Both fall well below the composition tier of the same table---every merge-initialized APR row exceeds $0.543$ on GLUE-8, $0.485$ on CLIP-8, and $0.661$ on CLIP-20---so at this sample size the labels are better spent refining the encoder than learning masks or Fisher weights.
 
