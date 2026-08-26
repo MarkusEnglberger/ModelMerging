@@ -22,6 +22,7 @@
 
 set -euo pipefail
 source slurm/common.sh
+source slurm/args.sh "$@"      # KEY=VALUE positional args; env does NOT propagate
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 : "${BUDGET:=32}"
@@ -38,6 +39,7 @@ WIN="results/cv_winners/glue8_B${BUDGET}_${INIT}/draw${DRAW}${SUFFIX}"
 
 echo "[job] GLUE-8 protocol v2: draw ${DRAW} (seed ${SEED}) B=${BUDGET} init=${INIT}" \
      "arms=[${ARMS}] max_steps=[${MAX_STEPS}] -> ${OUT}"
+guard_output "${OUT}"
 
 # shellcheck disable=SC2086  # ARMS / MAX_STEPS are word lists on purpose
 python scripts/cv_protocol.py \

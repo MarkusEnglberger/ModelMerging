@@ -28,23 +28,29 @@
 
 set -euo pipefail
 source slurm/common.sh
+source slurm/args.sh "$@"      # KEY=VALUE positional args; env does NOT propagate
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 : "${BUDGET:=32}"
 : "${FOLDS:=2}"
 : "${DRAWS:=3}"
 : "${INIT:=pretrained}"
+: "${ARMS:=apr nogate gd}"
+: "${SUFFIX:=}"
 
-OUT="results/compare/cv_clip8_B${BUDGET}_${INIT}.json"
-WIN="results/cv_winners/clip8_B${BUDGET}_${INIT}"
+OUT="results/compare/cv_clip8_B${BUDGET}_${INIT}${SUFFIX}.json"
+WIN="results/cv_winners/clip8_B${BUDGET}_${INIT}${SUFFIX}"
 
-echo "[job] CLIP-8 protocol v2: B=${BUDGET} folds=${FOLDS} draws=${DRAWS} init=${INIT} -> ${OUT}"
+echo "[job] CLIP-8 protocol v2: B=${BUDGET} folds=${FOLDS} draws=${DRAWS} init=${INIT}" \
+     "arms=[${ARMS}] -> ${OUT}"
+guard_output "${OUT}"
 
+# shellcheck disable=SC2086  # ARMS is a word list on purpose
 python scripts/cv_protocol.py \
   --config configs/clip8.yaml \
   --budget "${BUDGET}" --folds "${FOLDS}" --draws "${DRAWS}" \
   --init "${INIT}" \
-  --arms apr nogate gd \
+  --arms ${ARMS} \
   --apr_lrs 1 2 4 8 16 32 \
   --nogate_lrs 0.5 1 2 4 8 16 \
   --gd_lrs 1e-5 1e-4 5e-4 1e-3 5e-3 1e-2 \
