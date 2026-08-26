@@ -155,6 +155,20 @@ def boundary_of(sel_lr, sel_S, lrs, steps, init_obj, obj_at_min_S):
 # the labeled arms: K-fold CV then refit
 # ---------------------------------------------------------------------------
 
+def step_cap(args, arm):
+    """Horizon ceiling for an arm from --max_steps (None = unbounded).
+    Tokens are either a bare integer (every arm) or ``arm=value``."""
+    cap = None
+    for tok in args.max_steps or []:
+        if "=" in tok:
+            a, v = tok.split("=", 1)
+            if a == arm:
+                cap = int(v)
+        else:
+            cap = int(tok) if cap is None else min(cap, int(tok))
+    return cap
+
+
 def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                         lrs, args, draw_tag):
     """K-fold select over (lr, S), auto-extend on boundary, refit on all B."""
@@ -167,6 +181,11 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
     # (Section: run_refine_checkpoints_from resume_state/resume_sweep)
     done: Dict[tuple, tuple] = {}
     lrs = sorted(lrs)
+    cap = step_cap(args, arm)
+    if cap is not None:
+        steps = [S for S in sorted(steps) if S <= cap] or [min(steps)]
+        _log(f"[{draw_tag}][{arm}] horizon capped at S<={cap}: grid {steps}")
+    S_capped = False      # selected S sits at the cap and could not be extended
 
     for attempt in range(args.max_extensions + 1):
         max_S = max(steps)
@@ -222,6 +241,14 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         init_obj = 1.0                                     # by construction
         obj_min_S = mean_obj[(sel_lr, min(steps))]
         edges = boundary_of(sel_lr, sel_S, lrs, steps, init_obj, obj_min_S)
+        S_capped = ("S_high" in edges and cap is not None
+                    and max(steps) * 2 > cap)
+        if S_capped:
+            # the horizon ceiling is a protocol decision: S=max stays a
+            # boundary pick (recorded as such) but is not extended past it
+            _log(f"[{draw_tag}][{arm}] selected S={sel_S} at the cap {cap}; "
+                 f"not extending S")
+            edges = [e for e in edges if e != "S_high"]
         if not edges or attempt == args.max_extensions:
             break
         _log(f"[{draw_tag}][{arm}] selected cell on boundary {edges}; extending")
@@ -247,7 +274,8 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         "cv_objective": mean_obj[(sel_lr, sel_S)],
         "cv_objective_per_fold": cells[(sel_lr, sel_S)],
         "lr_grid": sorted(lrs), "S_grid": sorted(steps),
-        "boundary_after_extension": edges,
+        "boundary_after_extension": edges + (["S_high"] if S_capped else []),
+        "S_cap": cap, "S_capped": bool(S_capped),
         "displacement": pd_global_norm(pd_sub(refit, init_state)),
         "traces": traces,
     }
@@ -348,6 +376,11 @@ def main():
     ap.add_argument("--steps", type=int, nargs="*", default=[5, 20, 50, 100])
     ap.add_argument("--order", default="random", choices=["random", "fixed"])
     ap.add_argument("--max_extensions", type=int, default=2)
+    ap.add_argument("--max_steps", nargs="*", default=None,
+                    help="horizon ceiling: bare integer (all arms) or arm=value "
+                         "tokens, e.g. apr=100. Grid entries above it are dropped "
+                         "and S is never extended past it; a selection at the "
+                         "cap is recorded as S_capped (a boundary pick)")
     ap.add_argument("--ta_lams", type=float, nargs="*", default=[0.2, 0.3, 0.4, 0.5])
     ap.add_argument("--ties_densities", type=float, nargs="*", default=[0.1, 0.2])
     ap.add_argument("--ties_lams", type=float, nargs="*", default=[0.8, 1.0])

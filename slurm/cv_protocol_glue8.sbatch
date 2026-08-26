@@ -27,23 +27,29 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 : "${BUDGET:=32}"
 : "${FOLDS:=2}"
 : "${INIT:=pretrained}"
+: "${ARMS:=apr nogate gd}"          # which labeled arms to run
+: "${MAX_STEPS:=apr=100}"           # horizon ceiling tokens (arm=value or int)
+: "${SUFFIX:=}"                     # tag for partial reruns, e.g. _aprS100
 DRAW=${SLURM_ARRAY_TASK_ID}
 SEED=$((100 + DRAW))
 
-OUT="results/compare/cv_glue8_B${BUDGET}_${INIT}_draw${DRAW}.json"
-WIN="results/cv_winners/glue8_B${BUDGET}_${INIT}/draw${DRAW}"
+OUT="results/compare/cv_glue8_B${BUDGET}_${INIT}_draw${DRAW}${SUFFIX}.json"
+WIN="results/cv_winners/glue8_B${BUDGET}_${INIT}/draw${DRAW}${SUFFIX}"
 
-echo "[job] GLUE-8 protocol v2: draw ${DRAW} (seed ${SEED}) B=${BUDGET} init=${INIT} -> ${OUT}"
+echo "[job] GLUE-8 protocol v2: draw ${DRAW} (seed ${SEED}) B=${BUDGET} init=${INIT}" \
+     "arms=[${ARMS}] max_steps=[${MAX_STEPS}] -> ${OUT}"
 
+# shellcheck disable=SC2086  # ARMS / MAX_STEPS are word lists on purpose
 python scripts/cv_protocol.py \
   --config configs/glue8.yaml \
   --budget "${BUDGET}" --folds "${FOLDS}" --draws 1 --draw_seed0 "${SEED}" \
   --init "${INIT}" \
-  --arms apr nogate gd \
+  --arms ${ARMS} \
   --apr_lrs 0.5 1 2 4 8 16 32 \
   --nogate_lrs 0.25 0.5 1 2 4 8 \
   --gd_lrs 1e-5 5e-5 1e-4 5e-4 1e-3 5e-3 1e-2 \
   --steps 5 20 50 100 200 \
+  --max_steps ${MAX_STEPS} \
   --order random \
   --max_extensions 2 \
   --save_winners "${WIN}" \
