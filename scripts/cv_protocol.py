@@ -162,7 +162,10 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
     names = ctx.task_names
     cells: Dict[tuple, list] = {}      # (lr,S) -> per-fold objectives
     traces: Dict[str, dict] = {}
-    tried = set()
+    # (lr, k) -> (CPU state at sweeps_done, sweeps_done): a constant-lr
+    # trajectory is CONTINUED when the horizon grid grows, never re-run
+    # (Section: run_refine_checkpoints_from resume_state/resume_sweep)
+    done: Dict[tuple, tuple] = {}
     lrs = sorted(lrs)
 
     for attempt in range(args.max_extensions + 1):
@@ -171,9 +174,9 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         # select on the first. --rotate turns this into full K-fold CV.
         for lr in lrs:
             for k in (range(K) if args.rotate else [0]):
-                if (lr, k) in tried:
+                prev = done.get((lr, k))
+                if prev is not None and prev[1] >= max_S:
                     continue
-                tried.add((lr, k))
                 # construct on every fold but k; score on fold k
                 train = {n: [e for f in range(K) if f != k for e in folds[n][f]]
                          for n in names}
@@ -184,11 +187,22 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                 rc = dataclasses.replace(cfg.refine, steps=max_S, lr=lr,
                                          order=args.order, lr_schedule="constant",
                                          **ARM_KW[arm])
-                _log(f"[{draw_tag}][{arm}] lr={lr:g} fold {k+1}/{K} "
-                     f"(construct {len(train[names[0]])}, hold {len(held[names[0]])})")
-                states, _ = ctx.run_refine_checkpoints_from(
-                    init_state, rc, sorted(steps), seed=cfg.seed)
-                for S in sorted(steps):
+                if prev is None:
+                    _log(f"[{draw_tag}][{arm}] lr={lr:g} fold {k+1}/{K} "
+                         f"(construct {len(train[names[0]])}, "
+                         f"hold {len(held[names[0]])})")
+                    states, _ = ctx.run_refine_checkpoints_from(
+                        init_state, rc, sorted(steps), seed=cfg.seed)
+                    new_S = sorted(steps)
+                else:
+                    resume_state, done_upto = prev
+                    _log(f"[{draw_tag}][{arm}] lr={lr:g} fold {k+1}/{K} "
+                         f"continuing S={done_upto} -> {max_S}")
+                    states, _ = ctx.run_refine_checkpoints_from(
+                        init_state, rc, sorted(steps), seed=cfg.seed,
+                        resume_state=resume_state, resume_sweep=done_upto)
+                    new_S = [S for S in sorted(steps) if S > done_upto]
+                for S in new_S:
                     agg, per_task = scored(ctx, states[S], ref)
                     cells.setdefault((lr, S), []).append(agg)
                     traces[f"lr{lr:g},S{S},fold{k}"] = {
@@ -196,6 +210,7 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                         "per_task_loss": per_task,
                         "per_task_ref": ref,
                     }
+                done[(lr, k)] = (states[max_S], max_S)
                 del states
 
         n_needed = K if args.rotate else 1
@@ -215,14 +230,11 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         if "lr_high" in edges:
             lrs = extend_lrs(lrs, "high")
         if "S_high" in edges:
-            # a longer horizon changes max_S for EVERY lr: the existing
-            # trajectories stop short of it, so they must all be re-run and
-            # the per-cell objectives rebuilt (they are deterministic, so the
-            # old cells are reproduced exactly alongside the new S).
+            # a longer horizon extends every trajectory IN PLACE: each (lr, k)
+            # continues from its retained state, paying only the extra sweeps
             steps = sorted(steps) + [max(steps) * 2]
-            tried.clear()
-            cells.clear()
 
+    done.clear()          # release the retained trajectory states
     # ---- refit on the FULL budget at the selected cell ----
     set_construction_buffer(ctx, budget_bufs)
     rc = dataclasses.replace(cfg.refine, steps=sel_S, lr=sel_lr,

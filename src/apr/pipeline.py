@@ -14,6 +14,7 @@ refinement rules can be compared from the *same* merge point and replay buffers
 
 from collections import OrderedDict
 from typing import Dict, List
+import dataclasses
 import hashlib
 import json
 import os
@@ -431,13 +432,22 @@ class MergeContext:
 
     def run_refine_checkpoints_from(self, start_state: ParamDict,
                                     refine_cfg: RefineConfig,
-                                    checkpoint_steps, seed: int = 0):
+                                    checkpoint_steps, seed: int = 0,
+                                    resume_state: ParamDict = None,
+                                    resume_sweep: int = 0):
         """Refine once and retain CPU states at selected sweep counts.
 
         This is intended for constant-schedule horizon grids: the state after,
         for example, 20 sweeps of an 80-sweep constant-LR trajectory is exactly
         the state produced by a separate 20-sweep run.  Horizon-dependent
         schedules such as cosine decay must continue to use separate runs.
+
+        Passing ``resume_state`` (the state this method previously returned at
+        ``resume_sweep``) CONTINUES that trajectory instead of restarting it:
+        only ``refine_cfg.steps - resume_sweep`` further sweeps are run, and the
+        captured checkpoints are exactly those a fresh full-length run would
+        have produced at the requested counts beyond ``resume_sweep``.
+        ``refine_cfg.steps`` is always the absolute total sweep count.
         """
         wanted = set(checkpoint_steps)
         invalid = sorted(step for step in wanted
@@ -445,6 +455,9 @@ class MergeContext:
         if invalid:
             raise ValueError(f"checkpoint steps outside [0, {refine_cfg.steps}]: "
                              f"{invalid}")
+        if resume_sweep and resume_state is None:
+            raise ValueError("resume_sweep requires resume_state")
+        wanted = {s for s in wanted if s > resume_sweep or s == 0}
 
         checkpoints = OrderedDict()
 
@@ -454,12 +467,15 @@ class MergeContext:
                     (name, value.detach().cpu().clone())
                     for name, value in state.items())
 
-        if 0 in wanted:
+        if 0 in wanted and not resume_sweep:
             save_checkpoint(0, start_state)
+        run_cfg = dataclasses.replace(
+            refine_cfg, steps=refine_cfg.steps - resume_sweep)
         _refined, history = refine(
-            start_state, self.handles, refine_cfg, self.device, seed=seed,
+            resume_state if resume_sweep else start_state,
+            self.handles, run_cfg, self.device, seed=seed,
             move_model=not self.keep_model_on_device, logger=_log,
-            checkpoint_callback=save_checkpoint)
+            checkpoint_callback=save_checkpoint, start_sweep=resume_sweep)
         missing = wanted - set(checkpoints)
         if missing:
             raise RuntimeError(f"failed to capture refinement steps: "

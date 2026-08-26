@@ -185,7 +185,8 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
            device: str, seed: int = 0,
            move_model: bool = True,
            logger=None,
-           checkpoint_callback: Optional[Callable[[int, ParamDict], None]] = None
+           checkpoint_callback: Optional[Callable[[int, ParamDict], None]] = None,
+           start_sweep: int = 0
            ) -> (ParamDict, List[dict]):
     """Run S sweeps of refinement. Returns ``(refined_encoder, history)``.
 
@@ -194,7 +195,23 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
     must clone any state it wants to retain because refinement continues in
     place.  This supports exact checkpoint reuse for constant-schedule sweeps
     without changing the existing return type or other callers.
+
+    ``start_sweep`` CONTINUES a constant-schedule trajectory: pass the state a
+    previous call returned after ``start_sweep`` sweeps as ``base_merged``, and
+    this call runs sweeps ``start_sweep .. start_sweep+cfg.steps-1`` exactly as
+    the tail of one longer run would have. Equivalence holds because the only
+    stochastic ingredient consumed per sweep is the task-order draw, whose
+    stream is advanced by ``start_sweep`` burnt shuffles below (the torch
+    generator is consumed only by random-gate modes, which do not support
+    continuation), and because with a constant learning rate ``_sweep_lr`` does
+    not depend on the sweep index. Horizon-dependent schedules must not use it.
     """
+    if start_sweep and cfg.lr_schedule != "constant":
+        raise ValueError("start_sweep requires a constant lr schedule")
+    if start_sweep and cfg.gate_mode.startswith("random"):
+        raise ValueError("start_sweep cannot reproduce random-gate draws")
+    if start_sweep and cfg.freeze_first_gates:
+        raise ValueError("start_sweep cannot reproduce sweep-0 frozen gates")
     enc_names = list(base_merged.keys())
     theta = pd_to(pd_clone(base_merged), device)
     by_name = {h.name: h for h in handles}
@@ -206,7 +223,13 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
     frozen_masks: Dict[str, ParamDict] = {}
     history: List[dict] = []
 
-    for s in range(cfg.steps):
+    # advance the order stream to where the previous segment left it: one
+    # shuffle of an equal-length list consumes exactly the same RNG draws
+    if cfg.order == "random":
+        for _ in range(start_sweep):
+            py_rng.shuffle(list(order_names))
+
+    for s in range(start_sweep, start_sweep + cfg.steps):
         lr_eff = _sweep_lr(cfg, s)
         # for the trust region, lr is already folded into the clipped update
         # inside _compute_update, so it is applied with unit step here; the
