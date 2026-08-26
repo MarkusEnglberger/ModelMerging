@@ -283,6 +283,8 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
             history.append(stats)
             if logger:
                 logger(f"  sweep {s} task {name}: gate_density={stats['gate_density']:.4f} "
+                       f"clip_gated={stats['clipped_frac_gated']:.4f} "
+                       f"clip_all={stats['clipped_frac_all']:.4f} "
                        f"ap_sum={stats['ap_sum']:.4g} step|lr*u|={stats['step_norm']:.4g} "
                        f"(raw|u|={raw_norm:.4g})")
             # release this task's large GPU param-dicts before the next task's

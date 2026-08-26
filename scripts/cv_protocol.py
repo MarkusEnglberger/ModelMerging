@@ -155,6 +155,30 @@ def boundary_of(sel_lr, sel_S, lrs, steps, init_obj, obj_at_min_S):
 # the labeled arms: K-fold CV then refit
 # ---------------------------------------------------------------------------
 
+def clip_summary(history):
+    """How often the expert-distance cap actually bound, over a trajectory.
+
+    ``clipped_frac_gated`` is the share of GATED coordinates whose pre-clip step
+    exceeded the remaining expert distance, i.e. that were snapped exactly onto
+    the expert. The cap binds when eta*|g_r| > 1, a condition on gradient
+    magnitude alone (|v| cancels), so this is the quantity that says whether the
+    selected eta makes the update perturbative or saturating. refine() computes
+    it per (sweep, task); nothing used to read it back.
+    """
+    if not history:
+        return None
+    cg = [h["clipped_frac_gated"] for h in history if "clipped_frac_gated" in h]
+    ca = [h["clipped_frac_all"] for h in history if "clipped_frac_all" in h]
+    gd = [h["gate_density"] for h in history if "gate_density" in h]
+    if not cg:
+        return None
+    return {"n_steps": len(cg),
+            "clipped_frac_gated_mean": sum(cg) / len(cg),
+            "clipped_frac_gated_max": max(cg),
+            "clipped_frac_all_mean": sum(ca) / len(ca),
+            "gate_density_mean": sum(gd) / len(gd) if gd else None}
+
+
 def step_cap(args, arm):
     """Horizon ceiling for an arm from --max_steps (None = unbounded).
     Tokens are either a bare integer (every arm) or ``arm=value``."""
@@ -176,6 +200,7 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
     names = ctx.task_names
     cells: Dict[tuple, list] = {}      # (lr,S) -> per-fold objectives
     traces: Dict[str, dict] = {}
+    clip_cells: Dict[str, list] = {}   # "lr..,fold.." -> cap-binding summaries
     # (lr, k) -> (CPU state at sweeps_done, sweeps_done): a constant-lr
     # trajectory is CONTINUED when the horizon grid grows, never re-run
     # (Section: run_refine_checkpoints_from resume_state/resume_sweep)
@@ -210,17 +235,22 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                     _log(f"[{draw_tag}][{arm}] lr={lr:g} fold {k+1}/{K} "
                          f"(construct {len(train[names[0]])}, "
                          f"hold {len(held[names[0]])})")
-                    states, _ = ctx.run_refine_checkpoints_from(
+                    states, hist = ctx.run_refine_checkpoints_from(
                         init_state, rc, sorted(steps), seed=cfg.seed)
                     new_S = sorted(steps)
                 else:
                     resume_state, done_upto = prev
                     _log(f"[{draw_tag}][{arm}] lr={lr:g} fold {k+1}/{K} "
                          f"continuing S={done_upto} -> {max_S}")
-                    states, _ = ctx.run_refine_checkpoints_from(
+                    states, hist = ctx.run_refine_checkpoints_from(
                         init_state, rc, sorted(steps), seed=cfg.seed,
                         resume_state=resume_state, resume_sweep=done_upto)
                     new_S = [S for S in sorted(steps) if S > done_upto]
+                # cap-binding rate over the segment just run, per (lr, fold);
+                # continuation segments accumulate into the same key
+                cs = clip_summary(hist)
+                if cs is not None:
+                    clip_cells.setdefault(f"lr{lr:g},fold{k}", []).append(cs)
                 for S in new_S:
                     agg, per_task = scored(ctx, states[S], ref)
                     cells.setdefault((lr, S), []).append(agg)
@@ -268,7 +298,13 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                              order=args.order, lr_schedule="constant",
                              **ARM_KW[arm])
     _log(f"[{draw_tag}][{arm}] REFIT on all {args.budget} at lr={sel_lr:g}, S={sel_S}")
-    refit, _ = ctx.run_refine_from(init_state, rc, seed=cfg.seed)
+    refit, refit_hist = ctx.run_refine_from(init_state, rc, seed=cfg.seed)
+    refit_clip = clip_summary(refit_hist)
+    if refit_clip is not None:
+        _log(f"[{draw_tag}][{arm}] refit cap-binding: "
+             f"{refit_clip['clipped_frac_gated_mean']:.4f} of gated coords "
+             f"(max {refit_clip['clipped_frac_gated_max']:.4f} over steps), "
+             f"gate_density={refit_clip['gate_density_mean']:.4f}")
     return refit, {
         "selected_lr": sel_lr, "selected_S": sel_S,
         "cv_objective": mean_obj[(sel_lr, sel_S)],
@@ -278,6 +314,8 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         "S_cap": cap, "S_capped": bool(S_capped),
         "displacement": pd_global_norm(pd_sub(refit, init_state)),
         "traces": traces,
+        "refit_clip": refit_clip,        # cap-binding at the EVALUATED model
+        "selection_clip": clip_cells,    # cap-binding per (lr, fold) in selection
     }
 
 
