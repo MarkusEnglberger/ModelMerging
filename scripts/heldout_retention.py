@@ -111,6 +111,11 @@ def main():
     ap.add_argument("--apr_order", default="random",
                     choices=["fixed", "cyclic", "random"])
     ap.add_argument("--lr_min_frac", type=float, default=0.05)
+    ap.add_argument("--state_files", nargs="*", default=[],
+                    help="label=path.pt pairs: evaluate saved encoder states "
+                         "directly (cv_protocol.py --save_winners output), so "
+                         "the probed model IS the reported one and nothing is "
+                         "re-derived")
     ap.add_argument("--out", default="results/compare/heldout_retention.json")
     args = ap.parse_args()
 
@@ -157,6 +162,16 @@ def main():
              f"(vs base {base_h_mean:.4f}, drop {h_m - base_h_mean:+.4f})  "
              f"dist0={d0:.3f}")
         return tr_m
+
+    # saved winners from protocol-v2 runs: the evaluated model IS the reported
+    # one (no re-derivation), and every draw's winner can be probed for error bars
+    for spec in args.state_files:
+        import torch
+        label, path = spec.split("=", 1)
+        _log(f"[state] {label} <- {path}")
+        st = torch.load(path, map_location="cpu")
+        record(label, st, state_file=path)
+        del st
 
     # base model: scores already computed at build time; distance 0 by definition.
     record("base:theta0", ctx.base_encoder, scores=ctx.base_scores)
