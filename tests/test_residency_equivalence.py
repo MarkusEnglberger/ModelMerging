@@ -30,20 +30,39 @@ import torch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from apr.config import RefineConfig
-from apr.refine import refine, _compute_update
+from apr.refine import refine, TaskHandle, _compute_update
 
-from test_refine import make_handle
+from test_refine import Quad
+
+
+def _make_handle(name, d, expert_vec, target_vec, device):
+    """Device-aware version of test_refine.make_handle.
+
+    The shared fixture closes over a CPU target, which breaks under
+    move_model=True on CUDA: refine() moves the model to the device before
+    calling grad_fn, so the parameters are on CUDA while the target is not.
+    Here the model, expert and target all live on `device` from the start,
+    which is also what the resident path assumes of a real context.
+    """
+    model = Quad(d).to(device)
+    target = target_vec.to(device)
+    expert = OrderedDict({"enc.w": expert_vec.to(device)})
+
+    def grad_fn():
+        w = dict(model.named_parameters())["enc.w"].detach()
+        return OrderedDict({"enc.w": (w - target.to(w.device)).clone()})
+
+    return TaskHandle(name, model, expert, grad_fn)
 
 
 def _setup(d=512, n_tasks=3, seed=5, device="cpu"):
     g = torch.Generator().manual_seed(seed)
     handles = []
-    for name in [f"t{i}" for i in range(n_tasks)]:
+    for i in range(n_tasks):
         expert = torch.randn(d, generator=g)
         target = torch.randn(d, generator=g)
-        h, _ = make_handle(name, d, expert, target)
-        handles.append(h)
-    base = OrderedDict({"enc.w": torch.randn(d, generator=g)})
+        handles.append(_make_handle(f"t{i}", d, expert, target, device))
+    base = OrderedDict({"enc.w": torch.randn(d, generator=g).to(device)})
     return base, handles
 
 
