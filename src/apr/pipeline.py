@@ -27,7 +27,8 @@ import torch
 from .config import ExperimentConfig, RefineConfig
 from .tasks import get_task
 from .models import (load_tokenizer, load_classifier, get_encoder_state,
-                     load_encoder_state, ParamDict, pd_sub, pd_global_norm)
+                     load_encoder_state, ParamDict, pd_sub, pd_global_norm,
+                     pd_to)
 from .data import (load_task_dataset, sample_replay_buffer,
                    sample_replay_buffer_split, batches_from_buffer, make_collator)
 from .gradients import make_grad_fn
@@ -310,6 +311,59 @@ def _log(msg: str):
     print(msg, flush=True)
 
 
+#: fraction of total device memory the resident path is allowed to plan for.
+#: Conservative on purpose -- the estimate below counts parameters, not the
+#: activations a forward/backward allocates on top.
+RESIDENT_MEMORY_FRACTION = 0.5
+
+
+def decide_residency(cfg, device, handles, shared_model):
+    """Keep the task models and expert encoders on the device, or shuttle them?
+
+    refine() originally moved each task model to the GPU, took its gradient,
+    moved it back and emptied the allocator cache -- every task, every sweep --
+    and copied the expert encoder over alongside. That was written for the 3B
+    MergeBench models, where the card genuinely cannot hold eight models at
+    once. For RoBERTa-base and ViT-B/32 it dominates the step: profiling put
+    roughly two thirds of a task-step in those transfers.
+
+    The decision is made from PARAMETER COUNTS and the device's TOTAL memory,
+    never from free memory, so a given config always takes the same path -- a
+    free-memory rule would silently change behaviour depending on what else
+    happens to share the node. Set cfg.data.resident (True/False) to override.
+    """
+    if not device.startswith("cuda"):
+        return False, {"reason": "cpu device: shuttling", "need_gib": 0.0,
+                       "total_gib": 0.0}
+
+    def nbytes(params):
+        return sum(p.numel() * p.element_size() for p in params)
+
+    models = {id(h.model): h.model for h in handles}.values()
+    model_b = sum(nbytes(m.parameters()) for m in models)
+    expert_b = sum(nbytes(h.expert_encoder.values()) for h in handles)
+    enc_b = max((nbytes(h.expert_encoder.values()) for h in handles), default=0)
+    # per-step working set: theta, g, v, u, masks, plus slack for the snapshot
+    # of aggregated mode and for autograd's activations.
+    work_b = 8 * enc_b
+    need_b = model_b + expert_b + work_b
+    total_b = torch.cuda.get_device_properties(device).total_memory
+    info = {"need_gib": need_b / 2**30, "total_gib": total_b / 2**30,
+            "model_gib": model_b / 2**30, "expert_gib": expert_b / 2**30,
+            "work_gib": work_b / 2**30,
+            "fraction": RESIDENT_MEMORY_FRACTION}
+
+    override = getattr(cfg.data, "resident", None)
+    if override is not None:
+        info["reason"] = f"resident={override} (config override)"
+        return bool(override), info
+
+    fits = need_b <= RESIDENT_MEMORY_FRACTION * total_b
+    info["reason"] = ("models and experts resident on device" if fits else
+                      "footprint too large: shuttling models per task-step")
+    return fits, info
+
+
 class MergeContext:
     """Reusable setup: experts loaded, merge built, base/expert/merge scored."""
 
@@ -331,9 +385,19 @@ class MergeContext:
         self.task_vectors = task_vectors or {}
         self.lambdas = lambdas or {}
         self.shared_model = len({id(h.model) for h in handles}) == 1
-        self.keep_model_on_device = self.shared_model and cfg.modality == "t5_mats_ia3"
+        self.keep_model_on_device, self.residency = decide_residency(
+            cfg, device, handles, self.shared_model)
         if self.keep_model_on_device:
-            handles[0].model.to(device)
+            # models AND expert encoders stay put: refine() forms
+            # v = theta_i - theta every task-step, so a CPU-resident expert
+            # would be copied across the bus 8-20 times per sweep.
+            for m in {id(h.model): h.model for h in handles}.values():
+                m.to(device)
+            for h in handles:
+                h.expert_encoder = pd_to(h.expert_encoder, device)
+        _log(f"[residency] {self.residency['reason']} "
+             f"(need ~{self.residency['need_gib']:.1f} GiB of "
+             f"{self.residency['total_gib']:.1f} GiB)")
 
     @property
     def task_names(self) -> List[str]:

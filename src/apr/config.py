@@ -68,6 +68,11 @@ class DataConfig:
     # CLIP/ViT track sets this >0 so PIL decode+resize of images runs in parallel
     # and does not starve the GPU (the dominant cost for large image test sets).
     eval_num_workers: int = 0
+    # Keep task models and expert encoders on the device instead of shuttling
+    # them per task-step. None => decide from the parameter footprint (see
+    # apr.pipeline.decide_residency); True/False forces the choice. Forcing
+    # True on a model too large for the card will OOM.
+    resident: Optional[bool] = None
     probe_seed: int = 0  # sampling seed for replay buffers
     class_balanced: bool = True
     cache_dir: Optional[str] = None

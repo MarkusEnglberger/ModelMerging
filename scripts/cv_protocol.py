@@ -62,6 +62,7 @@ from apr.pipeline import MergeContext, _log
 from apr.gradients import make_grad_fn
 from apr.data import sample_replay_buffer
 from apr.replay_baselines import replay_losses, fisher_merge_matena
+from apr.localize_stitch import learn_sigmoids, masks_from_sigmoids, stitch
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
@@ -154,6 +155,69 @@ def boundary_of(sel_lr, sel_S, lrs, steps, init_obj, obj_at_min_S):
 # ---------------------------------------------------------------------------
 # the labeled arms: K-fold CV then refit
 # ---------------------------------------------------------------------------
+
+def ls_select_and_refit(ctx, budget_bufs, folds, args, draw_tag):
+    """Localize-and-Stitch with LEARNED masks, under select-then-refit.
+
+    L&S is the one baseline whose construction consumes labels, so it cannot
+    follow the merge rule of scoring every candidate on all B: the masks would
+    be trained and scored on the same examples. It follows the labeled arms
+    instead -- train masks on the construction fold, choose (gamma, sparsity,
+    lambda) by held-out replay loss on the other fold, then retrain the masks on
+    all B at the chosen gamma and apply the chosen sparsity and lambda.
+
+    One mask training serves an entire sparsity grid (masks_from_sigmoids
+    top-k's the same sigmoids), so the cost is one training pass per gamma plus
+    one refit pass, not one per candidate.
+    """
+    names = ctx.task_names
+    K = args.folds
+    train = {n: [e for f in range(K) if f != 0 for e in folds[n][f]] for n in names}
+    held = {n: folds[n][0] for n in names}
+    set_construction_buffer(ctx, train)
+    set_score_buffer(ctx, held)
+    ref = replay_losses(ctx, ctx.base_encoder, buffer_key="cv_buffer")
+
+    best = None                      # (obj, gamma, sparsity, lam, info)
+    traces = {}
+    for gamma in args.ls_gammas:
+        _log(f"[{draw_tag}][ls] learning masks on {len(train[names[0]])} "
+             f"examples, gamma={gamma:g}")
+        sig = learn_sigmoids(ctx, steps=args.ls_steps, lr=args.ls_lr,
+                             gamma=gamma, batch_size=args.ls_bs, logger=_log)
+        for sp in args.ls_sparsities:
+            masks = masks_from_sigmoids(sig, sp)
+            for lam in args.ls_lams:
+                state, info = stitch(ctx.base_encoder, ctx.task_vectors,
+                                     masks, lam=lam)
+                agg, _ = scored(ctx, state, ref)
+                traces[f"g{gamma:g},sp{sp:g},l{lam:g}"] = {
+                    "objective": agg, "covered_frac": info["covered_frac"],
+                    "overlap_frac": info["overlap_frac"]}
+                if best is None or agg < best[0]:
+                    best = (agg, gamma, sp, lam, info)
+                del state
+        del sig
+
+    obj, gamma, sp, lam = best[0], best[1], best[2], best[3]
+    _log(f"[{draw_tag}][ls] REFIT masks on all {args.budget} at gamma={gamma:g}, "
+         f"applying sparsity={sp:g}, lambda={lam:g} (held-out obj {obj:.4f})")
+    set_construction_buffer(ctx, budget_bufs)
+    sig = learn_sigmoids(ctx, steps=args.ls_steps, lr=args.ls_lr, gamma=gamma,
+                         batch_size=args.ls_bs, logger=_log)
+    state, info = stitch(ctx.base_encoder, ctx.task_vectors,
+                         masks_from_sigmoids(sig, sp), lam=lam)
+    return state, {
+        "selected": f"LS@g{gamma:g},sp{sp:g},l{lam:g}",
+        "selection_obj": obj,
+        "ls_gamma": gamma, "ls_sparsity": sp, "ls_lam": lam,
+        "ls_grid": {"gammas": args.ls_gammas, "sparsities": args.ls_sparsities,
+                    "lams": args.ls_lams, "steps": args.ls_steps},
+        "covered_frac": info["covered_frac"], "overlap_frac": info["overlap_frac"],
+        "traces": traces,
+        "tier": "labeled construction",
+    }
+
 
 def clip_summary(history):
     """How often the expert-distance cap actually bound, over a trajectory.
@@ -402,8 +466,10 @@ def main():
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
-                    choices=["pretrained"] + ["ta", "ties", "dareties", "bc"],
-                    help="initialization the labeled arms refine from")
+                    choices=["pretrained", "ta", "ties", "dareties", "bc",
+                             "fisher", "ls"],
+                    help="initialization the labeled arms refine from; 'fisher' "
+                         "requires --fisher and 'ls' requires --ls")
     ap.add_argument("--arms", nargs="*", default=["apr", "nogate", "gd"])
     ap.add_argument("--apr_lrs", type=float, nargs="*",
                     default=[1, 2, 4, 8, 16, 32])
@@ -429,6 +495,18 @@ def main():
     ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01, 0.05])
     ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.4])
     ap.add_argument("--skip_merges", action="store_true")
+    ap.add_argument("--ls", action="store_true",
+                    help="add Localize-and-Stitch with masks LEARNED on the "
+                         "buffer, under select-then-refit")
+    ap.add_argument("--ls_gammas", type=float, nargs="*",
+                    default=[0.0, 1e-7, 1e-6, 1e-5], help="L1 penalty grid")
+    ap.add_argument("--ls_sparsities", type=float, nargs="*",
+                    default=[0.01, 0.05, 0.1])
+    ap.add_argument("--ls_lams", type=float, nargs="*",
+                    default=[0.1, 0.2, 0.3, 0.5, 1.0])
+    ap.add_argument("--ls_steps", type=int, default=300)
+    ap.add_argument("--ls_lr", type=float, default=0.1)
+    ap.add_argument("--ls_bs", type=int, default=16)
     ap.add_argument("--fisher", action="store_true",
                     help="include Fisher merging (expected label-free Fisher, "
                          "per-model simplex coefficients) among the candidates")
@@ -438,6 +516,12 @@ def main():
                     help="directory to persist the refit winners' weights")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
+    if args.init == "fisher" and not args.fisher:
+        ap.error("--init fisher requires --fisher (nothing would build it)")
+    if args.init == "ls" and not args.ls:
+        ap.error("--init ls requires --ls (nothing would build it)")
+    if args.init != "pretrained" and args.skip_merges:
+        ap.error(f"--init {args.init} needs the merges built; drop --skip_merges")
 
     cfg = ExperimentConfig.from_yaml(args.config)
     cfg.data.n_probe = args.budget      # buffers are replaced per draw anyway
@@ -540,8 +624,23 @@ def main():
                     **({"meta": meta[fam]} if fam in meta else {})}
                 _log(f"[{tag}][merge] WINNER {nm}: "
                      f"mean_nr={ag['mean_normret']:.4f} mean_acc={ag['mean_acc']:.4f}")
-                if args.init != "pretrained" and fam.lower().startswith(args.init[:2]):
+                if args.init != "pretrained" and fam.lower() == args.init.lower():
                     init_state = state
+
+            # Localize-and-Stitch: labeled construction, so select-then-refit
+            # rather than the merges' score-on-all-B rule (see ls_select_and_refit)
+            if args.ls:
+                ls_state, ls_info = ls_select_and_refit(ctx, budget_bufs, folds,
+                                                        args, tag)
+                scores, nr, ag = eval_and_record(ctx, ls_state)
+                ls_info.update({"scores": scores, "normret": nr, "aggregate": ag})
+                entry["methods"]["merge:LS"] = ls_info
+                _log(f"[{tag}][ls] WINNER {ls_info['selected']}: "
+                     f"mean_nr={ag['mean_normret']:.4f} mean_acc={ag['mean_acc']:.4f}")
+                if args.init.lower() == "ls":
+                    init_state = ls_state
+                else:
+                    del ls_state
 
         # ---- labeled arms: CV select -> refit -> evaluate ----
         for arm in args.arms:

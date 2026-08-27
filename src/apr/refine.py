@@ -123,10 +123,19 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         del neg
     u = OrderedDict()
     masks = OrderedDict()
-    ap_sum = 0.0
-    gated = 0
     total = 0
-    clipped = 0  # gated coords whose step hit the +/- |v| boundary
+    # Diagnostic counters are accumulated ON DEVICE and read back once, after
+    # the loop. Reading them per tensor (.item()/float()) forced three
+    # host-device syncs for each of ~200 encoder tensors -- ~600 stalls per
+    # task-step, which profiling put at ~65 ms of a ~140 ms step. None of these
+    # values feeds the update itself (the gate is the per-coordinate sign of
+    # g*v), so the refined weights are bit-identical either way; only ap_sum's
+    # last digits can move, because the partial sums are now added in float64
+    # on device instead of in Python.
+    dev = next(iter(g.values())).device
+    ap_sum_t = torch.zeros((), device=dev, dtype=torch.float64)
+    gated_t = torch.zeros((), device=dev, dtype=torch.int64)
+    clipped_t = torch.zeros((), device=dev, dtype=torch.int64)
     for name in g:
         gi, vi = g[name], v[name]
         if frozen_mask is not None:
@@ -162,19 +171,23 @@ def _compute_update(g: ParamDict, v: ParamDict, cfg: RefineConfig,
         if pre is not None:
             # count coords pushed to the trust-region boundary (only gated ones
             # can be, since masked coords have u_raw=0 <= bound)
-            clipped += int(((pre.abs() > bound) & (m > 0)).sum().item())
+            clipped_t += ((pre.abs() > bound) & (m > 0)).sum()
         if cfg.rms_normalize:
             rms = torch.sqrt((u_t ** 2).mean())
             if rms > 0:
                 u_t = u_t / rms
         u[name] = u_t
         masks[name] = m
-        ap_sum += float((gi * vi).sum())
+        ap_sum_t += (gi * vi).sum(dtype=torch.float64)
         # count via bool->int64: float-dtype m.sum() accumulates in fp32 and
         # loses integer precision on >2^24-element tensors (logged density 1.0001
         # for an all-ones mask on Llama's 394M-param tied embedding)
-        gated += int((m > 0).sum().item())
+        gated_t += (m > 0).sum()
         total += m.numel()
+    # the one host-device sync of the step
+    ap_sum = float(ap_sum_t)
+    gated = int(gated_t)
+    clipped = int(clipped_t)
     stats = {"ap_sum": ap_sum, "gate_density": gated / max(total, 1),
              "clipped_frac_gated": clipped / max(gated, 1),
              "clipped_frac_all": clipped / max(total, 1)}
@@ -293,7 +306,12 @@ def refine(base_merged: ParamDict, handles: List[TaskHandle], cfg: RefineConfig,
             # u is already folded into theta/agg_u; masks is cloned into
             # frozen_masks above when needed. The model was moved to CPU above.
             del g, v, u, masks
-            if device.startswith("cuda"):
+            # Only the shuttled path needs this. empty_cache() releases the
+            # allocator's cached blocks and synchronises, so on the resident
+            # path -- where the models and experts stay put and the per-step
+            # dicts are the same shapes every time -- it throws away exactly the
+            # blocks the next step reallocates, for a full sync each step.
+            if move_model and device.startswith("cuda"):
                 torch.cuda.empty_cache()
 
         if cfg.aggregated and agg_u is not None:
