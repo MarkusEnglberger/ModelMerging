@@ -61,7 +61,8 @@ from apr.config import ExperimentConfig
 from apr.pipeline import MergeContext, _log
 from apr.gradients import make_grad_fn
 from apr.data import sample_replay_buffer
-from apr.replay_baselines import replay_losses, fisher_merge_matena
+from apr.replay_baselines import (replay_losses, replay_metrics,
+                                  fisher_merge_matena)
 from apr.localize_stitch import learn_sigmoids, masks_from_sigmoids, stitch
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm
@@ -113,12 +114,29 @@ def set_score_buffer(ctx, buffers: Dict[str, list]):
         ctx.per_task[name]["cv_buffer"] = buffers[name]
 
 
-def scored(ctx, state, ref: Dict[str, float]) -> (float, Dict[str, float]):
-    """Scale-free held-out objective: mean_t L_t(state)/L_t(reference).
+def scored(ctx, state, ref: Dict[str, float], select_on: str = "loss"
+           ) -> (float, Dict[str, float]):
+    """Held-out selection objective (LOWER is better). Reads no eval split.
 
-    Raw losses are not commensurable across tasks, so each is normalised by the
-    initialization's loss on the SAME examples. Returns (aggregate, per-task).
+    ``loss`` (default): mean_t L_t(state)/L_t(reference). Raw losses are not
+    commensurable across tasks, so each is normalised by the initialization's
+    loss on the SAME examples.
+
+    ``metric``: minus the mean of the tasks' own reported metrics. Held-out
+    cross-entropy is a biased RANKING function whenever the grid spans a wide
+    confidence range: GLUE's pretrained heads sit at CE ~ ln C (maximum
+    entropy), and because -log p is unbounded above, becoming confident raises
+    CE on the examples it gets wrong faster than it lowers CE on those it gets
+    right -- until accuracy clears ~0.8. Selection then prefers a model that
+    has not moved. Measured on GLUE-8: at the cell a pinned probe shows is
+    good, held-out CE RISES on 6 of 8 tasks while the metric improves on 5 of
+    those 6. The metric is noisier on a small fold but unbiased. CLIP-8 does
+    not show this (zero-shot CE / ln C is 0.39-0.91, already informative), so
+    the correction is expected to be inert there.
     """
+    if select_on == "metric":
+        M = replay_metrics(ctx, state, buffer_key="cv_buffer")
+        return -sum(M.values()) / len(M), M
     L = replay_losses(ctx, state, buffer_key="cv_buffer")
     agg = sum(L[n] / max(ref[n], 1e-8) for n in L) / len(L)
     return agg, L
@@ -190,7 +208,7 @@ def ls_select_and_refit(ctx, budget_bufs, folds, args, draw_tag):
             for lam in args.ls_lams:
                 state, info = stitch(ctx.base_encoder, ctx.task_vectors,
                                      masks, lam=lam)
-                agg, _ = scored(ctx, state, ref)
+                agg, _ = scored(ctx, state, ref, args.select_on)
                 traces[f"g{gamma:g},sp{sp:g},l{lam:g}"] = {
                     "objective": agg, "covered_frac": info["covered_frac"],
                     "overlap_frac": info["overlap_frac"]}
@@ -316,7 +334,8 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                 if cs is not None:
                     clip_cells.setdefault(f"lr{lr:g},fold{k}", []).append(cs)
                 for S in new_S:
-                    agg, per_task = scored(ctx, states[S], ref)
+                    agg, per_task = scored(ctx, states[S], ref,
+                                           args.select_on)
                     cells.setdefault((lr, S), []).append(agg)
                     traces[f"lr{lr:g},S{S},fold{k}"] = {
                         "objective": agg,
@@ -331,8 +350,9 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
         (sel_lr, sel_S) = min(mean_obj, key=mean_obj.get)
         # S=0 reference on fold 0 for the interiority test
         set_score_buffer(ctx, {n: folds[n][0] for n in names})
-        ref0 = replay_losses(ctx, init_state, buffer_key="cv_buffer")
-        init_obj = 1.0                                     # by construction
+        init_obj, _ = scored(ctx, init_state, ref, args.select_on)
+        # for the loss objective this is 1.0 by construction; for the metric
+        # objective it is minus the initialization's own mean metric
         obj_min_S = mean_obj[(sel_lr, min(steps))]
         edges = boundary_of(sel_lr, sel_S, lrs, steps, init_obj, obj_min_S)
         S_capped = ("S_high" in edges and cap is not None
@@ -480,6 +500,12 @@ def main():
     ap.add_argument("--steps", type=int, nargs="*", default=[5, 20, 50, 100])
     ap.add_argument("--order", default="random", choices=["random", "fixed"])
     ap.add_argument("--max_extensions", type=int, default=2)
+    ap.add_argument("--select_on", default="loss", choices=["loss", "metric"],
+                    help="held-out selection objective. 'loss': normalised "
+                         "replay cross-entropy (default). 'metric': the tasks' "
+                         "own reported metrics, which held-out CE ranks "
+                         "incorrectly when the initialization is at maximum "
+                         "entropy (see scored()). Applies to EVERY method.")
     ap.add_argument("--max_steps", nargs="*", default=None,
                     help="horizon ceiling: bare integer (all arms) or arm=value "
                          "tokens, e.g. apr=100. Grid entries above it are dropped "
@@ -550,8 +576,11 @@ def main():
             "draws": args.draws,
             "construction_per_fold": args.budget - args.budget // args.folds,
             "refit_on": args.budget,
-            "selection_rule": "mean over folds of held-out replay loss, "
-                              "normalised by the initialization on the same fold",
+            "selection_rule": (
+                "mean over folds of held-out replay loss, normalised by the "
+                "initialization on the same fold" if args.select_on == "loss"
+                else "mean over folds of the held-out per-task metric"),
+            "select_on": args.select_on,
             "init": args.init,
             "order": args.order,
             "evaluation_split_used_for": "selected cells only",
@@ -587,14 +616,14 @@ def main():
                 for nm, state, mt in fisher_merge_matena(
                         ctx, budget_bufs, None, n_points=args.fisher_points,
                         seed=seed, logger=_log):
-                    agg, _ = scored(ctx, state, ref)
+                    agg, _ = scored(ctx, state, ref, args.select_on)
                     if "FISHER" not in best or agg < best["FISHER"][0]:
                         best["FISHER"] = (agg, nm, state)
                         meta["FISHER"] = mt
                     _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
             for attempt in range(args.max_extensions + 1):
                 for nm, state in merge_candidates(ctx, args):
-                    agg, _ = scored(ctx, state, ref)
+                    agg, _ = scored(ctx, state, ref, args.select_on)
                     fam = nm.split("@")[0]
                     if fam not in best or agg < best[fam][0]:
                         best[fam] = (agg, nm, state)

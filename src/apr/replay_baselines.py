@@ -36,6 +36,7 @@ import torch
 
 from .data import batches_from_buffer
 from .eval import evaluate_task
+from .metrics import score_predictions
 from .models import (ParamDict, load_encoder_state, get_head_state, load_head_state,
                      is_head_param, pd_clone, pd_axpy_)
 from .taskvec import task_arithmetic_merge
@@ -73,6 +74,67 @@ def replay_losses(ctx, state: ParamDict,
         out[n] = buffer_loss(info["model"], info[buffer_key], info["collator"],
                              ctx.cfg.data.eval_batch_size, ctx.device,
                              move_model=not ctx.keep_model_on_device)
+    return out
+
+
+@torch.no_grad()
+def buffer_metric(model, buffer, spec, collator, batch_size: int, device: str,
+                  move_model: bool = True) -> float:
+    """The task's own GLUE-convention metric on a replay buffer.
+
+    The classification counterpart of :func:`buffer_loss`, scoring the same
+    forward pass by the metric the paper reports instead of by cross-entropy.
+    Cross-entropy is a poor RANKING function across models of differing
+    confidence: from a maximum-entropy initialization (GLUE's pretrained heads
+    sit at CE ~ ln C) any gain in confidence RAISES held-out CE until accuracy
+    clears roughly 0.8, so a timid model outranks an accurate one. The metric
+    has no such bias, at the cost of sampling noise on a small fold.
+
+    Degenerate cases are real on an 8-example fold and are mapped to 0.0, the
+    score of an uninformative predictor: MCC is undefined when predictions are
+    constant, and Pearson/Spearman are NaN when either side has zero variance.
+    """
+    model.eval()
+    if move_model:
+        model.to(device)
+    preds, labels = [], []
+    for batch in batches_from_buffer(buffer, collator, batch_size, device):
+        y = batch.pop("labels")
+        logits = model(**batch).logits
+        p = (logits.squeeze(-1) if spec.is_regression
+             else logits.argmax(dim=-1))
+        preds.append(p.float().cpu().numpy())
+        labels.append(y.float().cpu().numpy())
+    if move_model:
+        model.to("cpu")
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
+    import numpy as np
+    preds = np.concatenate(preds)
+    labels = np.concatenate(labels)
+    if not spec.is_regression:
+        preds = preds.astype(int)
+        labels = labels.astype(int)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        try:
+            v = float(score_predictions(spec, preds, labels)["primary"])
+        except Exception:
+            return 0.0
+    return 0.0 if (v != v) else v          # NaN -> 0
+
+
+def replay_metrics(ctx, state: ParamDict,
+                   buffer_key: str = "probe_buffer") -> Dict[str, float]:
+    """Per-task metric on a replay buffer, the selection counterpart of
+    :func:`replay_losses`. Reads no evaluation split."""
+    out = {}
+    for n in ctx.task_names:
+        info = ctx.per_task[n]
+        load_encoder_state(info["model"], state)
+        out[n] = buffer_metric(info["model"], info[buffer_key], info["spec"],
+                               info["collator"], ctx.cfg.data.eval_batch_size,
+                               ctx.device,
+                               move_model=not ctx.keep_model_on_device)
     return out
 
 
