@@ -52,8 +52,9 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 : "${EXTRA:=}"                 # e.g. EXTRA=--fisher
 : "${SUFFIX:=}"
 
+: "${SEED0:=100}"              # buffer seed of array task 0; 103 = fresh draws
 DRAW=${SLURM_ARRAY_TASK_ID:-0}
-SEED=$((100 + DRAW))
+SEED=$((SEED0 + DRAW))
 
 OUT="results/compare/cv_${TAG}_B${BUDGET}_${INIT}${SUFFIX}_draw${DRAW}.json"
 WIN="results/cv_winners/${TAG}_B${BUDGET}_${INIT}${SUFFIX}/draw${DRAW}"

@@ -123,6 +123,65 @@ def buffer_metric(model, buffer, spec, collator, batch_size: int, device: str,
     return 0.0 if (v != v) else v          # NaN -> 0
 
 
+@torch.no_grad()
+def buffer_loss_and_metric(model, buffer, spec, collator, batch_size: int,
+                           device: str, move_model: bool = True
+                           ) -> Tuple[float, float]:
+    """Loss AND metric on a replay buffer from ONE forward pass.
+
+    The metric is the selection criterion and the loss its tie-break, so both
+    are needed for every scored cell; computing them separately would double
+    the held-out passes for no reason.
+    """
+    import numpy as np
+    model.eval()
+    if move_model:
+        model.to(device)
+    tot, n = 0.0, 0
+    preds, labels = [], []
+    for batch in batches_from_buffer(buffer, collator, batch_size, device):
+        out = model(**batch)
+        bn = int(batch["labels"].shape[0])
+        tot += float(out.loss) * bn
+        n += bn
+        p = (out.logits.squeeze(-1) if spec.is_regression
+             else out.logits.argmax(dim=-1))
+        preds.append(p.float().cpu().numpy())
+        labels.append(batch["labels"].float().cpu().numpy())
+    if move_model:
+        model.to("cpu")
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
+    preds = np.concatenate(preds)
+    labels = np.concatenate(labels)
+    if not spec.is_regression:
+        preds = preds.astype(int)
+        labels = labels.astype(int)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        try:
+            v = float(score_predictions(spec, preds, labels)["primary"])
+        except Exception:
+            v = 0.0
+    if v != v:
+        v = 0.0
+    return tot / max(n, 1), v
+
+
+def replay_losses_and_metrics(ctx, state: ParamDict,
+                              buffer_key: str = "probe_buffer"
+                              ) -> Tuple[Dict[str, float], Dict[str, float]]:
+    """(per-task loss, per-task metric) on a replay buffer, one pass per task."""
+    L, M = {}, {}
+    for n in ctx.task_names:
+        info = ctx.per_task[n]
+        load_encoder_state(info["model"], state)
+        L[n], M[n] = buffer_loss_and_metric(
+            info["model"], info[buffer_key], info["spec"], info["collator"],
+            ctx.cfg.data.eval_batch_size, ctx.device,
+            move_model=not ctx.keep_model_on_device)
+    return L, M
+
+
 def replay_metrics(ctx, state: ParamDict,
                    buffer_key: str = "probe_buffer") -> Dict[str, float]:
     """Per-task metric on a replay buffer, the selection counterpart of

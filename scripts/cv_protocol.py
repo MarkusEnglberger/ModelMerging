@@ -62,6 +62,7 @@ from apr.pipeline import MergeContext, _log
 from apr.gradients import make_grad_fn
 from apr.data import sample_replay_buffer
 from apr.replay_baselines import (replay_losses, replay_metrics,
+                                  replay_losses_and_metrics,
                                   fisher_merge_matena)
 from apr.localize_stitch import learn_sigmoids, masks_from_sigmoids, stitch
 from apr.metrics import aggregate_all
@@ -133,13 +134,38 @@ def scored(ctx, state, ref: Dict[str, float], select_on: str = "loss"
     those 6. The metric is noisier on a small fold but unbiased. CLIP-8 does
     not show this (zero-shot CE / ln C is 0.39-0.91, already informative), so
     the correction is expected to be inert there.
+
+    Returns ``(primary, per_task, secondary)``. Under ``metric`` the secondary
+    is the loss objective, used ONLY to break exact ties in the primary: on a
+    small fold the metric is quantized (accuracy on 16 examples moves in steps
+    of 1/16) and distinct cells tie exactly, so the rule is lexicographic --
+    the reported metric first, the finer-grained likelihood of the same
+    predictions where the metric cannot discriminate. Under ``loss`` the
+    secondary is None.
     """
     if select_on == "metric":
-        M = replay_metrics(ctx, state, buffer_key="cv_buffer")
-        return -sum(M.values()) / len(M), M
+        L, M = replay_losses_and_metrics(ctx, state, buffer_key="cv_buffer")
+        sec = sum(L[n] / max(ref[n], 1e-8) for n in L) / len(L)
+        return -sum(M.values()) / len(M), M, sec
     L = replay_losses(ctx, state, buffer_key="cv_buffer")
     agg = sum(L[n] / max(ref[n], 1e-8) for n in L) / len(L)
-    return agg, L
+    return agg, L, None
+
+
+def select_cell(primary: Dict, secondary: Dict = None, ndigits: int = 9):
+    """Lexicographic argmin: primary objective, then secondary as tie-break.
+
+    The primary is rounded before comparison so that cells whose metric is
+    the same rational number (k/n on an n-example fold) compare equal rather
+    than being separated by floating-point summation order. Without a
+    secondary, ties fall to the smallest (lr, S) -- deterministic, and the
+    least-moving of the tied cells.
+    """
+    def key(c):
+        p = round(primary[c], ndigits)
+        s = secondary[c] if secondary and secondary.get(c) is not None else 0.0
+        return (p, s, c)
+    return min(primary, key=key)
 
 
 # ---------------------------------------------------------------------------
@@ -208,16 +234,18 @@ def ls_select_and_refit(ctx, budget_bufs, folds, args, draw_tag):
             for lam in args.ls_lams:
                 state, info = stitch(ctx.base_encoder, ctx.task_vectors,
                                      masks, lam=lam)
-                agg, _ = scored(ctx, state, ref, args.select_on)
+                agg, _, sec = scored(ctx, state, ref, args.select_on)
+                key = (round(agg, 9), sec if sec is not None else 0.0)
                 traces[f"g{gamma:g},sp{sp:g},l{lam:g}"] = {
-                    "objective": agg, "covered_frac": info["covered_frac"],
+                    "objective": agg, "objective_secondary": sec,
+                    "covered_frac": info["covered_frac"],
                     "overlap_frac": info["overlap_frac"]}
-                if best is None or agg < best[0]:
-                    best = (agg, gamma, sp, lam, info)
+                if best is None or key < best[0]:
+                    best = (key, gamma, sp, lam, info)
                 del state
         del sig
 
-    obj, gamma, sp, lam = best[0], best[1], best[2], best[3]
+    obj, gamma, sp, lam = best[0][0], best[1], best[2], best[3]
     _log(f"[{draw_tag}][ls] REFIT masks on all {args.budget} at gamma={gamma:g}, "
          f"applying sparsity={sp:g}, lambda={lam:g} (held-out obj {obj:.4f})")
     set_construction_buffer(ctx, budget_bufs)
@@ -281,6 +309,7 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
     K = args.folds
     names = ctx.task_names
     cells: Dict[tuple, list] = {}      # (lr,S) -> per-fold objectives
+    cells_sec: Dict[tuple, list] = {}  # (lr,S) -> per-fold tie-break objectives
     traces: Dict[str, dict] = {}
     clip_cells: Dict[str, list] = {}   # "lr..,fold.." -> cap-binding summaries
     # (lr, k) -> (CPU state at sweeps_done, sweeps_done): a constant-lr
@@ -334,11 +363,13 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
                 if cs is not None:
                     clip_cells.setdefault(f"lr{lr:g},fold{k}", []).append(cs)
                 for S in new_S:
-                    agg, per_task = scored(ctx, states[S], ref,
-                                           args.select_on)
+                    agg, per_task, sec = scored(ctx, states[S], ref,
+                                                args.select_on)
                     cells.setdefault((lr, S), []).append(agg)
+                    cells_sec.setdefault((lr, S), []).append(sec)
                     traces[f"lr{lr:g},S{S},fold{k}"] = {
                         "objective": agg,
+                        "objective_secondary": sec,
                         "per_task_loss": per_task,
                         "per_task_ref": ref,
                     }
@@ -347,10 +378,12 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 
         n_needed = K if args.rotate else 1
         mean_obj = {c: sum(v) / len(v) for c, v in cells.items() if len(v) == n_needed}
-        (sel_lr, sel_S) = min(mean_obj, key=mean_obj.get)
+        mean_sec = {c: (sum(v) / len(v) if all(x is not None for x in v) else None)
+                    for c, v in cells_sec.items() if len(v) == n_needed}
+        (sel_lr, sel_S) = select_cell(mean_obj, mean_sec)
         # S=0 reference on fold 0 for the interiority test
         set_score_buffer(ctx, {n: folds[n][0] for n in names})
-        init_obj, _ = scored(ctx, init_state, ref, args.select_on)
+        init_obj, _, _ = scored(ctx, init_state, ref, args.select_on)
         # for the loss objective this is 1.0 by construction; for the metric
         # objective it is minus the initialization's own mean metric
         obj_min_S = mean_obj[(sel_lr, min(steps))]
@@ -363,7 +396,9 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
             _log(f"[{draw_tag}][{arm}] selected S={sel_S} at the cap {cap}; "
                  f"not extending S")
             edges = [e for e in edges if e != "S_high"]
-        if not edges or attempt == args.max_extensions:
+        # S_low (the initialization beats every horizon) is recorded but has
+        # no extension direction, so it must not spin the loop on its own
+        if not [e for e in edges if e != "S_low"] or attempt == args.max_extensions:
             break
         _log(f"[{draw_tag}][{arm}] selected cell on boundary {edges}; extending")
         if "lr_low" in edges:
@@ -581,6 +616,9 @@ def main():
                 "initialization on the same fold" if args.select_on == "loss"
                 else "mean over folds of the held-out per-task metric"),
             "select_on": args.select_on,
+            "tie_break": ("normalised held-out replay loss, then the smallest "
+                          "(eta, S)" if args.select_on == "metric"
+                          else "the smallest (eta, S)"),
             "init": args.init,
             "order": args.order,
             "evaluation_split_used_for": "selected cells only",
@@ -616,17 +654,21 @@ def main():
                 for nm, state, mt in fisher_merge_matena(
                         ctx, budget_bufs, None, n_points=args.fisher_points,
                         seed=seed, logger=_log):
-                    agg, _ = scored(ctx, state, ref, args.select_on)
-                    if "FISHER" not in best or agg < best["FISHER"][0]:
-                        best["FISHER"] = (agg, nm, state)
+                    agg, _, sec = scored(ctx, state, ref, args.select_on)
+                    key = (round(agg, 9), sec if sec is not None else 0.0)
+                    if "FISHER" not in best or key < best["FISHER"][0]:
+                        best["FISHER"] = (key, nm, state)
                         meta["FISHER"] = mt
                     _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
             for attempt in range(args.max_extensions + 1):
                 for nm, state in merge_candidates(ctx, args):
-                    agg, _ = scored(ctx, state, ref, args.select_on)
+                    agg, _, sec = scored(ctx, state, ref, args.select_on)
                     fam = nm.split("@")[0]
-                    if fam not in best or agg < best[fam][0]:
-                        best[fam] = (agg, nm, state)
+                    # same lexicographic rule as the labeled arms: primary
+                    # objective, then the tie-break objective
+                    key = (round(agg, 9), sec if sec is not None else 0.0)
+                    if fam not in best or key < best[fam][0]:
+                        best[fam] = (key, nm, state)
                     _log(f"[{tag}][merge] {nm:32s} obj={agg:.4f}")
                 # interiority for the merge grids. Task arithmetic's lambda is
                 # 1-D and cheap, so it is auto-extended like eta; the other
@@ -642,10 +684,11 @@ def main():
                     args.ta_lams = lams + [lams[-1] * 1.5]
                 _log(f"[{tag}][merge] TA lambda on grid edge {ta_edge}; "
                      f"extending to {sorted(args.ta_lams)}")
-            for fam, (agg, nm, state) in best.items():
+            for fam, (key, nm, state) in best.items():
                 scores, nr, ag = eval_and_record(ctx, state)
                 entry["methods"][f"merge:{fam}"] = {
-                    "selected": nm, "selection_obj": agg, "scores": scores,
+                    "selected": nm, "selection_obj": key[0],
+                    "selection_obj_secondary": key[1], "scores": scores,
                     "normret": nr, "aggregate": ag,
                     "grid_boundary": boundary.get(fam, []),
                     "tier": ("unlabeled construction" if fam == "FISHER"
