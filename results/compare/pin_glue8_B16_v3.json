@@ -1,0 +1,50 @@
+{
+ "config": "configs/glue8.yaml",
+ "budget": 16,
+ "arm": "apr",
+ "note": "cells PINNED, not selected; refit on the full budget from the pretrained model",
+ "cells": {
+  "seed101,lr16,S50": {
+   "buffer_seed": 101,
+   "lr": 16.0,
+   "S": 50,
+   "eta_times_S": 800.0,
+   "displacement": 2.9155311972252496,
+   "scores": {
+    "cola": 0.135781442012244,
+    "sst2": 0.643348623853211,
+    "mrpc": 0.614516806722689,
+    "stsb": 0.7780642677030223,
+    "qqp": 0.5656406103932061,
+    "mnli": 0.47345899133978603,
+    "qnli": 0.6820428336079077,
+    "rte": 0.4729241877256318
+   },
+   "normret": {
+    "cola": 0.21787205144772293,
+    "sst2": 0.3145161216597297,
+    "mrpc": -0.7959070263884316,
+    "stsb": 0.8630187255910671,
+    "qqp": 0.4267850248329456,
+    "mnli": 0.25560197016951514,
+    "qnli": 0.43611583312393193,
+    "rte": 0.0
+   },
+   "aggregate": {
+    "mean_acc": 0.5457222204197123,
+    "worst_acc": 0.135781442012244,
+    "mean_normret": 0.2147503375545601,
+    "worst_normret": -0.7959070263884316,
+    "hmean_normret": 3.9999650473809545e-06,
+    "degenerate_tasks": []
+   },
+   "clip": {
+    "n_steps": 400,
+    "clipped_frac_gated_mean": 1.1264075456003109e-05,
+    "clipped_frac_gated_max": 0.00031447722681430667,
+    "clipped_frac_all_mean": 3.976682446759116e-06,
+    "gate_density_mean": 0.3473025916963954
+   }
+  }
+ }
+}

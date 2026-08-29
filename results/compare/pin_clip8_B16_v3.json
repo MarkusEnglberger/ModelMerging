@@ -1,0 +1,134 @@
+{
+ "config": "configs/clip8.yaml",
+ "budget": 16,
+ "arm": "apr",
+ "note": "cells PINNED, not selected; refit on the full budget from the pretrained model",
+ "cells": {
+  "seed100,lr16,S50": {
+   "buffer_seed": 100,
+   "lr": 16.0,
+   "S": 50,
+   "eta_times_S": 800.0,
+   "displacement": 0.7515852516968039,
+   "scores": {
+    "sun397": 0.6220151133501259,
+    "cars": 0.5254321601790822,
+    "resisc45": 0.6615873015873016,
+    "eurosat": 0.8251851851851851,
+    "svhn": 0.8005915795943455,
+    "gtsrb": 0.6817102137767221,
+    "mnist": 0.9607,
+    "dtd": 0.5037234042553191
+   },
+   "normret": {
+    "sun397": -0.08365674143774747,
+    "cars": -0.38368981894886484,
+    "resisc45": 0.21712802176511017,
+    "eurosat": 0.6938356036071496,
+    "svhn": 0.7386934561004628,
+    "gtsrb": 0.5369751827504813,
+    "mnist": 0.9316055936943569,
+    "dtd": 0.18290854057169334
+   },
+   "aggregate": {
+    "mean_acc": 0.6976181197410103,
+    "worst_acc": 0.5037234042553191,
+    "mean_normret": 0.35422497976283024,
+    "worst_normret": -0.38368981894886484,
+    "hmean_normret": 3.999968393259183e-06,
+    "degenerate_tasks": []
+   },
+   "clip": {
+    "n_steps": 400,
+    "clipped_frac_gated_mean": 0.000187597140731471,
+    "clipped_frac_gated_max": 0.011173749111695778,
+    "clipped_frac_all_mean": 9.586331984083424e-05,
+    "gate_density_mean": 0.5149259573385474
+   }
+  },
+  "seed101,lr32,S50": {
+   "buffer_seed": 101,
+   "lr": 32.0,
+   "S": 50,
+   "eta_times_S": 1600.0,
+   "displacement": 1.1324195515373587,
+   "scores": {
+    "sun397": 0.6159697732997481,
+    "cars": 0.572441238651909,
+    "resisc45": 0.6350793650793651,
+    "eurosat": 0.9251851851851852,
+    "svhn": 0.803318992009834,
+    "gtsrb": 0.6823436262866192,
+    "mnist": 0.9667,
+    "dtd": 0.4776595744680851
+   },
+   "normret": {
+    "sun397": -0.1354031794404779,
+    "cars": -0.13101603573863682,
+    "resisc45": 0.14489618982333058,
+    "eurosat": 0.8787671070364986,
+    "svhn": 0.7428421062652415,
+    "gtsrb": 0.5379293812093892,
+    "mnist": 0.9432969418687266,
+    "dtd": 0.10944527427650505
+   },
+   "aggregate": {
+    "mean_acc": 0.7098372193725933,
+    "worst_acc": 0.4776595744680851,
+    "mean_normret": 0.38634472316257207,
+    "worst_normret": -0.1354031794404779,
+    "hmean_normret": 3.9999571170398385e-06,
+    "degenerate_tasks": []
+   },
+   "clip": {
+    "n_steps": 400,
+    "clipped_frac_gated_mean": 0.014185919370607534,
+    "clipped_frac_gated_max": 0.2180163914012936,
+    "clipped_frac_all_mean": 0.007190132781055617,
+    "gate_density_mean": 0.5081763075432217
+   }
+  },
+  "seed102,lr32,S50": {
+   "buffer_seed": 102,
+   "lr": 32.0,
+   "S": 50,
+   "eta_times_S": 1600.0,
+   "displacement": 1.0264361179311765,
+   "scores": {
+    "sun397": 0.6103778337531486,
+    "cars": 0.560875512995896,
+    "resisc45": 0.6453968253968254,
+    "eurosat": 0.9059259259259259,
+    "svhn": 0.8105024585125998,
+    "gtsrb": 0.7169437846397466,
+    "mnist": 0.9279,
+    "dtd": 0.5
+   },
+   "normret": {
+    "sun397": -0.18326863459300394,
+    "cars": -0.1931818077982964,
+    "resisc45": 0.17301037590845428,
+    "eurosat": 0.8431506693389943,
+    "svhn": 0.7537688327555742,
+    "gtsrb": 0.5900524720272391,
+    "mnist": 0.8676928903411358,
+    "dtd": 0.17241378824380932
+   },
+   "aggregate": {
+    "mean_acc": 0.7097402926530179,
+    "worst_acc": 0.5,
+    "mean_normret": 0.37795482327798835,
+    "worst_normret": -0.1931818077982964,
+    "hmean_normret": 3.99996612040561e-06,
+    "degenerate_tasks": []
+   },
+   "clip": {
+    "n_steps": 400,
+    "clipped_frac_gated_mean": 0.002729363233290083,
+    "clipped_frac_gated_max": 0.1037647166487554,
+    "clipped_frac_all_mean": 0.0013838308692371022,
+    "gate_density_mean": 0.5113244355733169
+   }
+  }
+ }
+}
