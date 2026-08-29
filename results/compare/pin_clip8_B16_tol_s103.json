@@ -1,0 +1,50 @@
+{
+ "config": "configs/clip8.yaml",
+ "budget": 16,
+ "arm": "apr",
+ "note": "cells PINNED, not selected; refit on the full budget from the pretrained model",
+ "cells": {
+  "seed103,lr16,S50": {
+   "buffer_seed": 103,
+   "lr": 16.0,
+   "S": 50,
+   "eta_times_S": 800.0,
+   "displacement": 0.6994190918380279,
+   "scores": {
+    "sun397": 0.6288664987405541,
+    "cars": 0.5464494465862455,
+    "resisc45": 0.633968253968254,
+    "eurosat": 0.9111111111111111,
+    "svhn": 0.7910264290104487,
+    "gtsrb": 0.6093428345209818,
+    "mnist": 0.9334,
+    "dtd": 0.4978723404255319
+   },
+   "normret": {
+    "sun397": -0.025010778367986514,
+    "cars": -0.2707219105823873,
+    "resisc45": 0.14186850824493244,
+    "eurosat": 0.8527397102575531,
+    "svhn": 0.7241439646775064,
+    "gtsrb": 0.4279580088202414,
+    "mnist": 0.8784099595009749,
+    "dtd": 0.16641678691358985
+   },
+   "aggregate": {
+    "mean_acc": 0.6940046142953908,
+    "worst_acc": 0.4978723404255319,
+    "mean_normret": 0.36197553118305303,
+    "worst_normret": -0.2707219105823873,
+    "hmean_normret": 3.99996182732434e-06,
+    "degenerate_tasks": []
+   },
+   "clip": {
+    "n_steps": 400,
+    "clipped_frac_gated_mean": 0.00016678055860453012,
+    "clipped_frac_gated_max": 0.011659965358775117,
+    "clipped_frac_all_mean": 8.517768935236005e-05,
+    "gate_density_mean": 0.5144147693983261
+   }
+  }
+ }
+}
