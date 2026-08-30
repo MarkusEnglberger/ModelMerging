@@ -50,6 +50,7 @@ import dataclasses
 import json
 import os
 import random
+import re
 import sys
 from typing import Dict, List
 
@@ -136,12 +137,14 @@ def scored(ctx, state, ref: Dict[str, float], select_on: str = "loss"
     the correction is expected to be inert there.
 
     Returns ``(primary, per_task, secondary)``. Under ``metric`` the secondary
-    is the loss objective, used ONLY to break exact ties in the primary: on a
-    small fold the metric is quantized (accuracy on 16 examples moves in steps
-    of 1/16) and distinct cells tie exactly, so the rule is lexicographic --
-    the reported metric first, the finer-grained likelihood of the same
-    predictions where the metric cannot discriminate. Under ``loss`` the
-    secondary is None.
+    is the loss objective, RECORDED in the traces for diagnosis but NOT used
+    for selection: on a small fold the metric is quantized (accuracy on 16
+    examples moves in steps of 1/16) and distinct cells can tie exactly, and
+    ties fall to the least-moving cell (select_cell / least_moving_key), not
+    to a second objective. (A loss tie-break was used while the rule was being
+    settled on seeds 100-102; on the fresh seeds it fired in 9/54 arm cells,
+    none on GLUE-8, and 2/80 merge families.) Under ``loss`` the secondary is
+    None.
     """
     if select_on == "metric":
         L, M = replay_losses_and_metrics(ctx, state, buffer_key="cv_buffer")
@@ -166,6 +169,22 @@ def select_cell(primary: Dict, secondary: Dict = None, ndigits: int = 9):
         s = secondary[c] if secondary and secondary.get(c) is not None else 0.0
         return (p, s, c)
     return min(primary, key=key)
+
+
+def least_moving_key(name: str) -> tuple:
+    """Tie order for merge candidates: the least-moving one wins.
+
+    Parses the ``k<value>`` tokens after '@' (``TIES@d0.1,l0.8`` ->
+    d=0.1, l=0.8) and returns (scale, remaining values in name order), so a
+    tie falls to the smaller scaling coefficient first, then to the smaller
+    density / drop / trim / outlier fraction. A name without a scale token
+    sorts by all of its values. Mirrors select_cell's smallest-(eta, S)
+    fallback for the labeled arms.
+    """
+    toks = re.findall(r"([a-z]+)(-?\d+(?:\.\d+)?(?:e-?\d+)?)", name.split("@", 1)[-1])
+    lam = [float(v) for k, v in toks if k == "l"]
+    rest = tuple(float(v) for k, v in toks if k != "l")
+    return (tuple(lam[:1]) + rest) if lam else rest
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +254,9 @@ def ls_select_and_refit(ctx, budget_bufs, folds, args, draw_tag):
                 state, info = stitch(ctx.base_encoder, ctx.task_vectors,
                                      masks, lam=lam)
                 agg, _, sec = scored(ctx, state, ref, args.select_on)
-                key = (round(agg, 9), sec if sec is not None else 0.0)
+                # ties to the least-moving stitch: smallest scale, then the
+                # sparser mask, then the smaller gamma
+                key = (round(agg, 9), (lam, sp, gamma))
                 traces[f"g{gamma:g},sp{sp:g},l{lam:g}"] = {
                     "objective": agg, "objective_secondary": sec,
                     "covered_frac": info["covered_frac"],
@@ -378,9 +399,9 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 
         n_needed = K if args.rotate else 1
         mean_obj = {c: sum(v) / len(v) for c, v in cells.items() if len(v) == n_needed}
-        mean_sec = {c: (sum(v) / len(v) if all(x is not None for x in v) else None)
-                    for c, v in cells_sec.items() if len(v) == n_needed}
-        (sel_lr, sel_S) = select_cell(mean_obj, mean_sec)
+        # ties in the primary fall to the smallest (lr, S), the least-moving
+        # cell; the secondary objective stays in the traces for diagnosis only
+        (sel_lr, sel_S) = select_cell(mean_obj)
         # S=0 reference on fold 0 for the interiority test
         set_score_buffer(ctx, {n: folds[n][0] for n in names})
         init_obj, _, _ = scored(ctx, init_state, ref, args.select_on)
@@ -616,9 +637,9 @@ def main():
                 "initialization on the same fold" if args.select_on == "loss"
                 else "mean over folds of the held-out per-task metric"),
             "select_on": args.select_on,
-            "tie_break": ("normalised held-out replay loss, then the smallest "
-                          "(eta, S)" if args.select_on == "metric"
-                          else "the smallest (eta, S)"),
+            "tie_break": ("the least-moving cell: smallest (eta, S) for the "
+                          "labeled arms; smallest scale, then the remaining "
+                          "hyperparameters, for merges"),
             "init": args.init,
             "order": args.order,
             "evaluation_split_used_for": "selected cells only",
@@ -655,7 +676,7 @@ def main():
                         ctx, budget_bufs, None, n_points=args.fisher_points,
                         seed=seed, logger=_log):
                     agg, _, sec = scored(ctx, state, ref, args.select_on)
-                    key = (round(agg, 9), sec if sec is not None else 0.0)
+                    key = (round(agg, 9), least_moving_key(nm))
                     if "FISHER" not in best or key < best["FISHER"][0]:
                         best["FISHER"] = (key, nm, state)
                         meta["FISHER"] = mt
@@ -664,9 +685,10 @@ def main():
                 for nm, state in merge_candidates(ctx, args):
                     agg, _, sec = scored(ctx, state, ref, args.select_on)
                     fam = nm.split("@")[0]
-                    # same lexicographic rule as the labeled arms: primary
-                    # objective, then the tie-break objective
-                    key = (round(agg, 9), sec if sec is not None else 0.0)
+                    # same rule as the labeled arms: primary objective, ties
+                    # to the least-moving candidate (smallest scale, then the
+                    # remaining hyperparameters in name order)
+                    key = (round(agg, 9), least_moving_key(nm))
                     if fam not in best or key < best[fam][0]:
                         best[fam] = (key, nm, state)
                     _log(f"[{tag}][merge] {nm:32s} obj={agg:.4f}")
@@ -688,7 +710,7 @@ def main():
                 scores, nr, ag = eval_and_record(ctx, state)
                 entry["methods"][f"merge:{fam}"] = {
                     "selected": nm, "selection_obj": key[0],
-                    "selection_obj_secondary": key[1], "scores": scores,
+                    "selection_tie_key": list(key[1]), "scores": scores,
                     "normret": nr, "aggregate": ag,
                     "grid_boundary": boundary.get(fam, []),
                     "tier": ("unlabeled construction" if fam == "FISHER"
