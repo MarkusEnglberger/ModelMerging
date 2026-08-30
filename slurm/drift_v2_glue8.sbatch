@@ -21,6 +21,12 @@
 # The merge rows use the hyperparameters v2 selected on the B=32 budget
 # (TA l0.3, TIES d0.2/l1, DARE-TIES dd0.5/t0.1/l1, BC d0.2/o0.01/l0.4);
 # merges are deterministic given the checkpoints, hence one row each.
+#
+# Protocol v3 (fresh seeds 103-105, metric selection) reuses this job with
+# positional overrides: SUFFIX names the winners directory, LABEL the output,
+# MERGES lists every merge cell v3 selected on any draw, e.g.
+#   sbatch slurm/drift_v2_glue8.sbatch SUFFIX=_v3fresh LABEL=v3 \
+#          "MERGES=ties:0.1:1.0 dareties:0.5:0.1:1.0 bc:0.2:0.01:0.4 bc:0.2:0.05:0.4"
 
 set -euo pipefail
 source slurm/common.sh
@@ -28,8 +34,11 @@ source slurm/args.sh "$@"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 : "${BUDGET:=32}"
-W="results/cv_winners/glue8_B${BUDGET}_pretrained"
-OUT="results/compare/drift_v2_glue8_B${BUDGET}.json"
+: "${SUFFIX:=}"                # winners dir suffix (_v3fresh for protocol v3)
+: "${LABEL:=v2}"               # output file label
+: "${MERGES:=ties:0.2:1.0 dareties:0.5:0.1:1.0 bc:0.2:0.01:0.4}"
+W="results/cv_winners/glue8_B${BUDGET}_pretrained${SUFFIX}"
+OUT="results/compare/drift_${LABEL}_glue8_B${BUDGET}.json"
 
 STATES=()
 for d in 0 1 2; do
@@ -40,15 +49,16 @@ for d in 0 1 2; do
     [ -f "$f" ] && STATES+=("${arm}_draw${d}=${f}")
   done
 done
-echo "[job] probing ${#STATES[@]} v2 winner states + merges -> ${OUT}"
+echo "[job] probing ${#STATES[@]} ${LABEL} winner states + merges [${MERGES}] -> ${OUT}"
 printf '       %s\n' "${STATES[@]}"
 guard_output "${OUT}"
 
+# shellcheck disable=SC2086  # MERGES is a word list on purpose
 python scripts/pretrain_drift.py \
   --config configs/glue8.yaml \
   --n_probe "${BUDGET}" \
   --state_files "${STATES[@]}" \
-  --merges ties:0.2:1.0 dareties:0.5:0.1:1.0 bc:0.2:0.01:0.4 \
+  --merges ${MERGES} \
   --out "${OUT}"
 
 echo "[done] -> ${OUT}"

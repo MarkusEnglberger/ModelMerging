@@ -20,6 +20,12 @@
 # draws. The merge rows use the hyperparameters v2 selected on the B=32
 # budget (TA l0.2, TIES d0.1/l1, DARE-TIES dd0.5/t0.1/l0.8, BC d0.2/o0.01/l0.4).
 # No refinement is run inside this job (all refinement lr grids are empty).
+#
+# Protocol v3 (fresh seeds 103-105, metric selection) reuses this job with
+# positional overrides: SUFFIX names the winners directory, LABEL the output,
+# and the merge grids cover every cell v3 selected on any draw, e.g.
+#   sbatch slurm/heldout_v2_clip8.sbatch SUFFIX=_v3fresh LABEL=v3 PROBE_SEED=103 \
+#          "TA_LAMS=0.2 0.3" "TIES_D=0.1 0.2" "TIES_L=0.8 1" DT_L=0.8 BC_O=0.01
 
 set -euo pipefail
 source slurm/common.sh
@@ -27,8 +33,16 @@ source slurm/args.sh "$@"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 : "${BUDGET:=32}"
-W="results/cv_winners/clip8_B${BUDGET}_pretrained"
-OUT="results/compare/heldout_v2_clip8_B${BUDGET}.json"
+: "${SUFFIX:=}"                # winners dir suffix (_v3fresh for protocol v3)
+: "${LABEL:=v2}"               # output file label
+: "${PROBE_SEED:=100}"
+: "${TA_LAMS:=0.2}"
+: "${TIES_D:=0.1}"
+: "${TIES_L:=1}"
+: "${DT_L:=0.8}"
+: "${BC_O:=0.01}"
+W="results/cv_winners/clip8_B${BUDGET}_pretrained${SUFFIX}"
+OUT="results/compare/heldout_${LABEL}_clip8_B${BUDGET}.json"
 
 STATES=()
 for d in 0 1 2; do
@@ -40,18 +54,20 @@ for d in 0 1 2; do
     done
   done
 done
-echo "[job] probing ${#STATES[@]} v2 winner states + merges -> ${OUT}"
+echo "[job] probing ${#STATES[@]} ${LABEL} winner states + merges -> ${OUT}"
+echo "      TA_LAMS=[${TA_LAMS}] TIES_D=[${TIES_D}] TIES_L=[${TIES_L}] DT_L=[${DT_L}] BC_O=[${BC_O}] probe_seed=${PROBE_SEED}"
 printf '       %s\n' "${STATES[@]}"
 guard_output "${OUT}"
 
+# shellcheck disable=SC2086  # the grids are word lists on purpose
 python scripts/heldout_retention.py --config configs/clip20.yaml \
   --heldout cifar100 stl10 flowers102 pets pcam fer2013 emnist cifar10 food101 fashion_mnist kmnist rendered_sst2 \
-  --n_probe "${BUDGET}" --probe_seed 100 \
+  --n_probe "${BUDGET}" --probe_seed "${PROBE_SEED}" \
   --state_files "${STATES[@]}" \
-  --ta_lams 0.2 \
-  --ties_densities 0.1 --ties_lams 1 \
-  --dt_drops 0.5 --dt_trims 0.1 --dt_lams 0.8 \
-  --bc_densities 0.2 --bc_outliers 0.01 --bc_lams 0.4 \
+  --ta_lams ${TA_LAMS} \
+  --ties_densities ${TIES_D} --ties_lams ${TIES_L} \
+  --dt_drops 0.5 --dt_trims 0.1 --dt_lams ${DT_L} \
+  --bc_densities 0.2 --bc_outliers ${BC_O} --bc_lams 0.4 \
   --apr_base_lrs --apr_ta_lrs --nogate_base_lrs --gd_base_lrs \
   --out "${OUT}"
 
