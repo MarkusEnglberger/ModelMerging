@@ -9,7 +9,7 @@
   "refit_on": 16,
   "selection_rule": "mean over folds of the held-out per-task metric",
   "select_on": "metric",
-  "tie_break": "normalised held-out replay loss, then the smallest (eta, S)",
+  "tie_break": "the least-moving cell: smallest (eta, S) for the labeled arms; smallest scale, then the remaining hyperparameters, for merges",
   "init": "pretrained",
   "order": "random",
   "evaluation_split_used_for": "selected cells only"
@@ -135,7 +135,9 @@
     "merge:TA": {
      "selected": "TA@l0.2",
      "selection_obj": -0.6171875,
-     "selection_obj_secondary": 0.6374740322735334,
+     "selection_tie_key": [
+      0.2
+     ],
      "scores": {
       "sun397": 0.6429722921914358,
       "cars": 0.6096256684491979,
@@ -170,7 +172,10 @@
     "merge:TIES": {
      "selected": "TIES@d0.1,l1",
      "selection_obj": -0.703125,
-     "selection_obj_secondary": 0.4602729864106641,
+     "selection_tie_key": [
+      1.0,
+      0.1
+     ],
      "scores": {
       "sun397": 0.6671536523929471,
       "cars": 0.6357418231563239,
@@ -208,7 +213,11 @@
     "merge:DARETIES": {
      "selected": "DARETIES@dd0.5,t0.1,l0.8",
      "selection_obj": -0.65625,
-     "selection_obj_secondary": 0.5643485027166415,
+     "selection_tie_key": [
+      0.8,
+      0.5,
+      0.1
+     ],
      "scores": {
       "sun397": 0.5945088161209068,
       "cars": 0.5765452058201717,
@@ -246,7 +255,11 @@
     "merge:BC": {
      "selected": "BC@d0.2,o0.01,l0.4",
      "selection_obj": -0.625,
-     "selection_obj_secondary": 0.5906931023125496,
+     "selection_tie_key": [
+      0.4,
+      0.2,
+      0.01
+     ],
      "scores": {
       "sun397": 0.6410579345088161,
       "cars": 0.6131078224101479,
@@ -282,14 +295,13 @@
      "tier": "checkpoint-only construction"
     },
     "apr:from=pretrained": {
-     "selected_lr": 8.0,
+     "selected_lr": 4.0,
      "selected_S": 50,
      "cv_objective": -0.515625,
      "cv_objective_per_fold": [
       -0.515625
      ],
      "lr_grid": [
-      0.5,
       1.0,
       2.0,
       4.0,
@@ -303,32 +315,8 @@
      "boundary_after_extension": [],
      "S_cap": 100,
      "S_capped": false,
-     "displacement": 0.5166023248865064,
+     "displacement": 0.3836986782314582,
      "traces": {
-      "lr0.5,S50,fold0": {
-       "objective": -0.484375,
-       "objective_secondary": 0.8665053025391127,
-       "per_task_loss": {
-        "sun397": 0.625,
-        "cars": 0.625,
-        "resisc45": 0.5,
-        "eurosat": 0.625,
-        "svhn": 0.375,
-        "gtsrb": 0.125,
-        "mnist": 1.0,
-        "dtd": 0.0
-       },
-       "per_task_ref": {
-        "sun397": 1.4470242261886597,
-        "cars": 1.0799829959869385,
-        "resisc45": 1.8947341442108154,
-        "eurosat": 2.3659496307373047,
-        "svhn": 1.9176394939422607,
-        "gtsrb": 2.285928964614868,
-        "mnist": 2.188406467437744,
-        "dtd": 2.391465425491333
-       }
-      },
       "lr1,S50,fold0": {
        "objective": -0.453125,
        "objective_secondary": 0.8375960918160458,
@@ -476,21 +464,12 @@
      },
      "refit_clip": {
       "n_steps": 400,
-      "clipped_frac_gated_mean": 3.162290321877851e-05,
-      "clipped_frac_gated_max": 0.001917857657722149,
-      "clipped_frac_all_mean": 1.6189655369557265e-05,
-      "gate_density_mean": 0.5135916514304335
+      "clipped_frac_gated_mean": 6.77432149421015e-06,
+      "clipped_frac_gated_max": 0.0004537321483337305,
+      "clipped_frac_all_mean": 3.483094356019027e-06,
+      "gate_density_mean": 0.5143228848220819
      },
      "selection_clip": {
-      "lr0.5,fold0": [
-       {
-        "n_steps": 400,
-        "clipped_frac_gated_mean": 1.706029117249545e-08,
-        "clipped_frac_gated_max": 2.6727275442878254e-06,
-        "clipped_frac_all_mean": 8.690084156604465e-09,
-        "gate_density_mean": 0.5129267572550769
-       }
-      ],
       "lr1,fold0": [
        {
         "n_steps": 400,
@@ -547,31 +526,31 @@
       ]
      },
      "scores": {
-      "sun397": 0.6293198992443325,
-      "cars": 0.5392364133814203,
-      "resisc45": 0.6674603174603174,
-      "eurosat": 0.8496296296296296,
-      "svhn": 0.699139520590043,
-      "gtsrb": 0.5888361045130641,
-      "mnist": 0.8705,
-      "dtd": 0.4957446808510638
+      "sun397": 0.6323425692695214,
+      "cars": 0.5531650292252207,
+      "resisc45": 0.6663492063492064,
+      "eurosat": 0.802962962962963,
+      "svhn": 0.5797864167178857,
+      "gtsrb": 0.5362628661916072,
+      "mnist": 0.8126,
+      "dtd": 0.4909574468085106
      },
      "normret": {
-      "sun397": -0.021129795517781186,
-      "cars": -0.30949196197443274,
-      "resisc45": 0.233131481536642,
-      "eurosat": 0.7390410822232127,
-      "svhn": 0.5843753563091859,
-      "gtsrb": 0.39706583371309456,
-      "mnist": 0.7558456594729995,
-      "dtd": 0.1604197855833704
+      "sun397": 0.004743423483583551,
+      "cars": -0.23462565583806927,
+      "resisc45": 0.23010379995824418,
+      "eurosat": 0.6527397139561834,
+      "svhn": 0.4028280878307697,
+      "gtsrb": 0.3178673616237299,
+      "mnist": 0.643024149590332,
+      "dtd": 0.14692653259037658
      },
      "aggregate": {
-      "mean_acc": 0.6674833207087338,
-      "worst_acc": 0.4957446808510638,
-      "mean_normret": 0.3174071801682864,
-      "worst_normret": -0.30949196197443274,
-      "hmean_normret": 3.9999651425054735e-06,
+      "mean_acc": 0.6343033121906143,
+      "worst_acc": 0.4909574468085106,
+      "mean_normret": 0.27045092664939374,
+      "worst_normret": -0.23462565583806927,
+      "hmean_normret": 7.99815493956616e-06,
       "degenerate_tasks": []
      },
      "tier": "labeled construction"
@@ -1204,11 +1183,11 @@
   },
   "apr:from=pretrained": {
    "n_draws": 1,
-   "mean_acc_mean": 0.6674833207087338,
+   "mean_acc_mean": 0.6343033121906143,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": 0.3174071801682864,
+   "mean_normret_mean": 0.27045092664939374,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": -0.30949196197443274
+   "worst_normret_mean": -0.23462565583806927
   },
   "nogate:from=pretrained": {
    "n_draws": 1,

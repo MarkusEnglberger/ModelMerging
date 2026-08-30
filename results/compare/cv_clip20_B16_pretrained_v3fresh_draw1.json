@@ -9,7 +9,7 @@
   "refit_on": 16,
   "selection_rule": "mean over folds of the held-out per-task metric",
   "select_on": "metric",
-  "tie_break": "normalised held-out replay loss, then the smallest (eta, S)",
+  "tie_break": "the least-moving cell: smallest (eta, S) for the labeled arms; smallest scale, then the remaining hyperparameters, for merges",
   "init": "pretrained",
   "order": "random",
   "evaluation_split_used_for": "selected cells only"
@@ -231,7 +231,9 @@
     "merge:TA": {
      "selected": "TA@l0.08",
      "selection_obj": -0.603125,
-     "selection_obj_secondary": 0.9236063378965225,
+     "selection_tie_key": [
+      0.08
+     ],
      "scores": {
       "sun397": 0.6339546599496222,
       "cars": 0.5713219748787465,
@@ -295,7 +297,10 @@
     "merge:TIES": {
      "selected": "TIES@d0.1,l1",
      "selection_obj": -0.625,
-     "selection_obj_secondary": 1.2640878069759063,
+     "selection_tie_key": [
+      1.0,
+      0.1
+     ],
      "scores": {
       "sun397": 0.590176322418136,
       "cars": 0.4426066409650541,
@@ -362,7 +367,11 @@
     "merge:DARETIES": {
      "selected": "DARETIES@dd0.5,t0.1,l0.8",
      "selection_obj": -0.553125,
-     "selection_obj_secondary": 1.503651458181148,
+     "selection_tie_key": [
+      0.8,
+      0.5,
+      0.1
+     ],
      "scores": {
       "sun397": 0.4650377833753149,
       "cars": 0.3176221862952369,
@@ -429,7 +438,11 @@
     "merge:BC": {
      "selected": "BC@d0.1,o0.05,l0.4",
      "selection_obj": -0.596875,
-     "selection_obj_secondary": 1.0107075643256485,
+     "selection_tie_key": [
+      0.4,
+      0.1,
+      0.05
+     ],
      "scores": {
       "sun397": 0.6228715365239295,
       "cars": 0.5412262156448203,
@@ -1420,7 +1433,7 @@
      "tier": "labeled construction"
     },
     "gd:from=pretrained": {
-     "selected_lr": 1.0000000000000002e-06,
+     "selected_lr": 1.0000000000000002e-07,
      "selected_S": 50,
      "cv_objective": -0.5375,
      "cv_objective_per_fold": [
@@ -1439,10 +1452,12 @@
      "S_grid": [
       50
      ],
-     "boundary_after_extension": [],
+     "boundary_after_extension": [
+      "lr_low"
+     ],
      "S_cap": null,
      "S_capped": false,
-     "displacement": 0.016094697797858184,
+     "displacement": 0.002110722866631625,
      "traces": {
       "lr1e-05,S50,fold0": {
        "objective": -0.51875,
@@ -1911,57 +1926,57 @@
       ]
      },
      "scores": {
-      "sun397": 0.6327959697732998,
-      "cars": 0.5907225469468972,
-      "resisc45": 0.5950793650793651,
-      "eurosat": 0.6237037037037036,
-      "svhn": 0.3612476951444376,
-      "gtsrb": 0.3209026128266033,
-      "mnist": 0.5076,
-      "dtd": 0.4351063829787234,
-      "cifar100": 0.6621,
-      "stl10": 0.9715,
-      "flowers102": 0.6644982924052691,
-      "pets": 0.8340147179067866,
-      "pcam": 0.565338134765625,
-      "fer2013": 0.387712454722764,
-      "emnist": 0.11509615384615385,
-      "cifar10": 0.8893,
-      "food101": 0.8274851485148514,
-      "fashion_mnist": 0.6764,
-      "kmnist": 0.1023,
-      "rendered_sst2": 0.5782537067545305
+      "sun397": 0.6313853904282116,
+      "cars": 0.5965675910956348,
+      "resisc45": 0.5866666666666667,
+      "eurosat": 0.48518518518518516,
+      "svhn": 0.3154963122311002,
+      "gtsrb": 0.3258115597783056,
+      "mnist": 0.4923,
+      "dtd": 0.43882978723404253,
+      "cifar100": 0.6249,
+      "stl10": 0.971125,
+      "flowers102": 0.6643356643356644,
+      "pets": 0.8351049332243118,
+      "pcam": 0.55389404296875,
+      "fer2013": 0.3801894678183338,
+      "emnist": 0.11149038461538462,
+      "cifar10": 0.8856,
+      "food101": 0.8271683168316831,
+      "fashion_mnist": 0.6679,
+      "kmnist": 0.0994,
+      "rendered_sst2": 0.5853926414058209
      },
      "normret": {
-      "sun397": 0.00862440633378888,
-      "cars": -0.032754008934659205,
-      "resisc45": 0.03589965300100426,
-      "eurosat": 0.32123287077172075,
-      "svhn": 0.07041018941631527,
-      "gtsrb": -0.006560114404992545,
-      "mnist": 0.04871395072654046,
-      "dtd": -0.010494752327884018,
-      "cifar100": 0.1711169548282454,
-      "stl10": 0.058823391003804314,
-      "flowers102": 0.0,
-      "pets": 0.008955222899799357,
-      "pcam": 0.027096773375200858,
-      "fer2013": 0.03416666564479865,
-      "emnist": 0.00686749760916208,
-      "cifar10": 0.06659387919280788,
-      "food101": 0.010146558554671888,
-      "fashion_mnist": 0.053677237585317526,
-      "kmnist": 0.003171726289400469,
-      "rendered_sst2": -0.06521738614083195
+      "sun397": -0.0034497625335147913,
+      "cars": -0.0013368983238640064,
+      "resisc45": 0.012975778193134026,
+      "eurosat": 0.06506849194736344,
+      "svhn": 0.0008180436944634515,
+      "gtsrb": 0.0008349236515445148,
+      "mnist": 0.01890101288189772,
+      "dtd": 0.0,
+      "cifar100": 0.031214741210427097,
+      "stl10": -0.029411695501876035,
+      "flowers102": -0.0007358351396270739,
+      "pets": 0.02089552009953183,
+      "pcam": -0.007465437562555338,
+      "fer2013": 0.011666666317736121,
+      "emnist": 0.002539242813471694,
+      "cifar10": 0.02620087050208912,
+      "food101": 0.001127395394963543,
+      "fashion_mnist": 0.024050190866148867,
+      "kmnist": -0.00011327593890716298,
+      "rendered_sst2": -0.008695651485444435
      },
      "aggregate": {
-      "mean_acc": 0.5670578442684505,
-      "worst_acc": 0.1023,
-      "mean_normret": 0.040523535771210505,
-      "worst_normret": -0.06521738614083195,
-      "hmean_normret": 3.999219805265434e-06,
-      "mean_normret_nondeg": 0.04119448699254078,
-      "worst_normret_nondeg": -0.06521738614083195,
+      "mean_acc": 0.5539371471909548,
+      "worst_acc": 0.0994,
+      "mean_normret": 0.008254216054349128,
+      "worst_normret": -0.029411695501876035,
+      "hmean_normret": 2.4987220106352873e-06,
+      "mean_normret_nondeg": 0.010742701177438614,
+      "worst_normret_nondeg": -0.008695651485444435,
       "degenerate_tasks": [
        "food101",
        "stl10"
@@ -2023,11 +2038,11 @@
   },
   "gd:from=pretrained": {
    "n_draws": 1,
-   "mean_acc_mean": 0.5670578442684505,
+   "mean_acc_mean": 0.5539371471909548,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": 0.040523535771210505,
+   "mean_normret_mean": 0.008254216054349128,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": -0.06521738614083195
+   "worst_normret_mean": -0.029411695501876035
   }
  }
 }

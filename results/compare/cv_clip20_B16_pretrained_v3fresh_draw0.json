@@ -9,7 +9,7 @@
   "refit_on": 16,
   "selection_rule": "mean over folds of the held-out per-task metric",
   "select_on": "metric",
-  "tie_break": "normalised held-out replay loss, then the smallest (eta, S)",
+  "tie_break": "the least-moving cell: smallest (eta, S) for the labeled arms; smallest scale, then the remaining hyperparameters, for merges",
   "init": "pretrained",
   "order": "random",
   "evaluation_split_used_for": "selected cells only"
@@ -231,7 +231,9 @@
     "merge:TA": {
      "selected": "TA@l0.05",
      "selection_obj": -0.63125,
-     "selection_obj_secondary": 0.8560589926273948,
+     "selection_tie_key": [
+      0.05
+     ],
      "scores": {
       "sun397": 0.6422670025188917,
       "cars": 0.5973137669444099,
@@ -295,7 +297,10 @@
     "merge:TIES": {
      "selected": "TIES@d0.1,l0.8",
      "selection_obj": -0.66875,
-     "selection_obj_secondary": 0.8758163872688558,
+     "selection_tie_key": [
+      0.8,
+      0.1
+     ],
      "scores": {
       "sun397": 0.627455919395466,
       "cars": 0.5112548190523567,
@@ -362,7 +367,11 @@
     "merge:DARETIES": {
      "selected": "DARETIES@dd0.5,t0.1,l0.8",
      "selection_obj": -0.553125,
-     "selection_obj_secondary": 1.3263283009164193,
+     "selection_tie_key": [
+      0.8,
+      0.5,
+      0.1
+     ],
      "scores": {
       "sun397": 0.4650377833753149,
       "cars": 0.3176221862952369,
@@ -429,7 +438,11 @@
     "merge:BC": {
      "selected": "BC@d0.1,o0.05,l0.4",
      "selection_obj": -0.625,
-     "selection_obj_secondary": 0.898334157385122,
+     "selection_tie_key": [
+      0.4,
+      0.1,
+      0.05
+     ],
      "scores": {
       "sun397": 0.6228715365239295,
       "cars": 0.5412262156448203,

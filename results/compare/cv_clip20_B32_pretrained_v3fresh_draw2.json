@@ -9,7 +9,7 @@
   "refit_on": 32,
   "selection_rule": "mean over folds of the held-out per-task metric",
   "select_on": "metric",
-  "tie_break": "normalised held-out replay loss, then the smallest (eta, S)",
+  "tie_break": "the least-moving cell: smallest (eta, S) for the labeled arms; smallest scale, then the remaining hyperparameters, for merges",
   "init": "pretrained",
   "order": "random",
   "evaluation_split_used_for": "selected cells only"
@@ -231,7 +231,9 @@
     "merge:TA": {
      "selected": "TA@l0.05",
      "selection_obj": -0.5984375,
-     "selection_obj_secondary": 0.8658462130603286,
+     "selection_tie_key": [
+      0.05
+     ],
      "scores": {
       "sun397": 0.6422670025188917,
       "cars": 0.5973137669444099,
@@ -295,7 +297,10 @@
     "merge:TIES": {
      "selected": "TIES@d0.1,l0.8",
      "selection_obj": -0.6078125,
-     "selection_obj_secondary": 0.8798869456199986,
+     "selection_tie_key": [
+      0.8,
+      0.1
+     ],
      "scores": {
       "sun397": 0.627455919395466,
       "cars": 0.5112548190523567,
@@ -362,7 +367,11 @@
     "merge:DARETIES": {
      "selected": "DARETIES@dd0.5,t0.1,l0.8",
      "selection_obj": -0.5140625,
-     "selection_obj_secondary": 1.5883114742656685,
+     "selection_tie_key": [
+      0.8,
+      0.5,
+      0.1
+     ],
      "scores": {
       "sun397": 0.4650377833753149,
       "cars": 0.3176221862952369,
@@ -429,7 +438,11 @@
     "merge:BC": {
      "selected": "BC@d0.1,o0.05,l0.4",
      "selection_obj": -0.6,
-     "selection_obj_secondary": 0.8850545491431463,
+     "selection_tie_key": [
+      0.4,
+      0.1,
+      0.05
+     ],
      "scores": {
       "sun397": 0.6228715365239295,
       "cars": 0.5412262156448203,
@@ -1481,7 +1494,7 @@
      "tier": "labeled construction"
     },
     "gd:from=pretrained": {
-     "selected_lr": 1.0000000000000002e-06,
+     "selected_lr": 1.0000000000000002e-07,
      "selected_S": 50,
      "cv_objective": -0.546875,
      "cv_objective_per_fold": [
@@ -1500,10 +1513,12 @@
      "S_grid": [
       50
      ],
-     "boundary_after_extension": [],
+     "boundary_after_extension": [
+      "lr_low"
+     ],
      "S_cap": null,
      "S_capped": false,
-     "displacement": 0.013688479015737803,
+     "displacement": 0.0016580656655324475,
      "traces": {
       "lr1e-05,S50,fold0": {
        "objective": -0.540625,
@@ -1972,57 +1987,57 @@
       ]
      },
      "scores": {
-      "sun397": 0.6335012594458438,
-      "cars": 0.59930356920781,
-      "resisc45": 0.5998412698412698,
-      "eurosat": 0.5922222222222222,
-      "svhn": 0.35671481253841425,
-      "gtsrb": 0.3310372129849565,
-      "mnist": 0.5431,
-      "dtd": 0.4377659574468085,
-      "cifar100": 0.6607,
-      "stl10": 0.97075,
-      "flowers102": 0.6659619450317125,
-      "pets": 0.8367402562005997,
-      "pcam": 0.56024169921875,
-      "fer2013": 0.40707718027305656,
-      "emnist": 0.11115384615384616,
-      "cifar10": 0.9053,
-      "food101": 0.8264554455445544,
-      "fashion_mnist": 0.6852,
-      "kmnist": 0.096,
-      "rendered_sst2": 0.6057111477210324
+      "sun397": 0.6316876574307305,
+      "cars": 0.5964432284541724,
+      "resisc45": 0.5844444444444444,
+      "eurosat": 0.4748148148148148,
+      "svhn": 0.3163414259373079,
+      "gtsrb": 0.3268408551068884,
+      "mnist": 0.4931,
+      "dtd": 0.43936170212765957,
+      "cifar100": 0.6239,
+      "stl10": 0.971125,
+      "flowers102": 0.6641730362660595,
+      "pets": 0.8340147179067866,
+      "pcam": 0.556304931640625,
+      "fer2013": 0.38005015324602953,
+      "emnist": 0.10951923076923077,
+      "cifar10": 0.8876,
+      "food101": 0.8271683168316831,
+      "fashion_mnist": 0.6661,
+      "kmnist": 0.099,
+      "rendered_sst2": 0.5886875343218012
      },
      "normret": {
-      "sun397": 0.014661490767440239,
-      "cars": 0.013368983238636485,
-      "resisc45": 0.048875431194138286,
-      "eurosat": 0.26301369376618505,
-      "svhn": 0.06351524970583793,
-      "gtsrb": 0.00870706093753562,
-      "mnist": 0.11788776075822764,
-      "dtd": -0.0029985006651096525,
-      "cifar100": 0.16585181775660682,
-      "stl10": -0.11764678200755638,
-      "flowers102": 0.0066225162566456745,
-      "pets": 0.03880596589913176,
-      "pcam": 0.011705068770920098,
-      "fer2013": 0.0920833305792744,
-      "emnist": 0.0021352723658739294,
-      "cifar10": 0.2412663492067305,
-      "food101": -0.019165721714380232,
-      "fashion_mnist": 0.0843499447769277,
-      "kmnist": -0.003964657861750594,
-      "rendered_sst2": 0.15217390099527542
+      "sun397": -0.0008624406333782227,
+      "cars": -0.002005347485795413,
+      "resisc45": 0.006920415036338087,
+      "eurosat": 0.04589041011024579,
+      "svhn": 0.002103540928620195,
+      "gtsrb": 0.002385496147270054,
+      "mnist": 0.020459859305146946,
+      "dtd": 0.0014992503325549046,
+      "cifar100": 0.02745392901639972,
+      "stl10": -0.029411695501876035,
+      "flowers102": -0.00147167027925465,
+      "pets": 0.008955222899799357,
+      "pcam": -0.00018433179166803306,
+      "fer2013": 0.011249999663531266,
+      "emnist": 0.00017313019182761813,
+      "cifar10": 0.04803492925382824,
+      "food101": 0.001127395394963543,
+      "fashion_mnist": 0.01777622803150127,
+      "kmnist": -0.0005663796945357992,
+      "rendered_sst2": 0.01739130297088887
      },
      "aggregate": {
-      "mean_acc": 0.5712388911915439,
-      "worst_acc": 0.096,
-      "mean_normret": 0.05906240873632954,
-      "worst_normret": -0.11764678200755638,
-      "hmean_normret": 4.998654947162296e-06,
-      "mean_normret_nondeg": 0.07322559324714041,
-      "worst_normret_nondeg": -0.003964657861750594,
+      "mean_acc": 0.5535338524649116,
+      "worst_acc": 0.099,
+      "mean_normret": 0.008845962194820386,
+      "worst_normret": -0.029411695501876035,
+      "hmean_normret": 3.328445339490498e-06,
+      "mean_normret_nondeg": 0.011400196889073346,
+      "worst_normret_nondeg": -0.002005347485795413,
       "degenerate_tasks": [
        "food101",
        "stl10"
@@ -2084,11 +2099,11 @@
   },
   "gd:from=pretrained": {
    "n_draws": 1,
-   "mean_acc_mean": 0.5712388911915439,
+   "mean_acc_mean": 0.5535338524649116,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": 0.05906240873632954,
+   "mean_normret_mean": 0.008845962194820386,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": -0.11764678200755638
+   "worst_normret_mean": -0.029411695501876035
   }
  }
 }
