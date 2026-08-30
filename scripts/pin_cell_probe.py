@@ -46,6 +46,39 @@ from apr.models import pd_sub, pd_global_norm                            # noqa:
 from cv_protocol import (ARM_KW, draw_budget_buffers,                    # noqa: E402
                          set_construction_buffer, eval_and_record,
                          clip_summary)
+from apr.merge_methods import (ties_combined_tau, ties_merge,            # noqa: E402
+                               dare_ties_merge, breadcrumbs_merge)
+from apr.taskvec import task_arithmetic_merge                            # noqa: E402
+
+
+def build_init(ctx, family: str, spec: str):
+    """The state a cell refines from, built exactly as cv_protocol builds it.
+
+    ``family`` is cv_protocol's --init name; ``spec`` is the hyperparameter
+    string it records after '@' for the merge selected on that draw (TA
+    'l0.05'; TIES 'd0.1,l0.8'; DARE-TIES 'dd0.5,t0.1,l0.8'; Breadcrumbs
+    'd0.1,o0.05,l0.4'), so a composition cell can be pinned from the same
+    merge the reported run refined.
+    """
+    if family == "pretrained":
+        return ctx.base_encoder
+    kv = {}
+    for tok in spec.split(","):
+        k = tok.rstrip("0123456789.-")
+        kv[k] = float(tok[len(k):])
+    tv, base, names = ctx.task_vectors, ctx.base_encoder, ctx.task_names
+    if family == "ta":
+        return task_arithmetic_merge(base, tv, {n: kv["l"] for n in names})
+    if family == "ties":
+        return ties_merge(base, tv, lam=kv["l"], density=kv["d"],
+                          combined=ties_combined_tau(tv, density=kv["d"]))
+    if family == "dareties":
+        return dare_ties_merge(base, tv, lam=kv["l"], drop_density=kv["dd"],
+                               trim_density=kv["t"], seed=0)
+    if family == "bc":
+        return breadcrumbs_merge(base, tv, {n: kv["l"] for n in names},
+                                 density=kv["d"], outlier_frac=kv["o"])
+    raise ValueError(f"unknown init family {family!r}")
 
 
 def main():
@@ -53,24 +86,34 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--budget", type=int, required=True)
     ap.add_argument("--cells", nargs="+", required=True,
-                    help="SEED:ETA:S triples, e.g. 101:4:50")
+                    help="SEED:ETA:S triples, e.g. 101:4:50; with --init other "
+                         "than pretrained, SEED:ETA:S:SPEC quadruples where SPEC "
+                         "is the selected merge's hyperparameter string, e.g. "
+                         "104:8:20:d0.1,l0.8")
     ap.add_argument("--arm", default="apr", choices=list(ARM_KW))
+    ap.add_argument("--init", default="pretrained",
+                    choices=["pretrained", "ta", "ties", "dareties", "bc"],
+                    help="what the cell refines from (cv_protocol's --init)")
     ap.add_argument("--order", default="random")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     cfg = ExperimentConfig.from_yaml(args.config)
     ctx = MergeContext.build(cfg)
-    init_state = ctx.base_encoder
 
     report = {"config": args.config, "budget": args.budget, "arm": args.arm,
+              "init": args.init,
               "note": "cells PINNED, not selected; refit on the full budget "
-                      "from the pretrained model", "cells": {}}
+                      f"from {args.init}", "cells": {}}
 
     for spec in args.cells:
-        seed_s, lr_s, S_s = spec.split(":")
-        seed, lr, S = int(seed_s), float(lr_s), int(S_s)
-        tag = f"seed{seed},lr{lr:g},S{S}"
+        parts = spec.split(":")
+        seed, lr, S = int(parts[0]), float(parts[1]), int(parts[2])
+        init_spec = parts[3] if len(parts) > 3 else ""
+        if args.init != "pretrained" and not init_spec:
+            raise SystemExit(f"--init {args.init} needs SEED:ETA:S:SPEC, got {spec}")
+        init_state = build_init(ctx, args.init, init_spec)
+        tag = f"seed{seed},lr{lr:g},S{S}" + (f",from={args.init}@{init_spec}" if init_spec else "")
         _log(f"\n===== PINNED {tag} (draw {seed - 100}) =====")
 
         # identical to cv_protocol's refit: same buffer draw, whole budget
@@ -81,6 +124,7 @@ def main():
         refit, hist = ctx.run_refine_from(init_state, rc, seed=cfg.seed)
         scores, nr, ag = eval_and_record(ctx, refit)
         rec = {"buffer_seed": seed, "lr": lr, "S": S, "eta_times_S": lr * S,
+               "init": args.init, "init_spec": init_spec,
                "displacement": pd_global_norm(pd_sub(refit, init_state)),
                "scores": scores, "normret": nr, "aggregate": ag,
                "clip": clip_summary(hist)}

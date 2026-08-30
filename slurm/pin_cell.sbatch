@@ -27,13 +27,14 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 : "${CELLS:?CELLS=\"SEED:ETA:S ...\" is required}"
 : "${OUT:?OUT=<results json> is required}"
 : "${ARM:=apr}"
+: "${INIT:=pretrained}"        # ta|ties|dareties|bc: cells are SEED:ETA:S:SPEC
 
 echo "[job] pinned cells: ${CONFIG} B=${BUDGET} arm=${ARM} cells=[${CELLS}] -> ${OUT}"
 guard_output "${OUT}"
 
 # shellcheck disable=SC2086  # CELLS is a word list on purpose
 python scripts/pin_cell_probe.py \
-  --config "${CONFIG}" --budget "${BUDGET}" --arm "${ARM}" \
+  --config "${CONFIG}" --budget "${BUDGET}" --arm "${ARM}" --init "${INIT}" \
   --cells ${CELLS} \
   --out "${OUT}"
 
