@@ -275,7 +275,7 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \centering
 \small
 \setlength{\tabcolsep}{4.5pt}
-\caption{\textbf{Both eight-task suites under the equal-budget protocol} ($B$ labels per task for every method; mean $\pm$ std over three fresh buffer draws). Both suites report the plain mean of the tasks' own metrics (Section~\ref{sec:protocol}) and the worst task on the same scale; the expert ceilings are $0.903$ ($0.749$ worst) on CLIP-8 and $0.860$ ($0.623$) on GLUE-8. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. GD and ungated are APR's ablations, run from the pretrained model where they isolate the anchor and the gate.}
+\caption{\textbf{Both eight-task suites under the equal-budget protocol} ($B$ labels per task for every method; mean $\pm$ std over three fresh buffer draws). Both suites report the plain mean of the tasks' own metrics (Section~\ref{sec:protocol}) and the worst task on the same scale; the expert ceilings are $0.903$ ($0.749$ worst) on CLIP-8 and $0.860$ ($0.623$) on GLUE-8. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. Interiority is enforced for $\eta$ and the task-arithmetic coefficient; TIES, DARE-TIES and Breadcrumbs select on two-point grids per hyperparameter that are not extended. GD and ungated are APR's ablations, run from the pretrained model where they isolate the anchor and the gate.}
 \label{tab:cv-v2}
 \begin{tabular}{lcccc}
 \toprule
@@ -302,6 +302,31 @@ TIES                       & $\mathbf{0.737}\pm0.007$ & $0.520\pm0.014$ & $0.549
 $\thetab+$GD (ablation)      & $0.546\pm0.004$ & $0.373\pm0.013$ & $0.395\pm0.048$ & $0.011\pm0.064$ \\
 $\thetab+$ungated (ablation) & $0.545\pm0.003$ & $0.398\pm0.009$ & $0.456\pm0.008$ & $0.066\pm0.055$ \\
 $\thetab+$APR                & $0.692\pm0.036$ & $0.503\pm0.019$ & $\mathbf{0.565}\pm0.032$ & $0.062\pm0.051$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.5pt}
+\caption{\textbf{CLIP-20 under the equal-budget protocol}, same conventions as Table~\ref{tab:cv-v2}: top-1 accuracy averaged over the twenty tasks (zero-shot floor $0.550$, worst task $0.100$; expert ceiling $0.896$, worst $0.711$). The task-arithmetic grid starts at $\lambda=0.05$ here and every selected $\lambda$ is interior; the ungated ablation's rate reached the lower edge of its twice-extended grid on two draws at $B=32$.}
+\label{tab:clip20-v3}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{$B=32$} & \multicolumn{2}{c}{$B=16$} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Model & Mean & Worst-task & Mean & Worst-task \\
+\midrule
+Pretrained $\thetab$         & $0.550$ & $0.100$ & $0.550$ & $0.100$ \\
+\midrule
+Task arithmetic              & $0.604\pm0.000$ & $0.115\pm0.000$ & $0.602\pm0.004$ & $0.117\pm0.004$ \\
+Breadcrumbs                  & $0.598\pm0.009$ & $0.133\pm0.024$ & $0.603\pm0.000$ & $0.119\pm0.000$ \\
+DARE-TIES                    & $0.520\pm0.000$ & $0.202\pm0.000$ & $0.520\pm0.000$ & $\mathbf{0.202}\pm0.000$ \\
+TIES                         & $0.619\pm0.000$ & $0.194\pm0.000$ & $0.612\pm0.013$ & $0.201\pm0.013$ \\
+$\thetab+$GD (ablation)      & $0.579\pm0.014$ & $0.102\pm0.006$ & $0.568\pm0.014$ & $0.108\pm0.012$ \\
+$\thetab+$ungated (ablation) & $0.602\pm0.005$ & $0.156\pm0.011$ & $0.578\pm0.003$ & $0.151\pm0.007$ \\
+$\thetab+$APR                & $\mathbf{0.649}\pm0.020$ & $\mathbf{0.215}\pm0.066$ & $\mathbf{0.613}\pm0.056$ & $0.188\pm0.083$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -414,6 +439,9 @@ Table~\ref{tab:cv-v2} reports both eight-task suites under the protocol of Secti
 On GLUE-8 the ordering is the same against the ablations and, at both budgets, against the merges as well. APR reaches $0.612\pm0.015$ at $B=32$ against $0.563$ for the best checkpoint-only merge (DARE-TIES), $0.521$ for ordinary descent and $0.480$ for the ungated update, and $0.565\pm0.032$ at $B=16$ against $0.554$, $0.395$ and $0.456$. The worst-task column tells the other half of the story: APR's mean is bought partly at the expense of its weakest task ($0.133$ against DARE-TIES's $0.268$ at $B=32$), so on this suite the refinement trades the worst task for the average where the merges do not, and every selected cell sits in the high-displacement part of the grid ($\eta\in\{8,16,32\}$, $2.6$--$6.1$ from $\thetab$). The selection rule is what makes GLUE-8 reportable at all. The same experiment selected by held-out replay loss chose a near-no-op on roughly half of its draws and produced a $\pm0.11$ spread, because RoBERTa's pretrained encoder predicts near-uniformly under every GLUE-8 head---the initial held-out loss is ${\approx}\ln C$---and an objective that is already near its normalized value of $1$ prefers models that do not move over models that move far enough to score; Appendix~\ref{app:selection} documents the failure, the pinned cells that diagnose it, and the rule that replaced it.
 
 On CLIP-8 the draw spread is the more interesting number. At $B=32$ APR varies by $\pm0.004$ across buffer draws, the same order as the merges, and selects the same cell every time. At $B=16$ it does not: two draws select $\eta=8$ and score $0.67$, the third selects $\eta=32$ and scores $0.73$, and the mean ($0.692\pm0.036$) lands below TIES ($0.737$). This is the one cell of Table~\ref{tab:cv-v2} in which a checkpoint-only merge beats the refinement, and Appendix~\ref{app:selection} traces it to the select-then-refit step rather than to the update: cells are constructed on $B/2=8$ examples per task, where $\eta=32$ genuinely collapses on some draws, and refit on $16$, where it is safe---pinning $\eta=32$ on the two draws that rejected it scores $0.725$ and $0.732$. Selection is right about the models it can see and conservative about the model it will build. An earlier version of the $B=32$ experiment showed a different instability---a $\pm0.081$ spread with the fine-grained Cars task collapsing on two draws of three---which we traced to the replay sampler: with more classes than the budget holds it had been keeping the lowest class ids deterministically, so Cars was refined and selected on $32$ of its $196$ classes, identically for every seed. Drawing the covered classes at random per seed (Appendix~\ref{app:protocol}) removes both the collapse and the spread. We report this because the failure is instructive: at these budgets a fine-grained task is representable only in part, and a selection buffer that inherits the same blind spot cannot detect damage to the classes it never sees.
+
+\paragraph{Twenty tasks.}
+On CLIP-20 (Table~\ref{tab:clip20-v3}) interference dominates: with twenty task vectors competing for one encoder, the best merge, TIES, recovers a fifth of the floor-to-ceiling gap ($0.619$) against half on CLIP-8, and the selected task-arithmetic coefficient falls to $\lambda\in\{0.05,0.08\}$ (Appendix~\ref{app:clip20}). APR from the pretrained model reaches $0.649\pm0.020$ at $B=32$, above every merge and both ablations on the mean and on the worst task ($0.215$), with $32$ labels per task in place of twenty expert checkpoints. At $B=16$ it ties TIES ($0.613\pm0.056$ against $0.612$), and the spread is again selection: the three draws select $\eta\in\{4,8,16\}$ and score $0.55$--$0.65$, and the draw that chose $\eta=16$ scored best on its eight construction examples and worst after the refit on sixteen---at this budget, eight examples per task are an unreliable guide to the refit in either direction. The selected rates ($\eta\le16$) are smaller than CLIP-8's $\eta=32$ on every draw.
 
 \paragraph{Cold start: refining from the pretrained model.}
 Refining \emph{from the pretrained model}---the setting with no merge to inherit, and the one where the refinement must supply all of the multi-task ability itself---is an unambiguous win for the gated, expert-anchored update: APR is the best cold-start treatment on all three benchmarks, ahead of the better of the two unconstrained baselines by $0.06$ (CLIP-20), $0.11$ (GLUE-8), and $0.39$ (CLIP-8). Neither unconstrained baseline is viable at this budget: ordinary descent recovers between a twentieth and a fifth of the expert--base gap on the two retention benchmarks ($0.046$ on CLIP-8, $0.209$ on GLUE-8), and the ungated update fails to improve on the pretrained model at all ($-0.018$ on GLUE-8, $-0.036$ on CLIP-8), so distance scaling without the gate is not merely weaker than APR but useless from this initialization. Only the gated, distance-scaled update turns a small replay buffer into multi-task ability with no merge to build on.
@@ -532,31 +560,29 @@ $n=8$  & APR                 & $\mathbf{0.567\pm0.017}$ & $\mathbf{0.557\pm0.007
 \end{table}
 \fi
 
-We also test whether the methods preserve zero-shot capabilities on tasks excluded from merging and refinement. Models are built on the standard CLIP-8 suite and evaluated on seven additional CLIP-20 tasks on which the pretrained model performs meaningfully above chance. Every data-dependent method uses eight inputs per training task, and refinement hyperparameters are fixed from the corresponding CLIP-8 experiment; the full twelve-task split and protocol details are given in Appendix~\ref{app:clip20}.
+We also test whether the methods preserve zero-shot capabilities on tasks excluded from merging and refinement. Models are built on the standard CLIP-8 suite under the protocol of Table~\ref{tab:cv-v2} at $B=32$ and evaluated, with no further training or selection, on seven additional CLIP-20 tasks on which the pretrained model performs meaningfully above chance; every probed state is the saved winner of a fresh draw or a merge at its selected hyperparameters, so nothing is re-derived. The full twelve-task split and the five near-chance tasks are given in Appendix~\ref{app:clip20}.
 
-APR retains more held-out accuracy than every checkpoint-only merge and both unconstrained refinements, and it dominates task arithmetic on both training accuracy and retention. AdaMerging remains the strongest matched-budget operating point in this lower-interference setting, so refinement from the pretrained model is not universally preferable to a strong data-fitted merge. The two ablations nevertheless show that APR's retention is not a consequence of using labels alone: it gains about $0.18$ training accuracy over ordinary descent and the ungated update while also preserving more held-out accuracy.
+APR dominates every checkpoint-only merge on both axes at once: it scores highest on the train tasks ($0.751$) and retains more held-out accuracy ($0.721$, a drop of $0.059$) than TIES ($0.711$), Breadcrumbs ($0.716$), task arithmetic ($0.695$) or DARE-TIES ($0.613$), at a third or less of their parameter displacement. The two ablations retain more still ($0.768$ and $0.738$), but they do so by barely moving---ordinary descent stays within $0.06$ of $\theta_0$ and scores $0.19$ less on the train tasks---so the frontier consists of $\theta_0$, GD and APR, and retention is cheap for a model that has not learned the tasks. What the ablations do show is that APR's retention is not a consequence of its labels alone: it gains $0.17$--$0.19$ train accuracy over both while giving up $0.02$--$0.05$ of held-out accuracy, whereas every merge gives up $0.06$--$0.17$ for a lower train score.
 
 \begin{table}[t]
 \centering
 \scriptsize
 \setlength{\tabcolsep}{3pt}
-\caption{Held-out zero-shot retention after building models on CLIP-8 ($n=8$). The held-out score averages seven additional CLIP-20 tasks; parentheses report the change from $\theta_0$. Single seed; $^\ast$ marks the Pareto frontier.}
+\caption{Held-out zero-shot retention after building models on CLIP-8 at $B{=}32$. Every state is the model Table~\ref{tab:cv-v2} scores---the saved winner of each fresh draw, and the merges at their selected hyperparameters---evaluated with no further training on the seven CLIP-20 tasks on which $\theta_0$ performs meaningfully above chance; parentheses report the change from $\theta_0$; mean $\pm$ std over three draws. $^\ast$ marks the train--held-out Pareto frontier.}
 \label{tab:heldout8}
 \renewcommand{\arraystretch}{0.95}
 \begin{tabular}{lccc}
 \toprule
 Model (built from the 8 train tasks) & Dist.\ $\theta_0$ & Train-8 & Held-out (drop) \\
 \midrule
-Base model $\theta_0$$^\ast$              & $0.00$  & $0.478$ & $0.780\ (\phantom{-}0.000)$ \\
-GD from base ($\eta{=}10^{-4}$, $S{=}20$) & $0.13$  & $0.496$ & $0.697\ (-0.082)$ \\
-Ungated from base ($\eta{=}1$, $S{=}20$)  & $0.49$  & $0.500$ & $0.699\ (-0.080)$ \\
-APR from base ($\eta{=}16$, $S{=}50$)     & $0.85$  & $0.678$ & $0.732\ (-0.047)$ \\
-AdaMerging-layer$^\ast$                   & $1.48$  & $0.720$ & $\mathbf{0.751}\ (-0.029)$ \\
-Task arithmetic ($\lambda{=}0.3$)         & $2.19$  & $0.673$ & $0.628\ (-0.151)$ \\
-Breadcrumbs                               & $2.16$  & $0.705$ & $0.716\ (-0.064)$ \\
-TIES$^\ast$                               & $3.82$  & $\mathbf{0.741}$ & $0.702\ (-0.077)$ \\
-DARE-TIES                                 & $5.25$  & $0.708$ & $0.613\ (-0.166)$ \\
-RegMean                                   & $123$   & $0.572$ & $0.461\ (-0.318)$ \\
+Base model $\theta_0$$^\ast$   & $0.00$        & $0.478$          & $0.780\ (\phantom{-}0.000)$ \\
+GD from base$^\ast$            & $0.06\pm0.00$ & $0.564\pm0.002$  & $\mathbf{0.768}\pm0.002\ (-0.012)$ \\
+Ungated from base              & $0.37\pm0.06$ & $0.579\pm0.008$  & $0.738\pm0.009\ (-0.042)$ \\
+APR from base$^\ast$           & $1.05\pm0.02$ & $\mathbf{0.751}\pm0.004$ & $0.721\pm0.009\ (-0.059)$ \\
+Task arithmetic                & $1.70\pm0.42$ & $0.685\pm0.011$  & $0.695\pm0.058\ (-0.085)$ \\
+Breadcrumbs                    & $2.16\pm0.00$ & $0.705\pm0.000$  & $0.716\pm0.000\ (-0.064)$ \\
+TIES                           & $3.34\pm0.42$ & $0.735\pm0.006$  & $0.711\pm0.027\ (-0.069)$ \\
+DARE-TIES                      & $5.25\pm0.00$ & $0.708\pm0.000$  & $0.613\pm0.000\ (-0.166)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -636,12 +662,12 @@ RegMean                               & $386$  & $0.675$ & $0.743\ (-0.059)$ \\
 \fi
 
 \paragraph{Summary.}
-Five claims survive the campaign at $n\le16$: (i)~the refinement is broadly compositional, improving most initializations, while the small-buffer Breadcrumbs rows delimit any universal improvement claim; (ii)~the anchored, distance-scaled, clipped step is the load-bearing ingredient, the gate contributing worst-task repair, small-budget stability, and held-out retention rather than mean accuracy; (iii)~in the dedicated safety audit, anchored runs avoid the overfitting signature that appears in a quarter of unconstrained descent's small-buffer configurations, although selected composition rows can still decline; (iv)~eight labels per task suffice to beat the tuned task-arithmetic merge starting from the pretrained model alone; and (v)~on held-out tasks never merged or refined, the anchored update dominates both unconstrained controls on accuracy and retention at once and retains more than every checkpoint-only merge, though where interference is mild the strongest label-free merge retains more still (Table~\ref{tab:heldout8}).
+Five claims survive the campaign at $n\le16$: (i)~the refinement is broadly compositional, improving most initializations, while the small-buffer Breadcrumbs rows delimit any universal improvement claim; (ii)~the anchored, distance-scaled, clipped step is the load-bearing ingredient, the gate contributing worst-task repair, small-budget stability, and held-out retention rather than mean accuracy; (iii)~in the dedicated safety audit, anchored runs avoid the overfitting signature that appears in a quarter of unconstrained descent's small-buffer configurations, although selected composition rows can still decline; (iv)~eight labels per task suffice to beat the tuned task-arithmetic merge starting from the pretrained model alone; and (v)~on held-out tasks never merged or refined, the anchored update retains more than every checkpoint-only merge while scoring higher on the merged tasks, and its unconstrained controls retain more only by staying near the pretrained model (Table~\ref{tab:heldout8}).
 
 \section{Discussion}
 \label{sec:contribution}
 
-We introduced APR, an expert-anchored refinement method designed to repair task interference in model merges. APR uses replay gradients to identify locally beneficial movements toward each task expert, scales those movements by the expert distance, and clips them before they can overshoot. Across GLUE-8 and the eight- and twenty-task CLIP suites, APR usually improves both checkpoint-only and data-fitted merges; when initialized directly from the pretrained model, it is the strongest of the tested replay refinements on all three benchmarks and on every buffer draw, and under the equal-budget protocol it outperforms every checkpoint-only merge on GLUE-8 at both budgets and on CLIP-8 at $B=32$, trailing TIES on CLIP-8 at $B=16$ because a learning rate selected on eight examples per task is conservative about the step the refit on sixteen can afford. The ablations identify the anchored, distance-scaled, clipped update as the main source of the gains, with the gate contributing primarily to worst-task performance and retention. On tasks excluded from merging and refinement, APR retains more zero-shot ability than every checkpoint-only merge and both unconstrained controls, although matched-budget AdaMerging remains stronger when interference is mild. APR is therefore best viewed as a practical correction stage for model merging when a modest labeled buffer is available, with the option to operate directly from the pretrained model when no suitable merge exists. Establishing whether these conclusions extend beyond the encoder architectures and small-data regimes studied here remains future work.
+We introduced APR, an expert-anchored refinement method designed to repair task interference in model merges. APR uses replay gradients to identify locally beneficial movements toward each task expert, scales those movements by the expert distance, and clips them before they can overshoot. Across GLUE-8 and the eight- and twenty-task CLIP suites, APR usually improves both checkpoint-only and data-fitted merges; when initialized directly from the pretrained model, it is the strongest of the tested replay refinements on all three benchmarks and on every buffer draw, and under the equal-budget protocol it outperforms every checkpoint-only merge on GLUE-8 at both budgets and on CLIP-8 at $B=32$, trailing TIES on CLIP-8 at $B=16$ because a learning rate selected on eight examples per task is conservative about the step the refit on sixteen can afford. The ablations identify the anchored, distance-scaled, clipped update as the main source of the gains, with the gate contributing primarily to worst-task performance and retention. On tasks excluded from merging and refinement, APR retains more zero-shot ability than every checkpoint-only merge while scoring higher on the merged tasks; its unconstrained controls retain more only by staying near the pretrained model. APR is therefore best viewed as a practical correction stage for model merging when a modest labeled buffer is available, with the option to operate directly from the pretrained model when no suitable merge exists. Establishing whether these conclusions extend beyond the encoder architectures and small-data regimes studied here remains future work.
 
 \subsection*{AI use statement}
 
