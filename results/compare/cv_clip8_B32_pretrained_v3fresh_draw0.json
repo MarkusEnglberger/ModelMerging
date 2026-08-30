@@ -9,7 +9,7 @@
   "refit_on": 32,
   "selection_rule": "mean over folds of the held-out per-task metric",
   "select_on": "metric",
-  "tie_break": "normalised held-out replay loss, then the smallest (eta, S)",
+  "tie_break": "the least-moving cell: smallest (eta, S) for the labeled arms; smallest scale, then the remaining hyperparameters, for merges",
   "init": "pretrained",
   "order": "random",
   "evaluation_split_used_for": "selected cells only"
@@ -135,7 +135,9 @@
     "merge:TA": {
      "selected": "TA@l0.2",
      "selection_obj": -0.71875,
-     "selection_obj_secondary": 0.5607101495256257,
+     "selection_tie_key": [
+      0.2
+     ],
      "scores": {
       "sun397": 0.6429722921914358,
       "cars": 0.6096256684491979,
@@ -168,47 +170,54 @@
      "tier": "checkpoint-only construction"
     },
     "merge:TIES": {
-     "selected": "TIES@d0.1,l1",
+     "selected": "TIES@d0.1,l0.8",
      "selection_obj": -0.78125,
-     "selection_obj_secondary": 0.4617736925624591,
+     "selection_tie_key": [
+      0.8,
+      0.1
+     ],
      "scores": {
-      "sun397": 0.6671536523929471,
-      "cars": 0.6357418231563239,
-      "resisc45": 0.7320634920634921,
-      "eurosat": 0.7385185185185185,
-      "svhn": 0.859019668100799,
-      "gtsrb": 0.8003167062549486,
-      "mnist": 0.9691,
-      "dtd": 0.5276595744680851
+      "sun397": 0.6777329974811083,
+      "cars": 0.6443228454172366,
+      "resisc45": 0.7355555555555555,
+      "eurosat": 0.7485185185185185,
+      "svhn": 0.8153042409342348,
+      "gtsrb": 0.7596991290577989,
+      "mnist": 0.9526,
+      "dtd": 0.5345744680851063
      },
      "normret": {
-      "sun397": 0.3027166623159738,
-      "cars": 0.20922458768465974,
-      "resisc45": 0.4091695390234944,
-      "eurosat": 0.5335616339683805,
-      "svhn": 0.8275680603346665,
-      "gtsrb": 0.7156488441810056,
-      "mnist": 0.9479734811384743,
-      "dtd": 0.2503748055366622
+      "sun397": 0.3932729288207518,
+      "cars": 0.2553475798579548,
+      "resisc45": 0.41868510969845923,
+      "eurosat": 0.5520547843113155,
+      "svhn": 0.7610727943132833,
+      "gtsrb": 0.6544608680035296,
+      "mnist": 0.9158222736589579,
+      "dtd": 0.2698650598598753
      },
      "aggregate": {
-      "mean_acc": 0.7411966793693893,
-      "worst_acc": 0.5276595744680851,
-      "mean_normret": 0.5245297017729147,
-      "worst_normret": 0.20922458768465974,
-      "hmean_normret": 0.39888846575971726,
+      "mean_acc": 0.7335384693811948,
+      "worst_acc": 0.5345744680851063,
+      "mean_normret": 0.527572674815516,
+      "worst_normret": 0.2553475798579548,
+      "hmean_normret": 0.4372010249389369,
       "degenerate_tasks": []
      },
      "grid_boundary": [
       "density_low",
-      "lam_high"
+      "lam_low"
      ],
      "tier": "checkpoint-only construction"
     },
     "merge:DARETIES": {
      "selected": "DARETIES@dd0.5,t0.1,l0.8",
      "selection_obj": -0.73046875,
-     "selection_obj_secondary": 0.5761613517946728,
+     "selection_tie_key": [
+      0.8,
+      0.5,
+      0.1
+     ],
      "scores": {
       "sun397": 0.5945088161209068,
       "cars": 0.5765452058201717,
@@ -246,7 +255,11 @@
     "merge:BC": {
      "selected": "BC@d0.2,o0.01,l0.4",
      "selection_obj": -0.74609375,
-     "selection_obj_secondary": 0.5438906753062328,
+     "selection_tie_key": [
+      0.4,
+      0.2,
+      0.01
+     ],
      "scores": {
       "sun397": 0.6410579345088161,
       "cars": 0.6131078224101479,
@@ -289,7 +302,6 @@
       -0.6484375
      ],
      "lr_grid": [
-      0.5,
       1.0,
       2.0,
       4.0,
@@ -306,30 +318,6 @@
      "S_capped": false,
      "displacement": 1.0438627019697835,
      "traces": {
-      "lr0.5,S50,fold0": {
-       "objective": -0.53125,
-       "objective_secondary": 0.8711167262116218,
-       "per_task_loss": {
-        "sun397": 0.6875,
-        "cars": 0.1875,
-        "resisc45": 0.5625,
-        "eurosat": 0.5625,
-        "svhn": 0.75,
-        "gtsrb": 0.5,
-        "mnist": 0.5,
-        "dtd": 0.5
-       },
-       "per_task_ref": {
-        "sun397": 1.2014845609664917,
-        "cars": 1.9565918445587158,
-        "resisc45": 1.4453128576278687,
-        "eurosat": 1.3958673477172852,
-        "svhn": 1.9669989347457886,
-        "gtsrb": 2.148000717163086,
-        "mnist": 2.004558801651001,
-        "dtd": 2.0286192893981934
-       }
-      },
       "lr1,S50,fold0": {
        "objective": -0.5546875,
        "objective_secondary": 0.8453709321372351,
@@ -507,15 +495,6 @@
       "gate_density_mean": 0.5147572612513721
      },
      "selection_clip": {
-      "lr0.5,fold0": [
-       {
-        "n_steps": 400,
-        "clipped_frac_gated_mean": 7.21586469835265e-09,
-        "clipped_frac_gated_max": 1.3779895900887698e-06,
-        "clipped_frac_all_mean": 3.716154409074277e-09,
-        "gate_density_mean": 0.5152301521908159
-       }
-      ],
       "lr1,fold0": [
        {
         "n_steps": 400,
@@ -1248,11 +1227,11 @@
   },
   "merge:TIES": {
    "n_draws": 1,
-   "mean_acc_mean": 0.7411966793693893,
+   "mean_acc_mean": 0.7335384693811948,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": 0.5245297017729147,
+   "mean_normret_mean": 0.527572674815516,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": 0.20922458768465974
+   "worst_normret_mean": 0.2553475798579548
   },
   "merge:DARETIES": {
    "n_draws": 1,
