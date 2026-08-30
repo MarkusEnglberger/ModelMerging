@@ -435,30 +435,29 @@ Strong performance on the merged tasks is useful only if it does not erase capab
 \end{figure}
 
 \paragraph{Drift on the pretraining objective.}
-Figure~\ref{fig:n16disp} shows the refinement reaching merge-level scores at a small fraction of the merge's displacement, but parameter distance is a geometric quantity, not a capability measure. We therefore measure drift on the pretraining objective itself: masked-language-model loss on WikiText-2 validation text. Each refined encoder is evaluated under RoBERTa's original pretrained MLM head; the head is never modified by any experiment, and the WikiText-2 text is never used for refinement or selection, so any increase in this loss over the pretrained model is attributable to encoder drift alone. The probed states are exactly the split-selected from-pretrained cells of Table~\ref{tab:main16}, re-derived from the same replay buffer, with the pretrained model and the task-arithmetic merge as references (Table~\ref{tab:drift}).
+Figure~\ref{fig:n16disp} shows the refinement reaching merge-level scores at a small fraction of the merge's displacement, but parameter distance is a geometric quantity, not a capability measure. We therefore measure drift on the pretraining objective itself: masked-language-model loss on WikiText-2 validation text. Each refined encoder is evaluated under RoBERTa's original pretrained MLM head; the head is never modified by any experiment, and the WikiText-2 text is never used for refinement or selection, so any increase in this loss over the pretrained model is attributable to encoder drift alone. The probed states are exactly the from-pretrained cells of Table~\ref{tab:cv-v2} at $B=32$---the saved winner of each of the three fresh draws, nothing re-derived---with the pretrained model and the merges at their selected hyperparameters as references (Table~\ref{tab:drift}).
 
-With the split-selected merges of Table~\ref{tab:main16} probed alongside (Table~\ref{tab:drift}), the picture parallels the held-out-task study below. APR is the only point that combines merge-level task retention with sub-merge drift: at $0.315$ it matches the best-scoring merges (task arithmetic $0.320$, DARE-TIES $0.301$) while adding $+1.08$ to the pretraining loss against their $+2.51$ and $+1.59$---the same multitask ability for $43\%$ of task arithmetic's damage, at roughly $2\%$ of its parameter displacement---and it dominates Breadcrumbs and AdaMerging outright (equal or lower drift at ten times the retention). The exception is TIES, which drifts least of every data-free merge ($+0.37$) but at a third less task retention ($0.208$); the frontier therefore consists of $\thetab$, TIES, APR, and---by a $0.005$ retention margin at more than twice the drift---task arithmetic. Refinement from the pretrained model is thus not the minimum-drift point, but it is the only one at the high-retention end that costs the base model less than half of what a merge at that level does. 
+With the selected merges probed alongside (Table~\ref{tab:drift}), the picture parallels the held-out-task study below. APR is the only point that combines the best task score with sub-merge drift: at $0.612$ it exceeds every merge (DARE-TIES $0.563$, task arithmetic $0.552$) while adding $+0.93$ to the pretraining loss against their $+1.59$ and $+2.51$---a better multitask model for $37\%$ of task arithmetic's damage, at roughly $3\%$ of its parameter displacement---and it dominates Breadcrumbs outright (the same drift at $0.14$ more score). The exception is TIES, which drifts least of every merge ($+0.44$) at $0.063$ less score, so the frontier consists of $\thetab$, TIES and APR alone. The ablations locate the drift protection: ordinary descent barely moves ($0.40$ from $\thetab$) and still drifts more than APR, while the ungated update, which moves less far than APR on average, adds $+12.3$ to the loss on one draw of three---distance scaling without the gate can leave the encoder while barely displacing it. Refinement from the pretrained model is thus not the minimum-drift point, but it is the only one at the high-score end that costs the base model less than half of what a merge at that level does.
 
 \begin{table}[t]
 \centering
 \small
-\caption{Pretraining-objective drift on GLUE-8 at the $16{+}16$ budget. MLM loss is measured on WikiText-2 validation with RoBERTa's pretrained MLM head; $\Delta$ is relative to $\thetab$. Single seed; $^\ast$ marks the retention--drift Pareto frontier.}
+\caption{Pretraining-objective drift on GLUE-8 at the $B{=}32$ budget of Table~\ref{tab:cv-v2}. MLM loss is measured on WikiText-2 validation with RoBERTa's pretrained MLM head; $\Delta$ is relative to $\thetab$. Every probed state is the model Table~\ref{tab:cv-v2} scores (the saved winner of each of the three fresh draws, and the merges at their selected hyperparameters), so the GLUE-8 column repeats that table's mean of per-task metrics; mean $\pm$ std over draws. $^\ast$ marks the score--drift Pareto frontier.}
 \label{tab:drift}
 \begin{tabular}{lccc}
 \toprule
-State & Dist.\ $\thetab$ & GLUE-8 NormRet & MLM loss ($\Delta$) \\
+State & Dist.\ $\thetab$ & GLUE-8 (task metric) & MLM loss ($\Delta$) \\
 \midrule
-Pretrained $\thetab$$^\ast$              & $0.00$   & $0$        & $2.51\ (\phantom{+}0.00)$ \\
+Pretrained $\thetab$$^\ast$              & $0.00$   & $0.354$        & $2.51\ (\phantom{+}0.00)$ \\
 \midrule
-Task arithmetic ($\lambda{=}0.3$)$^\ast$ & $107.7$  & $\mathbf{0.320}$ & $5.02\ (+2.51)$ \\
-TIES$^\ast$                              & $89.8$   & $0.208$    & $\mathbf{2.88}\ (+0.37)$ \\
-DARE-TIES                                & $178.3$  & $0.301$    & $4.10\ (+1.59)$ \\
-Breadcrumbs                              & $106.6$  & $0.030$    & $3.60\ (+1.09)$ \\
-AdaMerging (matched)                     & $116.0$  & $0.029$    & $8.72\ (+6.21)$ \\
+Task arithmetic ($\lambda{=}0.3$)        & $107.7$  & $0.552\pm0.000$ & $5.02\ (+2.51)$ \\
+TIES$^\ast$                              & $90.0$   & $0.549\pm0.000$ & $\mathbf{2.95}\ (+0.44)$ \\
+DARE-TIES                                & $178.3$  & $0.563\pm0.000$ & $4.10\ (+1.59)$ \\
+Breadcrumbs                              & $101.0$  & $0.473\pm0.015$ & $3.44\ (+0.93)$ \\
 \midrule
-APR from $\thetab$ ($\eta{=}8$, $S{=}50$)$^\ast$ & $2.47$ & $0.315$ & $3.59\ (+1.08)$ \\
-\quad GD ablation ($\eta{=}10^{-3}$, $S{=}50$)   & $0.45$ & $0.209$ & $4.13\ (+1.62)$ \\
-\quad ungated ablation ($\eta{=}8$, $S{=}50$)    & $5.32$ & $-0.431$ & $16.10\ (+13.59)$ \\
+APR from $\thetab$$^\ast$                & $3.54\pm1.28$ & $\mathbf{0.612}\pm0.015$ & $3.44\pm0.31\ (+0.93)$ \\
+\quad GD ablation                        & $0.40\pm0.01$ & $0.521\pm0.017$ & $3.56\pm0.07\ (+1.05)$ \\
+\quad ungated ablation                   & $1.95\pm0.98$ & $0.480\pm0.060$ & $7.89\pm6.01\ (+5.38)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
