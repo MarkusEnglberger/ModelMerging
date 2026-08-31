@@ -280,9 +280,9 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 
 \begin{table}[t]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\caption{\textbf{All three suites at $B{=}32$} (32 labels per task for every method; mean $\pm$ std over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. Zero-shot floors are quoted in the $\thetab$ row.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{All three suites at $B{=}32$} (32 labels per task for every method; written $\mathrm{mean}_{\pm\mathrm{std}}$ over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. Zero-shot floors are the $\thetab$ row.}
 \label{tab:b32}
 \begin{tabular}{lcccccc}
 \toprule
@@ -290,30 +290,29 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
 Model & Mean & Worst & Mean & Worst & Mean & Worst \\
 \midrule
-Pretrained $\thetab$       & $0.478$ & $0.315$ & $0.354$ & $-0.047$ & $0.550$ & $0.100$ \\
+Pretrained $\thetab$     & $0.478$ & $0.315$ & $0.354$ & $-0.047$ & $0.550$ & $0.100$ \\
 \midrule
-Task arithmetic            & $0.685\pm0.011$ & $0.503\pm0.026$ & $0.552\pm0.000$ & $0.130\pm0.000$ & $0.604\pm0.000$ & $0.115\pm0.000$ \\
-Breadcrumbs                & $0.705\pm0.000$ & $0.521\pm0.000$ & $0.473\pm0.015$ & $0.149\pm0.012$ & $0.598\pm0.009$ & $0.133\pm0.024$ \\
-DARE-TIES                  & $0.708\pm0.000$ & $0.486\pm0.000$ & $0.563\pm0.000$ & $0.268\pm0.000$ & $0.520\pm0.000$ & $0.202\pm0.000$ \\
-TIES                       & $0.732\pm0.002$ & $0.524\pm0.018$ & $0.549\pm0.000$ & $0.234\pm0.000$ & $0.619\pm0.000$ & $0.194\pm0.000$ \\
+Task arithmetic          & $0.685_{\pm0.011}$ & $0.503_{\pm0.026}$ & $0.552_{\pm0.000}$ & $0.130_{\pm0.000}$ & $0.604_{\pm0.000}$ & $0.115_{\pm0.000}$ \\
+\quad $+$XGD             & $0.765_{\pm0.011}$ & $0.557_{\pm0.004}$ & $0.681_{\pm0.023}$ & $0.059_{\pm0.045}$ & $0.664_{\pm0.005}$ & $0.208_{\pm0.051}$ \\
+Breadcrumbs              & $0.705_{\pm0.000}$ & $0.521_{\pm0.000}$ & $0.473_{\pm0.015}$ & $0.149_{\pm0.012}$ & $0.598_{\pm0.009}$ & $0.133_{\pm0.024}$ \\
+\quad $+$XGD             & $0.766_{\pm0.008}$ & $0.556_{\pm0.006}$ & $0.686_{\pm0.009}$ & $0.096_{\pm0.030}$ & $0.674_{\pm0.004}$ & $0.260_{\pm0.021}$ \\
+DARE-TIES                & $0.708_{\pm0.000}$ & $0.486_{\pm0.000}$ & $0.563_{\pm0.000}$ & $0.268_{\pm0.000}$ & $0.520_{\pm0.000}$ & $0.202_{\pm0.000}$ \\
+\quad $+$XGD             & $\mathbf{0.793}_{\pm0.010}$ & $0.556_{\pm0.013}$ & $\mathbf{0.699}_{\pm0.006}$ & $0.212_{\pm0.028}$ & $0.692_{\pm0.004}$ & $\mathbf{0.329}_{\pm0.018}$ \\
+TIES                     & $0.732_{\pm0.002}$ & $0.524_{\pm0.018}$ & $0.549_{\pm0.000}$ & $0.234_{\pm0.000}$ & $0.619_{\pm0.000}$ & $0.194_{\pm0.000}$ \\
+\quad $+$XGD             & $0.785_{\pm0.007}$ & $\mathbf{0.564}_{\pm0.005}$ & $0.690_{\pm0.010}$ & $\mathbf{0.363}_{\pm0.028}$ & $\mathbf{0.695}_{\pm0.003}$ & $0.319_{\pm0.010}$ \\
 \midrule
-Task arithmetic $+$XGD     & $0.765\pm0.011$ & $0.557\pm0.004$ & $0.681\pm0.023$ & $0.059\pm0.045$ & $0.664\pm0.005$ & $0.208\pm0.051$ \\
-Breadcrumbs $+$XGD         & $0.766\pm0.008$ & $0.556\pm0.006$ & $0.686\pm0.009$ & $0.096\pm0.030$ & $0.674\pm0.004$ & $0.260\pm0.021$ \\
-DARE-TIES $+$XGD           & $\mathbf{0.793}\pm0.010$ & $0.556\pm0.013$ & $\mathbf{0.699}\pm0.006$ & $0.212\pm0.028$ & $0.692\pm0.004$ & $\mathbf{0.329}\pm0.018$ \\
-TIES $+$XGD                & $0.785\pm0.007$ & $\mathbf{0.564}\pm0.005$ & $0.690\pm0.010$ & $\mathbf{0.363}\pm0.028$ & $\mathbf{0.695}\pm0.003$ & $0.319\pm0.010$ \\
-\midrule
-$\thetab+$GD (abl.)        & $0.546\pm0.032$ & $0.368\pm0.041$ & $0.521\pm0.017$ & $0.111\pm0.068$ & $0.573\pm0.021$ & $0.103\pm0.005$ \\
-$\thetab+$ungated (abl.)   & $0.579\pm0.009$ & $0.443\pm0.012$ & $0.480\pm0.060$ & $0.115\pm0.074$ & $0.602\pm0.005$ & $0.156\pm0.011$ \\
-$\thetab+$XGD              & $0.751\pm0.004$ & $0.524\pm0.003$ & $0.612\pm0.015$ & $0.133\pm0.047$ & $0.663\pm0.009$ & $0.267\pm0.029$ \\
+$\thetab+$GD             & $0.546_{\pm0.032}$ & $0.368_{\pm0.041}$ & $0.521_{\pm0.017}$ & $0.111_{\pm0.068}$ & $0.573_{\pm0.021}$ & $0.103_{\pm0.005}$ \\
+$\thetab+$ungated        & $0.579_{\pm0.009}$ & $0.443_{\pm0.012}$ & $0.480_{\pm0.060}$ & $0.115_{\pm0.074}$ & $0.602_{\pm0.005}$ & $0.156_{\pm0.011}$ \\
+$\thetab+$XGD            & $0.751_{\pm0.004}$ & $0.524_{\pm0.003}$ & $0.612_{\pm0.015}$ & $0.133_{\pm0.047}$ & $0.663_{\pm0.009}$ & $0.267_{\pm0.029}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[t]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
-\caption{\textbf{All three suites at $B{=}16$} (16 labels per task for every method; mean $\pm$ std over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. Same conventions as Table~\ref{tab:b32}.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{All three suites at $B{=}16$} (16 labels per task for every method; mean $\pm$ std over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. Same conventions as Table~\ref{tab:b32}.}
 \label{tab:b16}
 \begin{tabular}{lcccccc}
 \toprule
@@ -321,21 +320,20 @@ $\thetab+$XGD              & $0.751\pm0.004$ & $0.524\pm0.003$ & $0.612\pm0.015$
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
 Model & Mean & Worst & Mean & Worst & Mean & Worst \\
 \midrule
-Pretrained $\thetab$       & $0.478$ & $0.315$ & $0.354$ & $-0.047$ & $0.550$ & $0.100$ \\
+Pretrained $\thetab$     & $0.478$ & $0.315$ & $0.354$ & $-0.047$ & $0.550$ & $0.100$ \\
 \midrule
-Task arithmetic            & $0.685\pm0.011$ & $0.503\pm0.026$ & $0.552\pm0.000$ & $0.130\pm0.000$ & $0.602\pm0.004$ & $0.117\pm0.004$ \\
-Breadcrumbs                & $0.705\pm0.000$ & $0.521\pm0.000$ & $0.470\pm0.020$ & $0.132\pm0.017$ & $0.603\pm0.000$ & $0.119\pm0.000$ \\
-DARE-TIES                  & $0.708\pm0.000$ & $0.486\pm0.000$ & $0.554\pm0.016$ & $0.256\pm0.021$ & $0.520\pm0.000$ & $0.202\pm0.000$ \\
-TIES                       & $0.734\pm0.007$ & $0.512\pm0.014$ & $0.549\pm0.000$ & $0.234\pm0.000$ & $0.612\pm0.013$ & $0.201\pm0.013$ \\
+Task arithmetic          & $0.685_{\pm0.011}$ & $0.503_{\pm0.026}$ & $0.552_{\pm0.000}$ & $0.130_{\pm0.000}$ & $0.602_{\pm0.004}$ & $0.117_{\pm0.004}$ \\
+\quad $+$XGD             & $0.740_{\pm0.004}$ & $0.539_{\pm0.015}$ & $0.676_{\pm0.012}$ & $0.052_{\pm0.042}$ & $0.653_{\pm0.007}$ & $0.215_{\pm0.032}$ \\
+Breadcrumbs              & $0.705_{\pm0.000}$ & $0.521_{\pm0.000}$ & $0.470_{\pm0.020}$ & $0.132_{\pm0.017}$ & $0.603_{\pm0.000}$ & $0.119_{\pm0.000}$ \\
+\quad $+$XGD             & $0.756_{\pm0.006}$ & $\mathbf{0.561}_{\pm0.013}$ & $0.667_{\pm0.005}$ & $0.114_{\pm0.037}$ & $0.658_{\pm0.005}$ & $0.225_{\pm0.037}$ \\
+DARE-TIES                & $0.708_{\pm0.000}$ & $0.486_{\pm0.000}$ & $0.554_{\pm0.016}$ & $0.256_{\pm0.021}$ & $0.520_{\pm0.000}$ & $0.202_{\pm0.000}$ \\
+\quad $+$XGD             & $0.766_{\pm0.001}$ & $0.521_{\pm0.003}$ & $\mathbf{0.684}_{\pm0.003}$ & $0.181_{\pm0.013}$ & $0.662_{\pm0.006}$ & $\mathbf{0.287}_{\pm0.022}$ \\
+TIES                     & $0.734_{\pm0.007}$ & $0.512_{\pm0.014}$ & $0.549_{\pm0.000}$ & $0.234_{\pm0.000}$ & $0.612_{\pm0.013}$ & $0.201_{\pm0.013}$ \\
+\quad $+$XGD             & $\mathbf{0.774}_{\pm0.004}$ & $0.550_{\pm0.011}$ & $0.673_{\pm0.006}$ & $\mathbf{0.290}_{\pm0.042}$ & $\mathbf{0.679}_{\pm0.010}$ & $0.275_{\pm0.006}$ \\
 \midrule
-Task arithmetic $+$XGD     & $0.740\pm0.004$ & $0.539\pm0.015$ & $0.676\pm0.012$ & $0.052\pm0.042$ & $0.653\pm0.007$ & $0.215\pm0.032$ \\
-Breadcrumbs $+$XGD         & $0.756\pm0.006$ & $\mathbf{0.561}\pm0.013$ & $0.667\pm0.005$ & $0.114\pm0.037$ & $0.658\pm0.005$ & $0.225\pm0.037$ \\
-DARE-TIES $+$XGD           & $0.766\pm0.001$ & $0.521\pm0.003$ & $\mathbf{0.684}\pm0.003$ & $0.181\pm0.013$ & $0.662\pm0.006$ & $\mathbf{0.287}\pm0.022$ \\
-TIES $+$XGD                & $\mathbf{0.774}\pm0.004$ & $0.550\pm0.011$ & $0.673\pm0.006$ & $\mathbf{0.290}\pm0.042$ & $\mathbf{0.679}\pm0.010$ & $0.275\pm0.006$ \\
-\midrule
-$\thetab+$GD (abl.)        & $0.525\pm0.036$ & $0.351\pm0.032$ & $0.395\pm0.048$ & $0.011\pm0.064$ & $0.563\pm0.016$ & $0.107\pm0.013$ \\
-$\thetab+$ungated (abl.)   & $0.548\pm0.006$ & $0.402\pm0.010$ & $0.456\pm0.008$ & $0.066\pm0.055$ & $0.578\pm0.003$ & $0.151\pm0.007$ \\
-$\thetab+$XGD              & $0.681\pm0.050$ & $0.502\pm0.020$ & $0.565\pm0.032$ & $0.062\pm0.051$ & $0.613\pm0.056$ & $0.188\pm0.083$ \\
+$\thetab+$GD             & $0.525_{\pm0.036}$ & $0.351_{\pm0.032}$ & $0.395_{\pm0.048}$ & $0.011_{\pm0.064}$ & $0.563_{\pm0.016}$ & $0.107_{\pm0.013}$ \\
+$\thetab+$ungated        & $0.548_{\pm0.006}$ & $0.402_{\pm0.010}$ & $0.456_{\pm0.008}$ & $0.066_{\pm0.055}$ & $0.578_{\pm0.003}$ & $0.151_{\pm0.007}$ \\
+$\thetab+$XGD            & $0.681_{\pm0.050}$ & $0.502_{\pm0.020}$ & $0.565_{\pm0.032}$ & $0.062_{\pm0.051}$ & $0.613_{\pm0.056}$ & $0.188_{\pm0.083}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
