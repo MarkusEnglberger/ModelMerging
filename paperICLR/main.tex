@@ -281,7 +281,7 @@ Controls        & random gate   & $0.568{\pm}.031\ ({+}.03)$ & $0.498{\pm}.117\ 
 \begin{table}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{3pt}
+\setlength{\tabcolsep}{2.4pt}
 \caption{\textbf{All three suites at $B{=}32$} (32 labels per task for every method; written $\mathrm{mean}_{\pm\mathrm{std}}$ over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. The last block spends the same $B$ labels on estimating merge weights instead of on refinement. Zero-shot floors are the $\thetab$ row.}
 \label{tab:b32}
 \begin{tabular}{lcccccc}
@@ -314,7 +314,7 @@ Localize-and-Stitch      & $0.662_{\pm0.015}$ & $0.487_{\pm0.005}$ & $0.487_{\pm
 \begin{table}[t]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{3pt}
+\setlength{\tabcolsep}{2.4pt}
 \caption{\textbf{All three suites at $B{=}16$} (16 labels per task for every method; mean $\pm$ std over three fresh buffer draws). Each suite reports the plain mean of its tasks' own metrics and the worst task on the same scale (Section~\ref{sec:protocol}); expert ceilings are $0.903$ (CLIP-8), $0.860$ (GLUE-8) and $0.896$ (CLIP-20). A ``$+$XGD'' row refines that draw's own selected merge and is directly comparable to the merge row above it. Every method, merges included, selects its hyperparameters inside the budget by the same held-out-metric rule, so a merge row carries a draw spread wherever its selection varied. GD and ungated are XGD's ablations, run from the pretrained model where they isolate the anchor and the gate. The last block spends the same $B$ labels on estimating merge weights instead of on refinement. Same conventions as Table~\ref{tab:b32}.}
 \label{tab:b16}
 \begin{tabular}{lcccccc}
