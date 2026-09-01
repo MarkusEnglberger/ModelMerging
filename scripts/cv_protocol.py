@@ -66,6 +66,9 @@ from apr.replay_baselines import (replay_losses, replay_metrics,
                                   replay_losses_and_metrics,
                                   fisher_merge_matena)
 from apr.localize_stitch import learn_sigmoids, masks_from_sigmoids, stitch
+from apr.regmean import regmean_merge
+from apr.adamerging import adamerging
+from apr.apgd import apgd_merge, prepare_apgd
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
@@ -463,6 +466,21 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 # merge candidates (scored on the FULL budget)
 # ---------------------------------------------------------------------------
 
+def restore_residency(ctx):
+    """Undo a helper's model.to("cpu") when the context keeps models resident.
+
+    RegMean gathers its Grams through forward hooks and AdaMerging runs an
+    entropy pass; both end by moving each task model back to the CPU. That is
+    correct for a CPU-resident context, but when ``keep_model_on_device`` is
+    set the scoring path assumes the models are still on the device
+    (replay_losses_and_metrics passes ``move_model=not keep_model_on_device``),
+    so the next forward would mix CUDA inputs with CPU weights.
+    """
+    if getattr(ctx, "keep_model_on_device", False):
+        for n in ctx.task_names:
+            ctx.per_task[n]["model"].to(ctx.device)
+
+
 def merge_boundaries(best, args):
     """Which selected merge hyperparameters sit on their grid's edge."""
     import re
@@ -483,6 +501,10 @@ def merge_boundaries(best, args):
         elif fam == "DARETIES":
             e += edge(nums["dd"], args.dt_drops, "drop") + edge(nums["t"], args.dt_trims, "trim") + \
                  edge(nums["l"], args.dt_lams, "lam")
+        elif fam == "DOGE":
+            e += edge(nums["eta"], args.doge_etas, "eta")
+        elif fam == "REGMEAN":
+            e += edge(nums["nd"], args.regmean_nondiag, "nondiag")
         elif fam == "BC":
             e += edge(nums["d"], args.bc_densities, "density") + edge(nums["o"], args.bc_outliers, "outlier") + \
                  edge(nums["l"], args.bc_lams, "lam")
@@ -543,7 +565,7 @@ def main():
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
                     choices=["pretrained", "ta", "ties", "dareties", "bc",
-                             "fisher", "ls"],
+                             "fisher", "ls", "regmean", "doge", "ada"],
                     help="initialization the labeled arms refine from; 'fisher' "
                          "requires --fisher and 'ls' requires --ls")
     ap.add_argument("--arms", nargs="*", default=["apr", "nogate", "gd"])
@@ -589,6 +611,30 @@ def main():
     ap.add_argument("--ls_steps", type=int, default=300)
     ap.add_argument("--ls_lr", type=float, default=0.1)
     ap.add_argument("--ls_bs", type=int, default=16)
+    ap.add_argument("--regmean", action="store_true",
+                    help="include RegMean among the candidates (unlabeled "
+                         "construction: Gram matrices from the budget inputs)")
+    ap.add_argument("--regmean_nondiag", type=float, nargs="*",
+                    default=[0.9, 1.0],
+                    help="off-diagonal Gram shrinkage, as in merge_baselines.py")
+    ap.add_argument("--regmean_eps", type=float, default=1e-3)
+    ap.add_argument("--regmean_bs", type=int, default=16)
+    ap.add_argument("--doge", action="store_true",
+                    help="include DOGE/APGD (data-free; the budget selects eta)")
+    ap.add_argument("--doge_etas", type=float, nargs="*",
+                    default=[0.03, 0.05, 0.07, 0.09, 0.11, 0.13],
+                    help="vision defaults; RoBERTa needs a re-centred grid")
+    ap.add_argument("--doge_iters", type=int, default=400)
+    ap.add_argument("--doge_lr", type=float, default=1e-4)
+    ap.add_argument("--doge_density", type=float, default=0.30)
+    ap.add_argument("--doge_subspace", type=int, default=6)
+    ap.add_argument("--adamerging", action="store_true",
+                    help="include layer-wise AdaMerging fitted on the budget "
+                         "inputs (matched budget, NOT the transductive default)")
+    ap.add_argument("--ada_steps", type=int, default=300)
+    ap.add_argument("--ada_lr", type=float, default=1e-3)
+    ap.add_argument("--ada_bs", type=int, default=16)
+    ap.add_argument("--ada_init_lam", type=float, default=0.3)
     ap.add_argument("--fisher", action="store_true",
                     help="include Fisher merging (expected label-free Fisher, "
                          "per-model simplex coefficients) among the candidates")
@@ -602,6 +648,10 @@ def main():
         ap.error("--init fisher requires --fisher (nothing would build it)")
     if args.init == "ls" and not args.ls:
         ap.error("--init ls requires --ls (nothing would build it)")
+    for _f in ("regmean", "doge", "ada"):
+        _flag = "adamerging" if _f == "ada" else _f
+        if args.init == _f and not getattr(args, _flag):
+            ap.error(f"--init {_f} requires --{_flag} (nothing would build it)")
     if args.init != "pretrained" and args.skip_merges:
         ap.error(f"--init {args.init} needs the merges built; drop --skip_merges")
 
@@ -681,6 +731,67 @@ def main():
                         best["FISHER"] = (key, nm, state)
                         meta["FISHER"] = mt
                     _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+            if args.regmean:
+                # RegMean (Jin et al.): needs the live models to hook, and the
+                # Gram matrices depend on this draw's inputs -- hence here and
+                # not in merge_candidates. Unlabeled construction: it reads the
+                # budget inputs, never their labels.
+                for nd in args.regmean_nondiag:
+                    state, mt = regmean_merge(
+                        ctx.base_encoder, ctx.per_task, ctx.task_names, ctx.device,
+                        buffer_key="cv_buffer", nondiag_scale=nd,
+                        eps=args.regmean_eps, batch_size=args.regmean_bs,
+                        logger=_log)
+                    restore_residency(ctx)
+                    nm = f"REGMEAN@nd{nd:g}"
+                    agg, _, sec = scored(ctx, state, ref, args.select_on)
+                    key = (round(agg, 9), least_moving_key(nm))
+                    if "REGMEAN" not in best or key < best["REGMEAN"][0]:
+                        best["REGMEAN"] = (key, nm, state)
+                        meta["REGMEAN"] = mt
+                    _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+            if args.doge:
+                # DOGE/APGD (Wei et al.): data-free, so the budget enters only
+                # through the choice of the global scale eta. The shared-subspace
+                # SVD does not depend on eta, so it is built ONCE here rather
+                # than per candidate (each candidate is 400 Adam iterations).
+                # NOTE: our port does not reproduce the published numbers at the
+                # authors' own eta -- see results/compare/grid_nn_*_apgd_*.json.
+                prep = prepare_apgd(ctx.task_vectors, ctx.device,
+                                    subspace_divisor=args.doge_subspace,
+                                    logger=_log)
+                for eta in args.doge_etas:
+                    state, mt = apgd_merge(
+                        ctx.base_encoder, ctx.task_vectors, eta, ctx.device,
+                        preparation=prep, iterations=args.doge_iters,
+                        lr=args.doge_lr, keep_density=args.doge_density,
+                        logger=None)
+                    nm = f"DOGE@eta{eta:g}"
+                    agg, _, sec = scored(ctx, state, ref, args.select_on)
+                    key = (round(agg, 9), least_moving_key(nm))
+                    if "DOGE" not in best or key < best["DOGE"][0]:
+                        best["DOGE"] = (key, nm, state)
+                        meta["DOGE"] = mt
+                    _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+                del prep
+            if args.adamerging:
+                # AdaMerging (Yang et al.): entropy minimisation on UNLABELED
+                # inputs. data_key MUST be the draw's budget buffer -- the
+                # library default "eval_ds" is the transductive formulation and
+                # would fit coefficients on the evaluation split, outside the
+                # budget every other method is charged for.
+                state, mt = adamerging(
+                    ctx.base_encoder, ctx.task_vectors, ctx.per_task,
+                    ctx.task_names, ctx.device, layerwise=True,
+                    steps=args.ada_steps, lr=args.ada_lr,
+                    batch_size=args.ada_bs, init_lam=args.ada_init_lam,
+                    seed=seed, data_key="cv_buffer", logger=_log)
+                restore_residency(ctx)
+                nm = "ADA@layer"
+                agg, _, sec = scored(ctx, state, ref, args.select_on)
+                best["ADA"] = ((round(agg, 9), ()), nm, state)
+                meta["ADA"] = mt
+                _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
             for attempt in range(args.max_extensions + 1):
                 for nm, state in merge_candidates(ctx, args):
                     agg, _, sec = scored(ctx, state, ref, args.select_on)
