@@ -39,7 +39,9 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 : "${BUDGET:=32}"
 : "${FOLDS:=2}"
 : "${INIT:=pretrained}"
-: "${ARMS:=apr nogate gd}"
+: "${ARMS=apr nogate gd}"   # note "=" not ":=": ARMS= (empty) means NO labeled
+                            # arms, i.e. score merges only. Used by the Fisher /
+                            # Localize-and-Stitch rows, which are merge families.
 : "${STEPS:=5 20 50 100}"
 # Uniform horizon ceiling for APR across suites and budgets, so the B=16 and
 # B=32 tables are directly comparable. A selection at the ceiling is recorded
