@@ -70,7 +70,8 @@ from apr.regmean import regmean_merge
 from apr.adamerging import adamerging
 from apr.apgd import apgd_merge, prepare_apgd
 from apr.metrics import aggregate_all
-from apr.models import pd_sub, pd_global_norm
+from apr.models import pd_sub, pd_global_norm, load_encoder_state, pd_clone
+from apr.data import batches_from_buffer
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
                                breadcrumbs_merge)
 from apr.taskvec import task_arithmetic_merge
@@ -466,6 +467,76 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 # merge candidates (scored on the FULL budget)
 # ---------------------------------------------------------------------------
 
+def tatr_omega(ctx, buffers):
+    """TATR's conflict scores (Sun et al., ICLR 2025, released TATR_merging).
+
+    Omega = sum_{i != j} E[|per-example grad of task i's loss at theta_0|]
+            (elementwise) |tau_j|.
+
+    Faithful to the released code: gradients are taken at the PRETRAINED
+    encoder through each task's own head, one example at a time, in absolute
+    value, then averaged (order-1 variant, their default). The released run
+    uses 128 examples per task; here each task contributes the draw's B
+    labeled examples, the same budget every method is charged for. Only
+    parameter keys enter Omega, as in the released flattening; non-parameter
+    entries of a task vector are never masked.
+    """
+    grads = {}
+    for n in ctx.task_names:
+        info = ctx.per_task[n]
+        load_encoder_state(info["model"], ctx.base_encoder)
+        model = info["model"].to(ctx.device)
+        model.eval()
+        acc, count = None, 0
+        for batch in batches_from_buffer(buffers[n], info["collator"], 1,
+                                         ctx.device):
+            model.zero_grad(set_to_none=True)
+            with torch.enable_grad():
+                out = model(**batch)
+                out.loss.backward()
+            with torch.no_grad():
+                g = {k: pp.grad.detach().abs() for k, pp in
+                     model.named_parameters()
+                     if k in ctx.base_encoder and pp.grad is not None}
+            if acc is None:
+                acc = {k: v.clone() for k, v in g.items()}
+            else:
+                for k in acc:
+                    acc[k] += g[k]
+            count += 1
+        model.zero_grad(set_to_none=True)
+        if not getattr(ctx, "keep_model_on_device", False):
+            model.to("cpu")
+        grads[n] = {k: (v / max(count, 1)).cpu() for k, v in acc.items()}
+        _log(f"[tatr] |grad| at theta_0 for {n}: {count} examples, "
+             f"{len(grads[n])} tensors")
+    omega = {k: torch.zeros_like(v) for k, v in
+             next(iter(grads.values())).items()}
+    for i in ctx.task_names:
+        for j in ctx.task_names:
+            if i == j:
+                continue
+            tv = ctx.task_vectors[j]
+            for k in omega:
+                omega[k] += grads[i][k] * tv[k].abs().cpu()
+    return omega
+
+
+def tatr_mask(omega, ratio: float):
+    """Released thresholding: keep the bottom ``ratio`` fraction of Omega.
+
+    threshold = the int(ratio*N)-th smallest value; mask is strictly-below,
+    exactly as ``(Omega < values_desc[N - int(ratio*N)])`` in their code.
+    """
+    flat = torch.cat([v.reshape(-1) for v in omega.values()])
+    k = int(ratio * flat.numel())
+    if k < 1:
+        return {key: torch.zeros_like(v, dtype=torch.bool)
+                for key, v in omega.items()}
+    thr = torch.kthvalue(flat, k).values
+    return {key: v < thr for key, v in omega.items()}
+
+
 def restore_residency(ctx):
     """Undo a helper's model.to("cpu") when the context keeps models resident.
 
@@ -501,6 +572,8 @@ def merge_boundaries(best, args):
         elif fam == "DARETIES":
             e += edge(nums["dd"], args.dt_drops, "drop") + edge(nums["t"], args.dt_trims, "trim") + \
                  edge(nums["l"], args.dt_lams, "lam")
+        elif fam == "TATR":
+            e += edge(nums["r"], args.tatr_ratios, "ratio") + edge(nums["l"], args.ta_lams, "lam")
         elif fam == "DOGE":
             e += edge(nums["eta"], args.doge_etas, "eta")
         elif fam == "REGMEAN":
@@ -565,7 +638,7 @@ def main():
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
                     choices=["pretrained", "ta", "ties", "dareties", "bc",
-                             "fisher", "ls", "regmean", "doge", "ada"],
+                             "fisher", "ls", "regmean", "doge", "ada", "tatr"],
                     help="initialization the labeled arms refine from; 'fisher' "
                          "requires --fisher and 'ls' requires --ls")
     ap.add_argument("--arms", nargs="*", default=["apr", "nogate", "gd"])
@@ -611,6 +684,12 @@ def main():
     ap.add_argument("--ls_steps", type=int, default=300)
     ap.add_argument("--ls_lr", type=float, default=0.1)
     ap.add_argument("--ls_bs", type=int, default=16)
+    ap.add_argument("--tatr", action="store_true",
+                    help="include TATR (task arithmetic in trust region; the "
+                         "budget's labeled gradients at theta_0 define Omega)")
+    ap.add_argument("--tatr_ratios", type=float, nargs="*",
+                    default=[0.9, 0.95, 0.99],
+                    help="kept fraction of Omega; released default 0.99")
     ap.add_argument("--regmean", action="store_true",
                     help="include RegMean among the candidates (unlabeled "
                          "construction: Gram matrices from the budget inputs)")
@@ -648,7 +727,7 @@ def main():
         ap.error("--init fisher requires --fisher (nothing would build it)")
     if args.init == "ls" and not args.ls:
         ap.error("--init ls requires --ls (nothing would build it)")
-    for _f in ("regmean", "doge", "ada"):
+    for _f in ("regmean", "doge", "ada", "tatr"):
         _flag = "adamerging" if _f == "ada" else _f
         if args.init == _f and not getattr(args, _flag):
             ap.error(f"--init {_f} requires --{_flag} (nothing would build it)")
@@ -792,6 +871,30 @@ def main():
                 best["ADA"] = ((round(agg, 9), ()), nm, state)
                 meta["ADA"] = mt
                 _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+            if args.tatr:
+                # TATR (Sun et al., ICLR 2025): task arithmetic restricted to
+                # the low-conflict trust region. Omega needs this draw's
+                # labeled gradients at theta_0, so it is built here, once;
+                # masks and merges per (ratio, lambda) are then cheap.
+                omega = tatr_omega(ctx, budget_bufs)
+                for ratio in args.tatr_ratios:
+                    mask = tatr_mask(omega, ratio)
+                    for lam in args.ta_lams:
+                        state = pd_clone(ctx.base_encoder)
+                        for name2 in ctx.task_names:
+                            tv = ctx.task_vectors[name2]
+                            for k2, v2 in tv.items():
+                                m2 = mask.get(k2)
+                                upd = v2 * m2.to(v2.dtype) if m2 is not None else v2
+                                state[k2] = state[k2] + lam * upd
+                        nm = f"TATR@r{ratio:g},l{lam:g}"
+                        agg, _, sec = scored(ctx, state, ref, args.select_on)
+                        key = (round(agg, 9), least_moving_key(nm))
+                        if "TATR" not in best or key < best["TATR"][0]:
+                            best["TATR"] = (key, nm, state)
+                        _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+                        del state
+                del omega
             for attempt in range(args.max_extensions + 1):
                 for nm, state in merge_candidates(ctx, args):
                     agg, _, sec = scored(ctx, state, ref, args.select_on)
