@@ -537,6 +537,40 @@ def tatr_mask(omega, ratio: float):
     return {key: v < thr for key, v in omega.items()}
 
 
+def gradfix_signs(ctx, buffers):
+    """GradFix's per-task gradient signs at theta_0 (Rinaldi et al., 2025).
+
+    Faithful to the released ``compute_real_gradient_signs`` with its default
+    ``vote="mean"``: ONE mean gradient of the task loss over the task's
+    examples at the pretrained encoder, then ``sign(-grad)`` -- the descent
+    direction. Each task contributes the draw's B labeled examples.
+    """
+    signs = {}
+    for n in ctx.task_names:
+        info = ctx.per_task[n]
+        load_encoder_state(info["model"], ctx.base_encoder)
+        model = info["model"].to(ctx.device)
+        model.eval()
+        model.zero_grad(set_to_none=True)
+        nb = 0
+        for batch in batches_from_buffer(buffers[n], info["collator"],
+                                         ctx.cfg.data.eval_batch_size,
+                                         ctx.device):
+            with torch.enable_grad():
+                out = model(**batch)
+                (out.loss * batch["labels"].shape[0]).backward()
+            nb += int(batch["labels"].shape[0])
+        with torch.no_grad():
+            signs[n] = {k: torch.sign(-pp.grad.detach()).cpu()
+                        for k, pp in model.named_parameters()
+                        if k in ctx.base_encoder and pp.grad is not None}
+        model.zero_grad(set_to_none=True)
+        if not getattr(ctx, "keep_model_on_device", False):
+            model.to("cpu")
+        _log(f"[gradfix] sign(-grad) at theta_0 for {n}: {nb} examples")
+    return signs
+
+
 def restore_residency(ctx):
     """Undo a helper's model.to("cpu") when the context keeps models resident.
 
@@ -572,6 +606,8 @@ def merge_boundaries(best, args):
         elif fam == "DARETIES":
             e += edge(nums["dd"], args.dt_drops, "drop") + edge(nums["t"], args.dt_trims, "trim") + \
                  edge(nums["l"], args.dt_lams, "lam")
+        elif fam == "GRADFIX":
+            e += edge(nums["l"], args.ta_lams, "lam")
         elif fam == "TATR":
             e += edge(nums["r"], args.tatr_ratios, "ratio") + edge(nums["l"], args.ta_lams, "lam")
         elif fam == "DOGE":
@@ -638,7 +674,7 @@ def main():
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
                     choices=["pretrained", "ta", "ties", "dareties", "bc",
-                             "fisher", "ls", "regmean", "doge", "ada", "tatr"],
+                             "fisher", "ls", "regmean", "doge", "ada", "tatr", "gradfix"],
                     help="initialization the labeled arms refine from; 'fisher' "
                          "requires --fisher and 'ls' requires --ls")
     ap.add_argument("--arms", nargs="*", default=["apr", "nogate", "gd"])
@@ -684,6 +720,9 @@ def main():
     ap.add_argument("--ls_steps", type=int, default=300)
     ap.add_argument("--ls_lr", type=float, default=0.1)
     ap.add_argument("--ls_bs", type=int, default=16)
+    ap.add_argument("--gradfix", action="store_true",
+                    help="include GradFix (mask each task vector by sign "
+                         "agreement with -grad of its task loss at theta_0)")
     ap.add_argument("--tatr", action="store_true",
                     help="include TATR (task arithmetic in trust region; the "
                          "budget's labeled gradients at theta_0 define Omega)")
@@ -728,7 +767,7 @@ def main():
         ap.error("--init fisher requires --fisher (nothing would build it)")
     if args.init == "ls" and not args.ls:
         ap.error("--init ls requires --ls (nothing would build it)")
-    for _f in ("regmean", "doge", "ada", "tatr"):
+    for _f in ("regmean", "doge", "ada", "tatr", "gradfix"):
         _flag = "adamerging" if _f == "ada" else _f
         if args.init == _f and not getattr(args, _flag):
             ap.error(f"--init {_f} requires --{_flag} (nothing would build it)")
@@ -872,6 +911,37 @@ def main():
                 best["ADA"] = ((round(agg, 9), ()), nm, state)
                 meta["ADA"] = mt
                 _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+            if args.gradfix:
+                # GradFix (Rinaldi et al., 2025), Mask-then-Merge with the
+                # released mask_mode="normal": zero each task vector where its
+                # sign disagrees with sign(-grad) of that task's loss at
+                # theta_0, then task-arithmetic the masked vectors. The
+                # released merge fixes the scale (mean over tasks); here the
+                # coefficient is selected on the budget like TA's, the same
+                # treatment every merge family receives.
+                gsigns = gradfix_signs(ctx, budget_bufs)
+                masked = {}
+                for name2 in ctx.task_names:
+                    tv = ctx.task_vectors[name2]; gs = gsigns[name2]
+                    masked[name2] = {
+                        k2: (torch.where(torch.sign(v2) == gs[k2].to(v2.device),
+                                         v2, torch.zeros_like(v2))
+                             if k2 in gs else v2)
+                        for k2, v2 in tv.items()}
+                del gsigns
+                for lam in args.ta_lams:
+                    state = pd_clone(ctx.base_encoder)
+                    for name2 in ctx.task_names:
+                        for k2, v2 in masked[name2].items():
+                            state[k2] = state[k2] + lam * v2
+                    nm = f"GRADFIX@l{lam:g}"
+                    agg, _, sec = scored(ctx, state, ref, args.select_on)
+                    key = (round(agg, 9), least_moving_key(nm))
+                    if "GRADFIX" not in best or key < best["GRADFIX"][0]:
+                        best["GRADFIX"] = (key, nm, state)
+                    _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+                    del state
+                del masked
             if args.tatr:
                 # TATR (Sun et al., ICLR 2025): task arithmetic restricted to
                 # the low-conflict trust region. Omega needs this draw's
