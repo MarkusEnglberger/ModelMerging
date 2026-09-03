@@ -607,7 +607,7 @@ def merge_boundaries(best, args):
             e += edge(nums["dd"], args.dt_drops, "drop") + edge(nums["t"], args.dt_trims, "trim") + \
                  edge(nums["l"], args.dt_lams, "lam")
         elif fam == "GRADFIX":
-            e += edge(nums["l"], args.ta_lams, "lam")
+            e += edge(nums["l"], args.gradfix_lams, "lam")
         elif fam == "TATR":
             e += edge(nums["r"], args.tatr_ratios, "ratio") + edge(nums["l"], args.ta_lams, "lam")
         elif fam == "DOGE":
@@ -723,6 +723,10 @@ def main():
     ap.add_argument("--gradfix", action="store_true",
                     help="include GradFix (mask each task vector by sign "
                          "agreement with -grad of its task loss at theta_0)")
+    ap.add_argument("--gradfix_lams", type=float, nargs="*",
+                    default=[0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5],
+                    help="GradFix scale grid; includes 1/T for both suites "
+                         "(the released merge fixes lambda = 1/T)")
     ap.add_argument("--tatr", action="store_true",
                     help="include TATR (task arithmetic in trust region; the "
                          "budget's labeled gradients at theta_0 define Omega)")
@@ -929,7 +933,7 @@ def main():
                              if k2 in gs else v2)
                         for k2, v2 in tv.items()}
                 del gsigns
-                for lam in args.ta_lams:
+                for lam in args.gradfix_lams:
                     state = pd_clone(ctx.base_encoder)
                     for name2 in ctx.task_names:
                         for k2, v2 in masked[name2].items():
