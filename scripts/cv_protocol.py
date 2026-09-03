@@ -72,6 +72,7 @@ from apr.apgd import apgd_merge, prepare_apgd
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm, load_encoder_state, pd_clone
 from apr.data import batches_from_buffer
+from apr.tatr import tatr_omega, tatr_mask, tatr_merge
 from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
                                breadcrumbs_merge)
 from apr.taskvec import task_arithmetic_merge
@@ -467,76 +468,6 @@ def cv_select_and_refit(ctx, cfg, arm, init_state, budget_bufs, folds, steps,
 # merge candidates (scored on the FULL budget)
 # ---------------------------------------------------------------------------
 
-def tatr_omega(ctx, buffers):
-    """TATR's conflict scores (Sun et al., ICLR 2025, released TATR_merging).
-
-    Omega = sum_{i != j} E[|per-example grad of task i's loss at theta_0|]
-            (elementwise) |tau_j|.
-
-    Faithful to the released code: gradients are taken at the PRETRAINED
-    encoder through each task's own head, one example at a time, in absolute
-    value, then averaged (order-1 variant, their default). The released run
-    uses 128 examples per task; here each task contributes the draw's B
-    labeled examples, the same budget every method is charged for. Only
-    parameter keys enter Omega, as in the released flattening; non-parameter
-    entries of a task vector are never masked.
-    """
-    grads = {}
-    for n in ctx.task_names:
-        info = ctx.per_task[n]
-        load_encoder_state(info["model"], ctx.base_encoder)
-        model = info["model"].to(ctx.device)
-        model.eval()
-        acc, count = None, 0
-        for batch in batches_from_buffer(buffers[n], info["collator"], 1,
-                                         ctx.device):
-            model.zero_grad(set_to_none=True)
-            with torch.enable_grad():
-                out = model(**batch)
-                out.loss.backward()
-            with torch.no_grad():
-                g = {k: pp.grad.detach().abs() for k, pp in
-                     model.named_parameters()
-                     if k in ctx.base_encoder and pp.grad is not None}
-            if acc is None:
-                acc = {k: v.clone() for k, v in g.items()}
-            else:
-                for k in acc:
-                    acc[k] += g[k]
-            count += 1
-        model.zero_grad(set_to_none=True)
-        if not getattr(ctx, "keep_model_on_device", False):
-            model.to("cpu")
-        grads[n] = {k: (v / max(count, 1)).cpu() for k, v in acc.items()}
-        _log(f"[tatr] |grad| at theta_0 for {n}: {count} examples, "
-             f"{len(grads[n])} tensors")
-    omega = {k: torch.zeros_like(v) for k, v in
-             next(iter(grads.values())).items()}
-    for i in ctx.task_names:
-        for j in ctx.task_names:
-            if i == j:
-                continue
-            tv = ctx.task_vectors[j]
-            for k in omega:
-                omega[k] += grads[i][k] * tv[k].abs().cpu()
-    return omega
-
-
-def tatr_mask(omega, ratio: float):
-    """Released thresholding: keep the bottom ``ratio`` fraction of Omega.
-
-    threshold = the int(ratio*N)-th smallest value; mask is strictly-below,
-    exactly as ``(Omega < values_desc[N - int(ratio*N)])`` in their code.
-    """
-    flat = torch.cat([v.reshape(-1) for v in omega.values()])
-    k = int(ratio * flat.numel())
-    if k < 1:
-        return {key: torch.zeros_like(v, dtype=torch.bool)
-                for key, v in omega.items()}
-    thr = torch.kthvalue(flat, k).values
-    return {key: v < thr for key, v in omega.items()}
-
-
 def gradfix_signs(ctx, buffers):
     """GradFix's per-task gradient signs at theta_0 (Rinaldi et al., 2025).
 
@@ -724,9 +655,14 @@ def main():
                     help="include GradFix (mask each task vector by sign "
                          "agreement with -grad of its task loss at theta_0)")
     ap.add_argument("--gradfix_lams", type=float, nargs="*",
-                    default=[0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5],
-                    help="GradFix scale grid; includes 1/T for both suites "
-                         "(the released merge fixes lambda = 1/T)")
+                    default=[0.0125, 0.025, 0.05, 0.1, 0.2, 0.3],
+                    help="GradFix per-task coefficient. The released code "
+                         "averages the masked vectors and then sweeps a scaling "
+                         "coefficient alpha over linspace(0.1, 1, 10), so its "
+                         "effective per-task lambda is alpha/T: 0.0125-0.125 at "
+                         "eight tasks, 0.005-0.05 at twenty. This default spans "
+                         "the eight-task range with headroom above it; pass a "
+                         "lower grid for CLIP-20.")
     ap.add_argument("--tatr", action="store_true",
                     help="include TATR (task arithmetic in trust region; the "
                          "budget's labeled gradients at theta_0 define Omega)")
@@ -955,13 +891,8 @@ def main():
                 for ratio in args.tatr_ratios:
                     mask = tatr_mask(omega, ratio)
                     for lam in args.ta_lams:
-                        state = pd_clone(ctx.base_encoder)
-                        for name2 in ctx.task_names:
-                            tv = ctx.task_vectors[name2]
-                            for k2, v2 in tv.items():
-                                m2 = mask.get(k2)
-                                upd = v2 * m2.to(v2.dtype) if m2 is not None else v2
-                                state[k2] = state[k2] + lam * upd
+                        state = tatr_merge(ctx.base_encoder, ctx.task_vectors,
+                                           mask, lam, ctx.task_names)
                         nm = f"TATR@r{ratio:g},l{lam:g}"
                         agg, _, sec = scored(ctx, state, ref, args.select_on)
                         key = (round(agg, 9), least_moving_key(nm))
