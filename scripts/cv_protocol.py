@@ -688,8 +688,9 @@ def main():
                     help="include TATR (task arithmetic in trust region; the "
                          "budget's labeled gradients at theta_0 define Omega)")
     ap.add_argument("--tatr_ratios", type=float, nargs="*",
-                    default=[0.9, 0.95, 0.99],
-                    help="kept fraction of Omega; released default 0.99")
+                    default=[0.8, 0.9, 0.95, 0.99, 0.999],
+                    help="kept fraction of Omega; released default 0.99. "
+                         "ratio=1 would be plain TA, so 0.999 brackets it")
     ap.add_argument("--regmean", action="store_true",
                     help="include RegMean among the candidates (unlabeled "
                          "construction: Gram matrices from the budget inputs)")
