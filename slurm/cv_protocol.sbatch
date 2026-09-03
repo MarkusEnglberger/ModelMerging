@@ -58,6 +58,8 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 DRAW=${SLURM_ARRAY_TASK_ID:-0}
 SEED=$((SEED0 + DRAW))
 
+: "${SAVE:=1}"                 # SAVE=0: skip --save_winners (composition runs
+                               # whose winners no probe reads)
 OUT="results/compare/cv_${TAG}_B${BUDGET}_${INIT}${SUFFIX}_draw${DRAW}.json"
 WIN="results/cv_winners/${TAG}_B${BUDGET}_${INIT}${SUFFIX}/draw${DRAW}"
 
@@ -65,6 +67,9 @@ echo "[job] protocol v2: ${TAG} B=${BUDGET} init=${INIT} draw=${DRAW} (seed ${SE
 echo "      arms=[${ARMS}] steps=[${STEPS}] max_steps=[${MAX_STEPS}] extra=[${EXTRA}]"
 echo "      -> ${OUT}"
 guard_output "${OUT}"
+
+WINFLAG=""
+if [ "${SAVE}" = "1" ]; then WINFLAG="--save_winners ${WIN}"; fi
 
 # shellcheck disable=SC2086  # the grids are word lists on purpose
 python scripts/cv_protocol.py \
@@ -80,7 +85,7 @@ python scripts/cv_protocol.py \
   --max_steps ${MAX_STEPS} \
   --order random \
   --max_extensions 2 \
-  --save_winners "${WIN}" \
+  ${WINFLAG} \
   --out "${OUT}" \
   ${EXTRA}
 
