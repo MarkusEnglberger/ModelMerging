@@ -1,45 +1,32 @@
 Dear Douwe van der Wal,
 
-Thank you for the quick review. Answers to your three questions:
+Thank you for the response. Below are our answers to the three questions.
 
-1. Software and GPU utilization. We use plain PyTorch with HuggingFace transformers,
-not vLLM: each job holds a single model in GPU memory that is alternately updated
-(merging arithmetic and gradient steps on the full parameter vector) and evaluated, so
-the weights change between every evaluation. Everything runs in bf16; evaluation decodes
-in batches of 48 sequences, and deterministic evaluations (base model, experts, unrefined
-merges) are cached and never recomputed. Sampling nvidia-smi during a generation job on
-an H100 shows 98-100% utilization at 660-695 W of the 700 W limit. Your question also
-prompted us to profile the evaluation more carefully, and we found that the published
-MergeBench expert checkpoints ship with the KV cache disabled in their generation
-config, which our evaluation had inherited. We have fixed this; decoding is now about
-3.5x faster end-to-end (6.5x in isolation at 256 generated tokens: 2,230 vs. 340
-tokens/s). Since generation was about 85% of a run, this roughly halves the per-run
-cost behind our estimate. We intend to use that margin to evaluate every selected
-configuration on the full evaluation sets (1,319 GSM8K, 378 MBPP+, 541 IFEval items)
-instead of the 300-item subsamples the estimate assumed, which costs 3-4x more decoding
-per evaluation and brings the totals back to roughly the figures below. Given the
-throughput with the cache enabled, we do not see a need for vLLM.
+1. Each job keeps one model in GPU memory and alternates
+between updating its weights (merging arithmetic and gradient steps on the full
+parameter vector) and evaluating it. The updates run in PyTorch with HuggingFace
+transformers; the generation-based evaluations run in vLLM. Weights are kept unquantized in bf16 throughout: the method needs exact
+weight-space differences to the experts and gradients through the full model, and the
+evaluations must score exactly the weights the method produces — quantized inference
+would add score noise of the same magnitude as the method differences under study, and
+would require re-quantizing after every weight update. Sampling nvidia-smi every two seconds across a run with the 3B model on an
+H100, the GPU is at 90-100% utilization for two thirds of the compute time (81% on
+average), with power peaking at 690 W of the 700 W limit.
 
-2. Breakdown of the ~150 runs per model scale. One "grid run" covers one
-initialization x one method, including its hyperparameter sweep, selection and final
-evaluation:
-   - construction and hyperparameter selection of the 5 merge baselines, at 2 data
+
+2. One "run" is one job that sweeps the hyperparameter grid of one configuration,
+selects the best cell on held-out examples, and evaluates only that selection:
+
+   - construction and hyperparameter selection of the 5 merge baselines (i.e. merges obtained with existing methods), at 2 data
      budgets: ~10 runs;
-   - refinement grids: 6 initializations (pretrained + the 5 merges) x 3 methods (our
-     repair + 2 ablation baselines) x 2 data budgets = 36 runs;
-   - replication over 4 additional random draws of the labeled examples at the selected
-     hyperparameters: 6 x 3 x 4 = 72 runs (cheaper than full grids, since only the
-     selected configuration is re-run);
-   - held-out retention probes for every selected configuration and re-runs of grids
-     whose selected hyperparameter landed on the grid boundary (in our experience ~25%
-     of grids): ~30 runs.
-   That totals ~148 runs; since the replication runs cost less than the 5 (3B) /
-   15 (8B) H100-hours of a full grid run, the estimate of 150 x full-grid cost already
-   contains some internal margin.
+   - refinement grids: 6 initializations (pretrained + 5 merge baselines) x 3 methods
+     (our method + 2 ablation baselines) x 2 data budgets x 3 independent draws of the
+     labeled examples = 108 runs. Each draw repeats the full select-then-evaluate
+     procedure, so the reported draw-to-draw variance includes selection variance;
+   - held-out retention probes (i.e. testing how good the method is at retaining unrelated capabilites of the pretrained model) for the selected configurations: estimated at around 30 runs.
+   That leads to around ~150 runs per model scale.
 
-3. Lowering to 700,000 SBU works for us — thank you for pointing out the extension
-route via the servicedesk; we will use it with a concrete SBU calculation if the
-remaining experiments require it.
+3. Lowering to 700,000 SBU works for us.
 
 Kind regards,
 Markus Englberger

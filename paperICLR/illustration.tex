@@ -1,0 +1,228 @@
+% Included by main.tex.  The enclosing figure supplies the caption and label.
+\noindent
+\begin{minipage}{17.70cm}
+\begin{minipage}[t]{8.75cm}
+\centering
+\textbf{(a) Step toward $\theta_i$}\par\vspace{2pt}
+\begin{tikzpicture}[
+    scale=0.52,
+    transform shape,
+    x=1cm,
+    y=1cm,
+    >=Latex,
+    font=\normalsize,
+    line cap=round,
+    line join=round
+]
+
+\coordinate (current) at (1.65,2.60);
+\coordinate (expertI) at (12.45,5.10);
+\coordinate (updated) at (8.25,2.60);
+\coordinate (expertJ) at (6.90,6.00);
+\coordinate (expertBoxLL) at (expertJ |- expertI);
+\coordinate (expertBoxUR) at (expertI |- expertJ);
+
+\draw[black, very thick, ->]
+    (0,0) -- (15.55,0)
+    node[below left=1pt] {$\theta_{(1)}$};
+\draw[black, very thick, ->]
+    (0,0) -- (0,8.95)
+    node[below left=1pt] {$\theta_{(2)}$};
+
+\path[fill=aprBlue!6]
+    (expertBoxLL) rectangle (expertBoxUR);
+
+\fill[aprGreen] (expertJ) circle (3.5pt);
+\node[text=aprGreen, font=\large]
+    at ($(expertJ)+(-0.30,-0.45)$) {$\theta_j$};
+
+\path[fill=aprPurpleLight, fill opacity=0.72]
+    (current) rectangle (expertI);
+\draw[aprPurple, line width=0.8pt]
+    (current |- expertI) -- (expertI) -- (expertI |- current);
+\draw[aprPurple, line width=0.8pt]
+    (current) -- (current |- expertI);
+\draw[aprPurple, line width=1.1pt]
+    (current) -- (updated);
+\draw[aprPurple, dashed, line width=0.8pt]
+    (updated) -- (expertI |- current);
+
+\draw[aprBlue, densely dashed, line width=0.8pt]
+    (expertBoxLL) rectangle (expertBoxUR);
+\node[text=aprBlue, font=\large]
+    at ($(expertBoxLL)!0.5!(expertBoxUR)$) {expert box};
+
+\fill[black] (current) circle (3.3pt);
+\node[anchor=east, font=\large]
+    at ($(current)+(-0.20,0)$) {$\theta^{(s,k-1)}$};
+
+\fill[aprOrange] (expertI) circle (3.5pt);
+\node[text=aprOrange, font=\large, anchor=south west]
+    at ($(expertI)+(-0.10,0.18)$) {$\theta_i$};
+
+\draw[black, dashed, line width=0.9pt]
+    (current) -- (expertI);
+\node[anchor=west, font=\large]
+    at (3.00,4.30) {$v_i=\theta_i-\theta^{(s,k-1)}$};
+
+\draw[aprPurple, line width=2.2pt, ->, shorten >=2pt]
+    (current) -- (updated);
+\fill[aprPurple] (updated) circle (3.6pt);
+\node[text=black, font=\large, anchor=south]
+    at ($(updated)+(0,0.25)$) {$\theta^{(s,k)}$};
+\node[text=aprPurple, font=\large, anchor=north]
+    at ($(current)!0.43!(updated)+(0,-0.22)$) {$u_i$};
+
+\coordinate (descentEnd) at ($(current)+(2.65,-1.50)$);
+\draw[aprRed, line width=1.8pt, ->]
+    (current) -- node[pos=0.56, below left=1pt,
+    text=aprRed, font=\large] {$-g_i$} (descentEnd);
+\node[text=aprRed, align=left, anchor=west, font=\normalsize]
+    at (4.68,0.90)
+{
+    $g_i=\nabla_\theta\mathcal{L}_i
+      \!\left(\theta^{(s,k-1)};D_i^{\mathrm{probe}}\right)$
+    \\[2pt]
+    \footnotesize descent direction: $-g_i$
+};
+
+\node[
+    draw=aprBlue,
+    rounded corners=3pt,
+    line width=1pt,
+    align=center,
+    inner sep=7pt,
+    text width=4.7cm,
+    anchor=west
+] (calloutI) at (9.15,7.50)
+{
+    update remains inside the\\
+    coordinate-wise rectangle between\\
+    the current point and chosen expert
+};
+\draw[aprBlue, line width=1.1pt, ->, shorten >=5pt]
+    (calloutI.south) -- (expertI);
+
+\node[
+    draw=black,
+    rounded corners=3pt,
+    line width=0.8pt,
+    inner sep=7pt,
+    text width=5.8cm,
+    align=center,
+    anchor=south west
+] at (9.15,0.20)
+{
+    $\displaystyle
+    \begin{aligned}
+    u_{i,r}
+      &=\min\!\bigl(\eta |g_{i,r}|,1\bigr)\,v_{i,r}\\[-1pt]
+      &\quad\times\mathbf{1}\{g_{i,r}v_{i,r}<0\}
+    \end{aligned}$
+};
+
+\end{tikzpicture}
+\end{minipage}%
+\hspace{0.20cm}%
+\begin{minipage}[t]{8.75cm}
+\centering
+\textbf{(b) Next step toward $\theta_j$}\par\vspace{2pt}
+\begin{tikzpicture}[
+    scale=0.52,
+    transform shape,
+    x=1cm,
+    y=1cm,
+    >=Latex,
+    font=\normalsize,
+    line cap=round,
+    line join=round
+]
+
+\coordinate (current) at (8.25,2.60);
+\coordinate (expertJ) at (6.90,6.00);
+\coordinate (updated) at (7.45,3.60);
+\coordinate (expertI) at (12.45,5.10);
+\coordinate (lowerLeft) at (expertJ |- current);
+\coordinate (upperRight) at (current |- expertJ);
+\coordinate (expertBoxLL) at (expertJ |- expertI);
+\coordinate (expertBoxUR) at (expertI |- expertJ);
+
+\draw[black, very thick, ->]
+    (0,0) -- (15.55,0)
+    node[below left=1pt] {$\theta_{(1)}$};
+\draw[black, very thick, ->]
+    (0,0) -- (0,8.95)
+    node[below left=1pt] {$\theta_{(2)}$};
+
+\path[fill=aprBlue!6]
+    (expertBoxLL) rectangle (expertBoxUR);
+
+\fill[aprOrange] (expertI) circle (3.5pt);
+\node[text=aprOrange, font=\large, anchor=south west]
+    at ($(expertI)+(-0.10,0.18)$) {$\theta_i$};
+
+\path[fill=aprPurpleLight, fill opacity=0.72]
+    (lowerLeft) rectangle (upperRight);
+\draw[aprPurple, line width=0.8pt]
+    (lowerLeft) rectangle (upperRight);
+
+\draw[aprBlue, densely dashed, line width=0.8pt]
+    (expertBoxLL) rectangle (expertBoxUR);
+\node[text=aprBlue, font=\large]
+    at ($(expertBoxLL)!0.5!(expertBoxUR)$) {expert box};
+
+\fill[black] (current) circle (3.3pt);
+\node[anchor=west, font=\large]
+    at ($(current)+(0.20,0)$) {$\theta^{(s,k)}$};
+
+\fill[aprGreen] (expertJ) circle (3.5pt);
+\node[text=aprGreen, font=\large, anchor=south east]
+    at ($(expertJ)+(-0.10,0.18)$) {$\theta_j$};
+
+\draw[black, dashed, line width=0.9pt]
+    (current) -- (expertJ);
+\node[anchor=west, font=\large]
+    at (8.15,4.45) {$v_j=\theta_j-\theta^{(s,k)}$};
+
+\draw[aprPurple, line width=2.2pt, ->, shorten >=2pt]
+    (current) -- (updated);
+\fill[aprPurple] (updated) circle (3.6pt);
+\node[text=black, font=\large, anchor=west]
+    at ($(updated)+(0.18,0.05)$) {$\theta^{(s,k+1)}$};
+\node[text=aprPurple, font=\large, anchor=north]
+    at ($(current)!0.50!(updated)+(0,-0.22)$) {$u_j$};
+
+\coordinate (descentEnd) at ($(current)+(-2.30,2.00)$);
+\draw[aprRed, line width=1.8pt, ->]
+    (current) -- node[pos=0.72, below left=2pt,
+    text=aprRed, font=\large] {$-g_j$} (descentEnd);
+\node[text=aprRed, align=left, anchor=west, font=\normalsize]
+    at (0.85,0.72)
+{
+    $g_j=\nabla_\theta\mathcal{L}_j
+      \!\left(\theta^{(s,k)};D_j^{\mathrm{probe}}\right)$
+    \\[2pt]
+    \footnotesize descent direction: $-g_j$
+};
+
+\node[
+    draw=black,
+    rounded corners=3pt,
+    line width=0.8pt,
+    inner sep=7pt,
+    text width=5.8cm,
+    align=center,
+    anchor=south west
+] at (9.15,0.20)
+{
+    $\displaystyle
+    \begin{aligned}
+    u_{j,r}
+      &=\min\!\bigl(\eta |g_{j,r}|,1\bigr)\,v_{j,r}\\[-1pt]
+      &\quad\times\mathbf{1}\{g_{j,r}v_{j,r}<0\}
+    \end{aligned}$
+};
+
+\end{tikzpicture}
+\end{minipage}
+\end{minipage}
