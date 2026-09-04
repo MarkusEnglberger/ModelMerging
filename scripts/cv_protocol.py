@@ -68,6 +68,7 @@ from apr.replay_baselines import (replay_losses, replay_metrics,
 from apr.localize_stitch import learn_sigmoids, masks_from_sigmoids, stitch
 from apr.regmean import regmean_merge
 from apr.adamerging import adamerging
+from apr.atlas import atlas
 from apr.apgd import apgd_merge, prepare_apgd
 from apr.metrics import aggregate_all
 from apr.models import pd_sub, pd_global_norm, load_encoder_state, pd_clone
@@ -605,7 +606,8 @@ def main():
     ap.add_argument("--draw_seed0", type=int, default=100)
     ap.add_argument("--init", default="pretrained",
                     choices=["pretrained", "ta", "ties", "dareties", "bc",
-                             "fisher", "ls", "regmean", "doge", "ada", "tatr", "gradfix"],
+                             "fisher", "ls", "regmean", "doge", "ada", "tatr", "gradfix",
+                             "atlas"],
                     help="initialization the labeled arms refine from; 'fisher' "
                          "requires --fisher and 'ls' requires --ls")
     ap.add_argument("--arms", nargs="*", default=["apr", "nogate", "gd"])
@@ -651,6 +653,19 @@ def main():
     ap.add_argument("--ls_steps", type=int, default=300)
     ap.add_argument("--ls_lr", type=float, default=0.1)
     ap.add_argument("--ls_bs", type=int, default=16)
+    ap.add_argument("--atlas", action="store_true",
+                    help="include aTLAS (per-(task, block) coefficients learned "
+                         "by supervised descent on the labeled budget)")
+    ap.add_argument("--atlas_blockwise", type=int, default=1,
+                    help="1: one coefficient per (task, block), the released "
+                         "default; 0: one per task")
+    ap.add_argument("--atlas_steps", type=int, default=300)
+    ap.add_argument("--atlas_lr", type=float, default=1e-3)
+    ap.add_argument("--atlas_wd", type=float, default=0.1)
+    ap.add_argument("--atlas_bs", type=int, default=16)
+    ap.add_argument("--atlas_lp", type=float, default=None,
+                    help="Lp penalty order on the coefficients (released "
+                         "default: none)")
     ap.add_argument("--gradfix", action="store_true",
                     help="include GradFix (mask each task vector by sign "
                          "agreement with -grad of its task loss at theta_0)")
@@ -707,7 +722,7 @@ def main():
         ap.error("--init fisher requires --fisher (nothing would build it)")
     if args.init == "ls" and not args.ls:
         ap.error("--init ls requires --ls (nothing would build it)")
-    for _f in ("regmean", "doge", "ada", "tatr", "gradfix"):
+    for _f in ("regmean", "doge", "ada", "tatr", "gradfix", "atlas"):
         _flag = "adamerging" if _f == "ada" else _f
         if args.init == _f and not getattr(args, _flag):
             ap.error(f"--init {_f} requires --{_flag} (nothing would build it)")
@@ -850,6 +865,24 @@ def main():
                 agg, _, sec = scored(ctx, state, ref, args.select_on)
                 best["ADA"] = ((round(agg, 9), ()), nm, state)
                 meta["ADA"] = mt
+                _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
+            if args.atlas:
+                # aTLAS (Zhang et al., NeurIPS 2024): a coefficient per (task,
+                # parameter block) learned by supervised descent on the draw's
+                # labeled budget. Its released default is blockwise, AdamW at
+                # lr 1e-3 / wd 0.1 from a zero init.
+                state, mt = atlas(
+                    ctx.base_encoder, ctx.task_vectors, ctx.per_task,
+                    ctx.task_names, ctx.device, blockwise=args.atlas_blockwise,
+                    steps=args.atlas_steps, lr=args.atlas_lr,
+                    weight_decay=args.atlas_wd, batch_size=args.atlas_bs,
+                    lp=args.atlas_lp, seed=seed, data_key="cv_buffer",
+                    logger=_log)
+                restore_residency(ctx)
+                nm = "ATLAS@blockwise" if args.atlas_blockwise else "ATLAS@task"
+                agg, _, sec = scored(ctx, state, ref, args.select_on)
+                best["ATLAS"] = ((round(agg, 9), ()), nm, state)
+                meta["ATLAS"] = mt
                 _log(f"[{tag}][merge] {nm:28s} obj={agg:.4f}")
             if args.gradfix:
                 # GradFix (Rinaldi et al., 2025), Mask-then-Merge with the
