@@ -30,6 +30,7 @@ import argparse
 import dataclasses
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -45,6 +46,8 @@ from apr.merge_methods import (ties_combined_tau, ties_merge, dare_ties_merge,
 from apr.adamerging import adamerging
 from apr.regmean import regmean_merge
 from apr.refine import refine
+from apr.data import sample_replay_buffer
+from apr.tatr import tatr_omega, tatr_mask, tatr_merge
 
 DEFAULT_HELDOUT = ["sun397", "stl10", "cifar10", "pets", "food101", "flowers102"]
 
@@ -65,6 +68,14 @@ def main():
     ap.add_argument("--bc_densities", type=float, nargs="*", default=[0.1])
     ap.add_argument("--bc_outliers", type=float, nargs="*", default=[0.01])
     ap.add_argument("--bc_lams", type=float, nargs="*", default=[0.2])
+    ap.add_argument("--tatr_specs", nargs="*", default=[],
+                    help="TATR merges over the TRAIN tasks, one per draw: "
+                         "label=seed<S>,r<ratio>,l<lam> (e.g. "
+                         "draw0=seed103,r0.99,l0.3). TATR is data-dependent "
+                         "(|grad| at theta_0 on the draw's buffer), so each "
+                         "spec redraws that draw's n_probe examples per train "
+                         "task with its own seed and rebuilds the merge at "
+                         "the protocol-selected (ratio, lam).")
     ap.add_argument("--ada", action="store_true",
                     help="AdaMerging-layer over the TRAIN tasks (entropy-min on "
                          "their unlabeled inputs only)")
@@ -184,7 +195,8 @@ def main():
         m = record(f"merge:TA{len(train)}@l{lam:g}", state, lam=lam)
         if best_ta is None or m > best_ta[0]:
             best_ta = (m, f"merge:TA{len(train)}@l{lam:g}", state)
-    _log(f"[best TA] {best_ta[1]}")
+    if best_ta is not None:
+        _log(f"[best TA] {best_ta[1]}")
 
     # --- TIES merge over the TRAIN tasks ------------------------------------
     for d in args.ties_densities:
@@ -209,6 +221,28 @@ def main():
                                           {n: lam for n in train},
                                           density=d, outlier_frac=o)
                 record(f"merge:BC{len(train)}@d{d:g},o{o:g},l{lam:g}", state, lam=lam)
+
+    # --- TATR over the TRAIN tasks (labeled, data-dependent, per draw) ------
+    # Omega depends on the draw's labeled buffer, so unlike the checkpoint-only
+    # merges each row rebuilds its own draw's buffers with that draw's seed.
+    for spec in args.tatr_specs:
+        m = re.fullmatch(r"([^=]+)=seed(\d+),r([\d.]+),l([\d.]+)", spec)
+        assert m, f"bad --tatr_specs entry: {spec!r}"
+        label, tseed, ratio, lam = (m.group(1), int(m.group(2)),
+                                    float(m.group(3)), float(m.group(4)))
+        bufs = {n: sample_replay_buffer(ctx.per_task[n]["train_ds"],
+                                        ctx.per_task[n]["spec"], args.n_probe,
+                                        tseed, cfg.data.class_balanced)
+                for n in train}
+        _log(f"\n[TATR] {label}: Omega from {args.n_probe} examples/task at "
+             f"seed {tseed}, mask r={ratio:g}, lam={lam:g}")
+        omega = tatr_omega(ctx, bufs, names=train)
+        state = tatr_merge(ctx.base_encoder, tv_train,
+                           tatr_mask(omega, ratio), lam, train)
+        del omega
+        record(f"merge:TATR{len(train)}@r{ratio:g},l{lam:g},{label}", state,
+               ratio=ratio, lam=lam, buffer_seed=tseed)
+        del state
 
     # --- AdaMerging over the TRAIN tasks (label-free, data-dependent) --------
     ada_state = None

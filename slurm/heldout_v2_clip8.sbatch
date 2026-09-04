@@ -41,6 +41,8 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 : "${TIES_L:=1}"
 : "${DT_L:=0.8}"
 : "${BC_O:=0.01}"
+: "${TATR_SPECS:=}"            # per-draw TATR rows, e.g.
+                               # "TATR_SPECS=draw0=seed103,r0.99,l0.3 draw1=..."
 W="results/cv_winners/clip8_B${BUDGET}_pretrained${SUFFIX}"
 OUT="results/compare/heldout_${LABEL}_clip8_B${BUDGET}.json"
 
@@ -68,6 +70,7 @@ python scripts/heldout_retention.py --config configs/clip20.yaml \
   --ties_densities ${TIES_D} --ties_lams ${TIES_L} \
   --dt_drops 0.5 --dt_trims 0.1 --dt_lams ${DT_L} \
   --bc_densities 0.2 --bc_outliers ${BC_O} --bc_lams 0.4 \
+  --tatr_specs ${TATR_SPECS} \
   --apr_base_lrs --apr_ta_lrs --nogate_base_lrs --gd_base_lrs \
   --out "${OUT}"
 
