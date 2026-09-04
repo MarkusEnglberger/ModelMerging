@@ -1,0 +1,39 @@
+{
+ "config": "configs/glue8.yaml",
+ "identical": true,
+ "mismatched_tensors": [],
+ "history_identical": true,
+ "speedup": 4.1504508326456895,
+ "shuttled": {
+  "wall_s": 11.891234636306763,
+  "task_steps": 24,
+  "ms_per_step": 495.4681098461151,
+  "peak_gib": 2.9018115997314453,
+  "keep_model_on_device": false,
+  "residency": {
+   "need_gib": 11.109031736850739,
+   "total_gib": 39.67462158203125,
+   "model_gib": 3.7147751450538635,
+   "expert_gib": 3.6971282958984375,
+   "work_gib": 3.6971282958984375,
+   "fraction": 0.5,
+   "reason": "resident=False (config override)"
+  }
+ },
+ "resident": {
+  "wall_s": 2.865046501159668,
+  "task_steps": 24,
+  "ms_per_step": 119.3769375483195,
+  "peak_gib": 10.313787460327148,
+  "keep_model_on_device": true,
+  "residency": {
+   "need_gib": 11.109031736850739,
+   "total_gib": 39.67462158203125,
+   "model_gib": 3.7147751450538635,
+   "expert_gib": 3.6971282958984375,
+   "work_gib": 3.6971282958984375,
+   "fraction": 0.5,
+   "reason": "resident=True (config override)"
+  }
+ }
+}

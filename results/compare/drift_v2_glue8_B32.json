@@ -1,0 +1,74 @@
+{
+ "config": "configs/glue8.yaml",
+ "n_probe": 32,
+ "probe_seed": 0,
+ "wikitext_blocks": 256,
+ "block_len": 128,
+ "states": {
+  "theta0": {
+   "dist_theta0": 0.0,
+   "drift_loss": 2.5090103493462372
+  },
+  "merge:TA@l0.3": {
+   "dist_theta0": 107.65692297678183,
+   "drift_loss": 5.021538297524254
+  },
+  "merge:TIES@d0.2,l1": {
+   "dist_theta0": 89.79763153620254,
+   "drift_loss": 2.879788144107493
+  },
+  "merge:DARETIES@dd0.5,t0.1,l1": {
+   "dist_theta0": 178.2843423857287,
+   "drift_loss": 4.096256471355518
+  },
+  "merge:BC@d0.2,o0.01,l0.4": {
+   "dist_theta0": 106.54962553610002,
+   "drift_loss": 3.598076102456106
+  },
+  "apr_draw0": {
+   "dist_theta0": 1.8037274384115833,
+   "drift_loss": 3.1729642656289623,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw0/apr_pretrained_draw0.pt"
+  },
+  "nogate_draw0": {
+   "dist_theta0": 1.174401117346254,
+   "drift_loss": 3.622618590599992,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw0/nogate_pretrained_draw0.pt"
+  },
+  "gd_draw0": {
+   "dist_theta0": 0.1915821259023133,
+   "drift_loss": 2.7772323138856287,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw0/gd_pretrained_draw0.pt"
+  },
+  "apr_draw1": {
+   "dist_theta0": 0.4663956175053771,
+   "drift_loss": 2.718941765036592,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw1/apr_pretrained_draw0.pt"
+  },
+  "nogate_draw1": {
+   "dist_theta0": 0.7421030863605355,
+   "drift_loss": 3.682200420388314,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw1/nogate_pretrained_draw0.pt"
+  },
+  "gd_draw1": {
+   "dist_theta0": 0.21322203795723615,
+   "drift_loss": 2.8193257348902687,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw1/gd_pretrained_draw0.pt"
+  },
+  "apr_draw2": {
+   "dist_theta0": 2.8182088428544576,
+   "drift_loss": 3.461289532351696,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw2/apr_pretrained_draw0.pt"
+  },
+  "nogate_draw2": {
+   "dist_theta0": 1.0397316182569314,
+   "drift_loss": 5.123388035572928,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw2/nogate_pretrained_draw0.pt"
+  },
+  "gd_draw2": {
+   "dist_theta0": 0.3923906009442263,
+   "drift_loss": 3.585209941233094,
+   "state_file": "results/cv_winners/glue8_B32_pretrained/draw2/gd_pretrained_draw0.pt"
+  }
+ }
+}

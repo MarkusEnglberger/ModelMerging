@@ -1,0 +1,39 @@
+{
+ "config": "configs/clip8.yaml",
+ "identical": true,
+ "mismatched_tensors": [],
+ "history_identical": true,
+ "speedup": 3.4364644964584183,
+ "shuttled": {
+  "wall_s": 8.419580698013306,
+  "task_steps": 24,
+  "ms_per_step": 350.81586241722107,
+  "peak_gib": 1.6975746154785156,
+  "keep_model_on_device": false,
+  "residency": {
+   "need_gib": 7.830894470214844,
+   "total_gib": 39.67462158203125,
+   "model_gib": 2.6181106567382812,
+   "expert_gib": 2.6063919067382812,
+   "work_gib": 2.6063919067382812,
+   "fraction": 0.5,
+   "reason": "resident=False (config override)"
+  }
+ },
+ "resident": {
+  "wall_s": 2.45007061958313,
+  "task_steps": 24,
+  "ms_per_step": 102.08627581596375,
+  "peak_gib": 6.923526763916016,
+  "keep_model_on_device": true,
+  "residency": {
+   "need_gib": 7.830894470214844,
+   "total_gib": 39.67462158203125,
+   "model_gib": 2.6181106567382812,
+   "expert_gib": 2.6063919067382812,
+   "work_gib": 2.6063919067382812,
+   "fraction": 0.5,
+   "reason": "resident=True (config override)"
+  }
+ }
+}

@@ -1,0 +1,301 @@
+{
+  "config": {
+    "base_model": "meta-llama/Llama-3.2-3B",
+    "experts": [
+      {
+        "name": "math",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "coding",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "instruction",
+        "checkpoint": null,
+        "lam": 0.3
+      },
+      {
+        "name": "multilingual",
+        "checkpoint": null,
+        "lam": 0.3
+      }
+    ],
+    "modality": "causal_lm",
+    "model_dtype": "bfloat16",
+    "eval_dtype": "bfloat16",
+    "refine": {
+      "steps": 5,
+      "lr": 8.0,
+      "gate_eps": 0.0,
+      "order": "fixed",
+      "aggregated": false,
+      "gate_mode": "coordinate",
+      "update_mode": "gated_grad",
+      "clip_mode": "vdist",
+      "rms_normalize": false,
+      "random_gate_density": null,
+      "freeze_first_gates": false,
+      "lr_schedule": "constant",
+      "lr_min_frac": 0.05,
+      "topk_frac": 0.05
+    },
+    "data": {
+      "n_probe": 8,
+      "n_val": 0,
+      "max_length": 1024,
+      "eval_batch_size": 48,
+      "grad_batch_size": 4,
+      "eval_num_workers": 0,
+      "resident": null,
+      "probe_seed": 0,
+      "class_balanced": false,
+      "cache_dir": null,
+      "probe_source": "train",
+      "max_eval": 300,
+      "max_eval_by_task": {
+        "multilingual": 5000
+      },
+      "eval0_cache": true
+    },
+    "seed": 0,
+    "device": "cuda",
+    "output_dir": "results/mergebench3b",
+    "tag": "mergebench3b"
+  },
+  "tasks": [
+    "math",
+    "coding",
+    "instruction",
+    "multilingual"
+  ],
+  "steps": [
+    5
+  ],
+  "base": {
+    "math": 0.06,
+    "coding": 0.37666666666666665,
+    "instruction": 0.2,
+    "multilingual": 0.4954
+  },
+  "expert": {
+    "math": 0.7333333333333333,
+    "coding": 0.48,
+    "instruction": 0.47333333333333333,
+    "multilingual": 0.4936
+  },
+  "grids": {
+    "config": "configs/mergebench_llama3b.yaml",
+    "n_probe": 8,
+    "probe_seed": null,
+    "ta_lams": [
+      0.3
+    ],
+    "ties_densities": [
+      0.1,
+      0.2
+    ],
+    "ties_lams": [
+      0.8,
+      1.0
+    ],
+    "dare_densities": [
+      0.3
+    ],
+    "dare_seeds": [
+      0,
+      1
+    ],
+    "dt_drops": [
+      0.5
+    ],
+    "dt_trims": [
+      0.1,
+      0.2
+    ],
+    "dt_lams": [
+      0.8,
+      1.0
+    ],
+    "dt_seed": 0,
+    "della_densities": [
+      0.7
+    ],
+    "della_windows": [
+      0.14
+    ],
+    "della_lams": [
+      1.1
+    ],
+    "della_seeds": [
+      42
+    ],
+    "bc_densities": [
+      0.1,
+      0.2
+    ],
+    "bc_outliers": [
+      0.01,
+      0.05
+    ],
+    "bc_lams": [
+      0.4
+    ],
+    "ls_fracs": [
+      0.05,
+      0.1
+    ],
+    "ls_lams": [
+      1.0
+    ],
+    "ada_variants": [
+      "task",
+      "layer"
+    ],
+    "ada_steps": 300,
+    "ada_lr": 0.001,
+    "ada_bs": 16,
+    "ada_init_lam": 0.3,
+    "ada_workers": 0,
+    "ada_data": [
+      "eval_ds"
+    ],
+    "regmean_nondiag_scales": [
+      0.9,
+      1.0
+    ],
+    "regmean_eps": 0.001,
+    "regmean_bs": 16,
+    "apr_schedules": [
+      "constant"
+    ],
+    "apr_order": "random",
+    "apr_constant_order": null,
+    "apr_gate_modes": [],
+    "topk_fracs": [
+      0.05
+    ],
+    "gd_lrs": [],
+    "gd_steps": [],
+    "gd_schedules": [
+      "constant"
+    ],
+    "gd_lr_min_frac": 0.05,
+    "gd_order": "random",
+    "nogate_lrs": [],
+    "refine_from": [
+      "ta"
+    ],
+    "apr_lrs": [
+      1024.0
+    ],
+    "control_gd_lrs": [],
+    "steps": [
+      5
+    ],
+    "skip_families": [
+      "ties",
+      "dare",
+      "dareties",
+      "della",
+      "bc",
+      "ls",
+      "ada"
+    ],
+    "n_select": 8,
+    "selection_seed": null,
+    "select_by": "mean_acc",
+    "retention_tasks": null,
+    "out": "results/compare/mb3b_util_probe.json"
+  },
+  "selection_protocol": {
+    "rule": "held-out replay loss on a disjoint selection buffer",
+    "n_probe_per_task": 8,
+    "n_select_per_task": 8,
+    "total_labels_per_task": 16,
+    "probe_seed": 0,
+    "selection_seed": 1,
+    "train_selection_overlap": 0,
+    "selection_ref_losses": {
+      "math": 0.47634053230285645,
+      "coding": 1.2400659322738647,
+      "instruction": 1.1716033220291138,
+      "multilingual": 1.060188889503479
+    }
+  },
+  "methods": {
+    "merge:TA@l0.3": {
+      "selection_obj": 1.0,
+      "displacement": 0.0,
+      "evaluated": true,
+      "lam": 0.3,
+      "scores": {
+        "math": 0.55,
+        "coding": 0.43,
+        "instruction": 0.2866666666666667,
+        "multilingual": 0.5044
+      },
+      "normret": {
+        "math": 0.7277227614694639,
+        "coding": 0.5161289823100986,
+        "instruction": 0.31707315913146983,
+        "multilingual": -5.000027777932007
+      },
+      "aggregate": {
+        "mean_acc": 0.44276666666666664,
+        "worst_acc": 0.2866666666666667,
+        "mean_normret": -0.8597757187552436,
+        "worst_normret": -5.000027777932007,
+        "hmean_normret": 3.999974138182662e-06,
+        "mean_normret_nondeg": 0.5203083009703442,
+        "worst_normret_nondeg": 0.31707315913146983,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      }
+    },
+    "apr:from=ta@lr1024": {
+      "selection_obj": 1.0860634390347172,
+      "displacement": 1.8276486577204583,
+      "init": "TA@l0.3",
+      "lr": 1024.0,
+      "steps": 5,
+      "schedule": "constant",
+      "order": "fixed",
+      "gate_mode": "coordinate",
+      "topk_frac": null,
+      "gate_density": 0.40901966665238854,
+      "evaluated": true,
+      "scores": {
+        "math": 0.4266666666666667,
+        "coding": 0.43333333333333335,
+        "instruction": 0.4033333333333333,
+        "multilingual": 0.5088
+      },
+      "normret": {
+        "math": 0.5445544473581022,
+        "coding": 0.54838704370448,
+        "instruction": 0.7439024118084483,
+        "multilingual": -7.444485802698818
+      },
+      "aggregate": {
+        "mean_acc": 0.4430333333333334,
+        "worst_acc": 0.4033333333333333,
+        "mean_normret": -1.4019104749569469,
+        "worst_normret": -7.444485802698818,
+        "hmean_normret": 3.999979983477781e-06,
+        "mean_normret_nondeg": 0.6122813009570102,
+        "worst_normret_nondeg": 0.5445544473581022,
+        "degenerate_tasks": [
+          "multilingual"
+        ]
+      }
+    }
+  },
+  "best_per_family": {
+    "ta": "merge:TA@l0.3"
+  },
+  "best_apr_from_ta": "apr:from=ta@lr1024"
+}
