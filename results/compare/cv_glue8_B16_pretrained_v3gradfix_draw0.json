@@ -133,42 +133,40 @@
    "buffer_seed": 103,
    "methods": {
     "merge:GRADFIX": {
-     "selected": "GRADFIX@l0.5",
-     "selection_obj": -0.432197666,
+     "selected": "GRADFIX@l0.05",
+     "selection_obj": -0.383022233,
      "selection_tie_key": [
-      0.5
+      0.05
      ],
      "scores": {
-      "cola": 0.10671095727576733,
-      "sst2": 0.4896788990825688,
-      "mrpc": 0.1616469541553276,
-      "stsb": 0.042282651419190076,
+      "cola": 0.0,
+      "sst2": 0.5091743119266054,
+      "mrpc": 0.7236409533873429,
+      "stsb": 0.13337247952874967,
       "qqp": 0.45317878342483403,
       "mnli": 0.3273560876209883,
-      "qnli": 0.5057660626029654,
-      "rte": 0.49097472924187724
+      "qnli": 0.5077796082738422,
+      "rte": 0.4729241877256318
      },
      "normret": {
-      "cola": 0.17122616190454987,
-      "sst2": -0.04569892365996062,
-      "mrpc": -3.4956775348112594,
-      "stsb": 0.09318958006871275,
+      "cola": 0.0,
+      "sst2": 0.0,
+      "mrpc": -0.14536658689600934,
+      "stsb": 0.18849449526016515,
       "qqp": 0.23458490417713043,
       "mnli": -0.016710975761454146,
-      "qnli": 0.025979556465390477,
-      "rte": 0.055555553845679
+      "qnli": 0.030664394516526326,
+      "rte": 0.0
      },
      "aggregate": {
-      "mean_acc": 0.32219939060293984,
-      "worst_acc": 0.042282651419190076,
-      "mean_normret": -0.37219395972140146,
-      "worst_normret": -3.4956775348112594,
-      "hmean_normret": 2.6665979344861613e-06,
+      "mean_acc": 0.39092830148599933,
+      "worst_acc": 0.0,
+      "mean_normret": 0.036458278912044804,
+      "worst_normret": -0.14536658689600934,
+      "hmean_normret": 1.599986502784106e-06,
       "degenerate_tasks": []
      },
-     "grid_boundary": [
-      "lam_high"
-     ],
+     "grid_boundary": [],
      "tier": "checkpoint-only construction"
     },
     "merge:TA": {
@@ -339,11 +337,11 @@
  "summary": {
   "merge:GRADFIX": {
    "n_draws": 1,
-   "mean_acc_mean": 0.32219939060293984,
+   "mean_acc_mean": 0.39092830148599933,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": -0.37219395972140146,
+   "mean_normret_mean": 0.036458278912044804,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": -3.4956775348112594
+   "worst_normret_mean": -0.14536658689600934
   },
   "merge:TA": {
    "n_draws": 1,

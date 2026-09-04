@@ -291,9 +291,7 @@
        "stl10"
       ]
      },
-     "grid_boundary": [
-      "eta_low"
-     ],
+     "grid_boundary": [],
      "tier": "checkpoint-only construction",
      "meta": {
       "method": "DOGE/APGD",

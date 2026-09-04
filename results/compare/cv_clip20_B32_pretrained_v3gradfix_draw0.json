@@ -291,9 +291,7 @@
        "stl10"
       ]
      },
-     "grid_boundary": [
-      "lam_low"
-     ],
+     "grid_boundary": [],
      "tier": "checkpoint-only construction"
     },
     "merge:TA": {

@@ -166,9 +166,7 @@
       "hmean_normret": 1.3333307066135219e-06,
       "degenerate_tasks": []
      },
-     "grid_boundary": [
-      "lam_low"
-     ],
+     "grid_boundary": [],
      "tier": "checkpoint-only construction"
     },
     "merge:TA": {

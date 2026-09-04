@@ -133,37 +133,37 @@
    "buffer_seed": 104,
    "methods": {
     "merge:GRADFIX": {
-     "selected": "GRADFIX@l0.1",
-     "selection_obj": -0.432100982,
+     "selected": "GRADFIX@l0.025",
+     "selection_obj": -0.483951744,
      "selection_tie_key": [
-      0.1
+      0.025
      ],
      "scores": {
       "cola": 0.0,
-      "sst2": 0.6146788990825688,
-      "mrpc": 0.6031478856602882,
-      "stsb": 0.11738639662241684,
+      "sst2": 0.5091743119266054,
+      "mrpc": 0.7480253018237863,
+      "stsb": 0.06196707897300596,
       "qqp": 0.45317878342483403,
-      "mnli": 0.3273560876209883,
-      "qnli": 0.5052169137836353,
+      "mnli": 0.34406520631686194,
+      "qnli": 0.5189456342668863,
       "rte": 0.4729241877256318
      },
      "normret": {
       "cola": 0.0,
-      "sst2": 0.24731182215978742,
-      "mrpc": -0.8636825199940508,
-      "stsb": 0.17176867298943801,
+      "sst2": 0.0,
+      "mrpc": 0.0,
+      "stsb": 0.11378488404000028,
       "qqp": 0.23458490417713043,
-      "mnli": -0.016710975761454146,
-      "qnli": 0.02470187336053506,
+      "mnli": 0.014432206339437736,
+      "qnli": 0.056643950981916935,
       "rte": 0.0
      },
      "aggregate": {
-      "mean_acc": 0.38673614424004543,
+      "mean_acc": 0.3885350630572015,
       "worst_acc": 0.0,
-      "mean_normret": -0.02525327788357675,
-      "worst_normret": -0.8636825199940508,
-      "hmean_normret": 1.999972694937707e-06,
+      "mean_normret": 0.05243074319231067,
+      "worst_normret": 0.0,
+      "hmean_normret": 1.999950003763236e-06,
       "degenerate_tasks": []
      },
      "grid_boundary": [],
@@ -337,11 +337,11 @@
  "summary": {
   "merge:GRADFIX": {
    "n_draws": 1,
-   "mean_acc_mean": 0.38673614424004543,
+   "mean_acc_mean": 0.3885350630572015,
    "mean_acc_std": 0.0,
-   "mean_normret_mean": -0.02525327788357675,
+   "mean_normret_mean": 0.05243074319231067,
    "mean_normret_std": 0.0,
-   "worst_normret_mean": -0.8636825199940508
+   "worst_normret_mean": 0.0
   },
   "merge:TA": {
    "n_draws": 1,
