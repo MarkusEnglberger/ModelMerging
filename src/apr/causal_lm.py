@@ -29,6 +29,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
@@ -187,9 +188,27 @@ def _mbpp_score(rows, texts) -> Dict[str, float]:
     # input/expected pairs and calls assertion(func(*inp), exp, 0)); append it to
     # the candidate code and run in the sandbox. Longer timeout: plus-suites run
     # hundreds of assertions.
-    hits = sum(int(run_python_tests(extract_code(t), [r["test"]], timeout=30.0))
-               for r, t in zip(rows, texts))
-    acc = hits / max(len(rows), 1)
+    #
+    # Scored in a thread pool: each item is an independent subprocess, so the
+    # work is I/O-wait on subprocess.run and threads suffice (no GIL contention,
+    # no fork of the CUDA-initialised parent). Serial scoring of 300 items took
+    # 88-142 s with the GPU at 0% utilisation, which is the whole coding eval
+    # once generation is fast. Order-independent: results are gathered by index,
+    # and each subprocess is isolated (python -I on its own temp file), so the
+    # score is identical to the serial version.
+    # sched_getaffinity, not cpu_count: under Slurm the latter reports the whole
+    # node (94 cores) rather than the job's --cpus-per-task allocation.
+    try:
+        n_cpu = len(os.sched_getaffinity(0))
+    except AttributeError:                      # not Linux
+        n_cpu = os.cpu_count() or 4
+    workers = max(1, min(n_cpu, max(len(rows), 1)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        passed = list(pool.map(
+            lambda rt: run_python_tests(extract_code(rt[1]), [rt[0]["test"]],
+                                        timeout=30.0),
+            zip(rows, texts)))
+    acc = sum(int(p) for p in passed) / max(len(rows), 1)
     return {"pass@1": acc, "primary": acc}
 
 
